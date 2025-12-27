@@ -4,21 +4,21 @@ Eine Web-Anwendung zur Verwaltung und Dokumentation deines lokalen Netzwerks.
 
 ## Was ist das?
 
-Diese Website hilft dir, den Ueberblick ueber dein Heimnetzwerk zu behalten:
+Diese Website hilft dir, den Überblick über dein Heimnetzwerk zu behalten:
 
 - **Switch-Ports** und **Router-Ports** dokumentieren (welches Kabel geht wohin)
 - **PiHole-Infos** speichern (IP, Hostname, URLs)
-- **Speedport-Infos** speichern (WLAN-Daten, Passwoerter)
-- **Speed-Test** im lokalen Netzwerk durchfuehren
-- **Versionshistorie** aller Aenderungen
+- **Speedport-Infos** speichern (WLAN-Daten, Passwörter)
+- **Speed-Test** im lokalen Netzwerk durchführen
+- **Versionshistorie** aller Änderungen
 
-## Fuer wen ist das?
+## Für wen ist das?
 
-Fuer jeden, der zu Hause ein Netzwerk mit Switch, Router und evtl. Raspberry Pi (PiHole) betreibt und den Ueberblick behalten moechte.
+Für jeden, der zu Hause ein Netzwerk mit Switch, Router und evtl. Raspberry Pi (PiHole) betreibt und den Überblick behalten möchte.
 
 ## Voraussetzungen
 
-- [Node.js](https://nodejs.org/) (Version 18 oder hoeher)
+- [Node.js](https://nodejs.org/) (Version 18 oder höher)
 - Ein Webbrowser
 
 ## Installation
@@ -32,31 +32,33 @@ Fuer jeden, der zu Hause ein Netzwerk mit Switch, Router und evtl. Raspberry Pi 
    ```bash
    node server.js
    ```
-4. Im Browser oeffnen: `http://localhost:5055`
+4. Im Browser öffnen: `http://localhost:5055`
 
 ## Konfiguration
 
 ### Data/Nutzer
 
-Diese Datei enthaelt den aktuellen Benutzernamen und das Passwort (jeweils in einer Zeile):
+Diese Datei enthält den aktuellen Benutzernamen und das Passwort (jeweils in einer Zeile):
 
 ```
 admin
 admin
 ```
 
-**Wichtig:** Diese Datei ist nur zum **Einsehen** gedacht. Aenderungen am Benutzernamen oder Passwort muessen ueber die Website selbst vorgenommen werden (Abschnitt "Benutzer & Passwort aendern").
+**Wichtig:** Diese Datei ist nur zum **Einsehen** gedacht. Änderungen am Benutzernamen oder Passwort müssen über die Website selbst vorgenommen werden (Abschnitt "Benutzer & Passwort ändern").
 
 ### Data/LoginToken.txt
 
-Mit Login-Tokens koennen sich Geraete ohne Benutzername/Passwort anmelden. Das ist praktisch fuer vertrauenswuerdige Geraete.
+Mit Login-Tokens können sich Geräte ohne Benutzername/Passwort anmelden. Das ist praktisch für vertrauenswürdige Geräte.
 
 **Format:**
 ```
 # Jede Zeile: token|Geraetename
-abc123-uuid-hier|MacBook von Max
-def456-uuid-hier|iPhone von Max
+abc123-uuid-hier|Beispielgerät von Maxmusterman
+def456-uuid-hier|iPhone von Maxmusterman
 ```
+
+Der senkrechte Strich `|` und der Gerätename dahinter sind optional, helfen aber bei der Übersicht.
 
 **Token erstellen:**
 
@@ -64,24 +66,24 @@ def456-uuid-hier|iPhone von Max
 Doppelklick auf `generate-token.command` - es wird ein Token in der Konsole ausgegeben.
 
 **Andere Systeme:**
-Im Terminal ausfuehren:
+Im Terminal ausführen:
 ```bash
 node -e "console.log(require('crypto').randomUUID())"
 ```
 
-Den generierten Token dann in `Data/LoginToken.txt` eintragen mit einem Geraete-Namen.
+Den generierten Token dann in `Data/LoginToken.txt` eintragen mit einem Geräte-Namen.
 
 ## Features
 
 ### Port-Verwaltung
 
-Dokumentiere welches Geraet an welchem Port haengt. Jeder Port hat:
+Dokumentiere welches Gerät an welchem Port hängt. Jeder Port hat:
 - **Belegung**: Was ist angeschlossen?
 - **Farbe**: Zur visuellen Unterscheidung
 
 ### Versionshistorie
 
-Jede Aenderung an den Ports, PiHole- oder Speedport-Infos wird automatisch versioniert. Du kannst jederzeit aeltere Versionen einsehen und nachvollziehen, was wann geaendert wurde.
+Jede Änderung an den Ports, PiHole- oder Speedport-Infos wird automatisch versioniert. Du kannst jederzeit ältere Versionen einsehen und nachvollziehen, was wann geändert wurde.
 
 ### Speed-Test
 
@@ -90,16 +92,16 @@ Der integrierte Speed-Test misst:
 - **Upload-Geschwindigkeit** (Mbit/s)
 - **Ping** (ms)
 
-Der Test laeuft im lokalen Netzwerk zwischen deinem Browser und dem Server. Optional kann ein Raspberry Pi als Test-Gegenstelle konfiguriert werden (siehe `PI_SPEEDTEST_SERVER.md`).
+Der Test läuft im lokalen Netzwerk zwischen deinem Browser und dem Server. Optional kann ein Raspberry Pi als Test-Gegenstelle konfiguriert werden (siehe `PI_SPEEDTEST_SERVER.md`).
 
-**Hinweis:** Der Speed-Test funktioniert nur, wenn du die Website ueber die LAN-IP oeffnest (nicht ueber `localhost`).
+**Hinweis:** Der Speed-Test funktioniert nur, wenn du die Website über die LAN-IP öffnest (nicht über `localhost`).
 
 ## Credits
 
-Entwickelt von **Manu**
+Entwickelt von **leminkozey**
 
-GitHub: [https://github.com/manuguth](https://github.com/manuguth)
+GitHub: [https://github.com/leminkozey](https://github.com/leminkozey)
 
 ---
 
-Wenn du diese Website weiterentwickelst und veroeffentlichst, gib bitte Credits an den urspruenglichen Entwickler.
+Wenn du diese Website weiterentwickelst und veröffentlichst, gib bitte Credits an den ursprünglichen Entwickler.
