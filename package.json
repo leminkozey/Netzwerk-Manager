@@ -1,0 +1,19 @@
+{
+  "name": "ports-belegunng",
+  "version": "1.0.0",
+  "description": "Switch/Router port dashboard with auth, theming, and versioning",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "NODE_ENV=development node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1",
+    "uuid": "^13.0.0",
+    "ws": "^8.18.3"
+  }
+}

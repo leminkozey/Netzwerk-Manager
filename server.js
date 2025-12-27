@@ -1,0 +1,697 @@
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const { randomUUID } = require('crypto');
+const WebSocket = require('ws');
+
+const app = express();
+const PORT = process.env.PORT || 5055;
+const DATA_DIR = path.join(__dirname, 'Data');
+const DATA_FILE = path.join(DATA_DIR, 'state.json');
+const USER_FILE = path.join(DATA_DIR, 'Nutzer');
+const LOGIN_TOKEN_FILE = path.join(DATA_DIR, 'LoginToken.txt');
+const MAX_VERSIONS = 100;
+
+// Runtime data not persisted
+const runtime = {
+  activeSession: null,
+  failedAttempts: 0,
+  sockets: new Map(), // token -> WebSocket
+};
+
+// Raw body parser für Upload-Tests (muss VOR json() kommen)
+app.use('/api/speedtest/upload', express.raw({ type: '*/*', limit: '50mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+const defaultState = {
+  theme: 'dark',
+  credentials: { username: 'admin', password: 'admin' },
+  speedportInfo: {
+    wifiName: '',
+    wifiPassword: '',
+    serialNumber: '',
+    configuration: '',
+    remoteUrl: '',
+    devicePassword: '',
+    modemId: '',
+  },
+  speedportVersions: [],
+  raspberryInfo: {
+    model: '',
+    hostname: '',
+    ipAddress: '',
+    vpnIp: '',
+    macAddress: '',
+    sshUser: '',
+    piholeUrl: '',
+    piholeRemoteUrl: '',
+  },
+  raspberryVersions: [],
+  deviceTokens: [],
+  speedTestHistory: [],
+  switchPorts: [
+    { id: 'port1', label: 'Port 1', status: '', color: '#000000' },
+    { id: 'port2', label: 'Port 2', status: '', color: '#000000' },
+    { id: 'port3', label: 'Port 3', status: '', color: '#000000' },
+    { id: 'port4', label: 'Port 4', status: '', color: '#000000' },
+    { id: 'port5', label: 'Port 5', status: '', color: '#000000' },
+    { id: 'port6', label: 'Port 6', status: '', color: '#000000' },
+    { id: 'port7', label: 'Port 7', status: '', color: '#000000' },
+    { id: 'port8', label: 'Port 8', status: '', color: '#000000' },
+  ],
+  routerPorts: [
+    { id: 'dsl', label: 'DSL', status: '', color: '#7a7a7a' },
+    { id: 'lan1', label: 'Link/LAN1', status: '', color: '#0050c8' },
+    { id: 'lan2', label: 'LAN2', status: '', color: '#d1ac00' },
+    { id: 'lan3', label: 'LAN3', status: '', color: '#d1ac00' },
+    { id: 'lan4', label: 'LAN4', status: '', color: '#d1ac00' },
+    { id: 'telefon', label: 'Telefon', status: '', color: '#d97800' },
+  ],
+  versions: [],
+};
+
+
+function ensureDataFile() {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  ensureLoginTokenFile();
+  if (!fs.existsSync(DATA_FILE)) {
+    const initial = { ...defaultState, versions: [] };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2));
+    writeCredentialsFile(initial.credentials);
+  } else {
+    const existing = readState();
+    const fileCredentials = readCredentialsFile();
+    if (fileCredentials) {
+      existing.credentials = { ...existing.credentials, ...fileCredentials };
+    }
+    saveState(existing);
+  }
+}
+
+function readState() {
+  const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+  const parsed = JSON.parse(raw);
+  const versions = Array.isArray(parsed.versions) ? parsed.versions : [];
+
+  const merged = {
+    ...defaultState,
+    ...parsed,
+    credentials: { ...defaultState.credentials, ...(parsed.credentials || {}) },
+    speedportInfo: { ...defaultState.speedportInfo, ...(parsed.speedportInfo || {}) },
+    raspberryInfo: { ...defaultState.raspberryInfo, ...(parsed.raspberryInfo || {}) },
+    switchPorts: parsed.switchPorts || defaultState.switchPorts,
+    routerPorts: parsed.routerPorts || defaultState.routerPorts,
+    versions,
+    speedportVersions: Array.isArray(parsed.speedportVersions) ? parsed.speedportVersions : [],
+    raspberryVersions: Array.isArray(parsed.raspberryVersions) ? parsed.raspberryVersions : [],
+    deviceTokens: Array.isArray(parsed.deviceTokens) ? parsed.deviceTokens : [],
+    speedTestHistory: Array.isArray(parsed.speedTestHistory) ? parsed.speedTestHistory : [],
+  };
+  return merged;
+}
+
+function saveState(nextState) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(nextState, null, 2));
+}
+
+function buildVersionLabel() {
+  const now = new Date();
+  const pad = (n) => `${n}`.padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(
+    now.getHours()
+  )}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
+
+function clonePorts(list = []) {
+  return list.map((p) => ({ ...p }));
+}
+
+function addVersion(state, summary, snapshot) {
+  const version = {
+    id: randomUUID(),
+    label: buildVersionLabel(),
+    summary,
+    timestamp: Date.now(),
+  };
+  if (snapshot) {
+    version.snapshot = snapshot;
+  }
+  state.versions = Array.isArray(state.versions) ? state.versions : [];
+  state.versions.unshift(version);
+  if (state.versions.length > MAX_VERSIONS) {
+    state.versions = state.versions.slice(0, MAX_VERSIONS);
+  }
+}
+
+function addSpeedportVersion(state, summary, snapshot) {
+  const version = {
+    id: randomUUID(),
+    label: buildVersionLabel(),
+    summary,
+    timestamp: Date.now(),
+  };
+  if (snapshot) {
+    version.snapshot = snapshot;
+  }
+  state.speedportVersions = Array.isArray(state.speedportVersions) ? state.speedportVersions : [];
+  state.speedportVersions.unshift(version);
+  if (state.speedportVersions.length > MAX_VERSIONS) {
+    state.speedportVersions = state.speedportVersions.slice(0, MAX_VERSIONS);
+  }
+}
+
+function addRaspberryVersion(state, summary, snapshot) {
+  const version = {
+    id: randomUUID(),
+    label: buildVersionLabel(),
+    summary,
+    timestamp: Date.now(),
+  };
+  if (snapshot) {
+    version.snapshot = snapshot;
+  }
+  state.raspberryVersions = Array.isArray(state.raspberryVersions) ? state.raspberryVersions : [];
+  state.raspberryVersions.unshift(version);
+  if (state.raspberryVersions.length > MAX_VERSIONS) {
+    state.raspberryVersions = state.raspberryVersions.slice(0, MAX_VERSIONS);
+  }
+}
+
+function writeCredentialsFile(credentials) {
+  if (!credentials) return;
+  const content = `${credentials.username ?? ''}\n${credentials.password ?? ''}\n`;
+  fs.writeFileSync(USER_FILE, content, 'utf-8');
+}
+
+function readCredentialsFile() {
+  if (!fs.existsSync(USER_FILE)) return null;
+  const raw = fs.readFileSync(USER_FILE, 'utf-8');
+  const lines = raw.split('\n');
+  return {
+    username: (lines[0] ?? '').trim(),
+    password: (lines[1] ?? '').trim(),
+  };
+}
+
+function ensureLoginTokenFile() {
+  if (fs.existsSync(LOGIN_TOKEN_FILE)) return;
+  const sample = [
+    '# Jede Zeile: token|Geraetename',
+    '# Beispiel:',
+    '# 123456789|MacBook von Manu',
+    '',
+  ].join('\n');
+  fs.writeFileSync(LOGIN_TOKEN_FILE, sample, 'utf-8');
+}
+
+function readLoginTokens() {
+  if (!fs.existsSync(LOGIN_TOKEN_FILE)) return [];
+  const lines = fs.readFileSync(LOGIN_TOKEN_FILE, 'utf-8').split('\n');
+  return lines
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => {
+      const [token, name] = line.split('|').map((p) => (p || '').trim());
+      return { token, name };
+    })
+    .filter((entry) => entry.token);
+}
+
+function maskStateForClient(state) {
+  return {
+    theme: state.theme,
+    switchPorts: state.switchPorts,
+    routerPorts: state.routerPorts,
+    versions: state.versions,
+    speedportInfo: state.speedportInfo,
+    speedportVersions: state.speedportVersions,
+    raspberryInfo: state.raspberryInfo,
+    raspberryVersions: state.raspberryVersions,
+    username: state.credentials.username,
+  };
+}
+
+function usePiSpeedtest() {
+  return process.env.PI_SPEEDTEST_ENABLED === '1';
+}
+
+function getPiSpeedtestTarget(state) {
+  const host = process.env.PI_SPEEDTEST_HOST || state.raspberryInfo?.ipAddress || '192.168.2.124';
+  const port = parseInt(process.env.PI_SPEEDTEST_PORT, 10) || 8080;
+  return { host, port };
+}
+
+function sendPiUnavailable(res, host, port, reason) {
+  res.status(503).json({
+    error: 'Raspberry Pi nicht erreichbar',
+    message: `${host}:${port} ist nicht erreichbar. Laeuft der Pi-Speedtest-Server?`,
+    piIp: host,
+    reason,
+  });
+}
+
+function authRequired(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token = header.replace('Bearer ', '').trim();
+  if (!runtime.activeSession || runtime.activeSession.token !== token) {
+    return res.status(401).json({ error: 'Unauthenticated' });
+  }
+  return next();
+}
+
+app.get('/api/bootstrap', (req, res) => {
+  const state = readState();
+  res.json({
+    theme: state.theme,
+    versions: state.versions,
+  });
+});
+
+app.post('/api/login', (req, res) => {
+  const { username, password, deviceName = 'Unbekanntes Gerät', deviceToken } = req.body || {};
+  const state = readState();
+  const fileCredentials = readCredentialsFile();
+  if (fileCredentials) {
+    state.credentials = { ...state.credentials, ...fileCredentials };
+  }
+  const fileTokens = readLoginTokens();
+  const fileTokenEntries = fileTokens.filter((t) => t.token);
+  const fileTokenList = fileTokenEntries.map((t) => t.token);
+
+  const isWhitelisted = deviceToken && (state.deviceTokens.includes(deviceToken) || fileTokenList.includes(deviceToken));
+
+  if (!isWhitelisted && (username !== state.credentials.username || password !== state.credentials.password)) {
+    runtime.failedAttempts += 1;
+    return res.status(401).json({
+      success: false,
+      failedAttempts: runtime.failedAttempts,
+      lockout: runtime.failedAttempts >= 3,
+      message: 'Falsche Zugangsdaten',
+    });
+  }
+
+  runtime.failedAttempts = 0;
+  const token = randomUUID();
+  const loginAt = Date.now();
+  const matchedFileToken = fileTokenEntries.find((t) => t.token === deviceToken);
+  const effectiveDeviceName = matchedFileToken?.name || deviceName || 'Unbekanntes Gerät';
+  const previousSession = runtime.activeSession;
+  runtime.activeSession = { token, deviceName: effectiveDeviceName, loginAt };
+
+  if (previousSession && previousSession.token !== token) {
+    const prevSocket = runtime.sockets.get(previousSession.token);
+    if (prevSocket && prevSocket.readyState === WebSocket.OPEN) {
+      prevSocket.send(
+        JSON.stringify({
+          type: 'forceLogout',
+          deviceName,
+          loginAt,
+        })
+      );
+    }
+  }
+
+  res.json({
+    success: true,
+    token,
+    state: maskStateForClient(state),
+  });
+});
+
+app.get('/api/state', authRequired, (req, res) => {
+  const state = readState();
+  res.json(maskStateForClient(state));
+});
+
+app.post('/api/theme', (req, res) => {
+  const { theme } = req.body || {};
+  if (!['dark', 'light'].includes(theme)) {
+    return res.status(400).json({ error: 'Ungültiges Theme' });
+  }
+  const state = readState();
+  state.theme = theme;
+  saveState(state);
+  res.json({ ok: true, theme, versions: state.versions });
+});
+
+app.post('/api/ports/color', authRequired, (req, res) => {
+  const { group, id, color } = req.body || {};
+  if (!group || !id || !color) {
+    return res.status(400).json({ error: 'Fehlende Werte' });
+  }
+
+  const state = readState();
+  const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
+  const port = collection.find((p) => p.id === id);
+  if (!port) {
+    return res.status(404).json({ error: 'Port nicht gefunden' });
+  }
+
+  port.color = color;
+  saveState(state);
+  res.json({ ok: true, switchPorts: state.switchPorts, routerPorts: state.routerPorts, versions: state.versions });
+});
+
+app.post('/api/ports/update', authRequired, (req, res) => {
+  const { group, id, label, status } = req.body || {};
+  if (!group || !id) {
+    return res.status(400).json({ error: 'Fehlende Werte' });
+  }
+  if (!['switch', 'router'].includes(group)) {
+    return res.status(400).json({ error: 'Ungültige Gruppe' });
+  }
+
+  const state = readState();
+  const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
+  const port = collection.find((p) => p.id === id);
+  if (!port) {
+    return res.status(404).json({ error: 'Port nicht gefunden' });
+  }
+
+  let changed = false;
+  if (typeof label === 'string') {
+    const next = label.trim();
+    if (next !== port.label) {
+      port.label = next;
+      changed = true;
+    }
+  }
+  if (typeof status === 'string') {
+    const next = status.trim();
+    if (next !== port.status) {
+      port.status = next;
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    addVersion(state, `Port geändert: ${port.label}`, {
+      switchPorts: clonePorts(state.switchPorts),
+      routerPorts: clonePorts(state.routerPorts),
+    });
+    saveState(state);
+  } else {
+    saveState(state);
+  }
+  res.json({ ok: true, switchPorts: state.switchPorts, routerPorts: state.routerPorts, versions: state.versions });
+});
+
+app.post('/api/settings/credentials', authRequired, (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich' });
+  }
+  const state = readState();
+  state.credentials.username = username;
+  state.credentials.password = password;
+  saveState(state);
+  writeCredentialsFile(state.credentials);
+  res.json({ ok: true, username });
+});
+
+app.post('/api/speedport', authRequired, (req, res) => {
+  const { wifiName, wifiPassword, serialNumber, configuration, remoteUrl, devicePassword, modemId } = req.body || {};
+  const state = readState();
+  const next = {
+    wifiName: wifiName ?? '',
+    wifiPassword: wifiPassword ?? '',
+    serialNumber: serialNumber ?? '',
+    configuration: configuration ?? '',
+    remoteUrl: remoteUrl ?? '',
+    devicePassword: devicePassword ?? '',
+    modemId: modemId ?? '',
+  };
+  const prev = state.speedportInfo || {};
+  const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
+  state.speedportInfo = next;
+  if (changed) {
+    addSpeedportVersion(state, 'Speedport geändert', {
+      speedportInfo: { ...state.speedportInfo },
+    });
+  }
+  saveState(state);
+  res.json({
+    ok: true,
+    speedportInfo: state.speedportInfo,
+    speedportVersions: state.speedportVersions,
+  });
+});
+
+app.post('/api/raspberry', authRequired, (req, res) => {
+  const { model, hostname, ipAddress, vpnIp, macAddress, sshUser, piholeUrl, piholeRemoteUrl } = req.body || {};
+  const state = readState();
+  const next = {
+    model: model ?? '',
+    hostname: hostname ?? '',
+    ipAddress: ipAddress ?? '',
+    vpnIp: vpnIp ?? '',
+    macAddress: macAddress ?? '',
+    sshUser: sshUser ?? '',
+    piholeUrl: piholeUrl ?? '',
+    piholeRemoteUrl: piholeRemoteUrl ?? '',
+  };
+  const prev = state.raspberryInfo || {};
+  const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
+  state.raspberryInfo = next;
+  if (changed) {
+    addRaspberryVersion(state, 'Raspberry geändert', {
+      raspberryInfo: { ...state.raspberryInfo },
+    });
+  }
+  saveState(state);
+  res.json({
+    ok: true,
+    raspberryInfo: state.raspberryInfo,
+    raspberryVersions: state.raspberryVersions,
+  });
+});
+
+app.get('/api/versions', authRequired, (req, res) => {
+  const state = readState();
+  res.json({ versions: state.versions });
+});
+
+app.get('/api/speedtest/download', authRequired, (req, res) => {
+  const sizeMB = parseInt(req.query.size) || 1;
+  const sizeBytes = sizeMB * 1024 * 1024;
+
+  // Generate random data for download test
+  const buffer = Buffer.alloc(sizeBytes);
+  for (let i = 0; i < sizeBytes; i += 1024) {
+    buffer.writeUInt32BE(Math.random() * 0xffffffff, i);
+  }
+
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Length', sizeBytes);
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.send(buffer);
+});
+
+app.post('/api/speedtest/upload', authRequired, (req, res) => {
+  // Der Body wurde bereits von express.raw() geparst
+  const receivedBytes = req.body ? req.body.length : 0;
+  res.json({ ok: true, bytes: receivedBytes });
+});
+
+// Local network proxy endpoints - test to Raspberry Pi
+app.get('/api/speedtest/local-ping', authRequired, (req, res) => {
+  if (!usePiSpeedtest()) {
+    return res.status(204).set('X-Pi-Status', 'disabled').end();
+  }
+
+  const http = require('http');
+  const state = readState();
+  const { host, port } = getPiSpeedtestTarget(state);
+
+  const options = {
+    hostname: host,
+    port,
+    path: '/speedtest/ping',
+    method: 'HEAD',
+    timeout: 2000,
+  };
+
+  const piRequest = http.request(options, (piRes) => {
+    piRes.resume();
+    res.status(204).set('X-Pi-Status', 'reachable').end();
+  });
+
+  piRequest.on('error', (e) => {
+    sendPiUnavailable(res, host, port, e?.message || 'error');
+  });
+
+  piRequest.on('timeout', () => {
+    piRequest.destroy();
+    sendPiUnavailable(res, host, port, 'timeout');
+  });
+
+  piRequest.end();
+});
+
+app.get('/api/speedtest/local-download-proxy', authRequired, async (req, res) => {
+  const sizeMB = parseInt(req.query.size, 10) || 1;
+
+  if (!usePiSpeedtest()) {
+    const sizeBytes = sizeMB * 1024 * 1024;
+    const buffer = Buffer.alloc(sizeBytes);
+    for (let i = 0; i < sizeBytes; i += 1024) {
+      buffer.writeUInt32BE(Math.random() * 0xffffffff, i);
+    }
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', sizeBytes);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('X-Pi-Status', 'disabled');
+    return res.send(buffer);
+  }
+
+  const http = require('http');
+  const state = readState();
+  const { host, port } = getPiSpeedtestTarget(state);
+
+  const options = {
+    hostname: host,
+    port,
+    path: `/speedtest/download?size=${sizeMB}`,
+    method: 'GET',
+    timeout: 10000,
+  };
+
+  const piRequest = http.request(options, (piRes) => {
+    if (piRes.statusCode && piRes.statusCode >= 400) {
+      piRes.resume();
+      return res.status(piRes.statusCode).json({
+        error: 'Pi-Speedtest-Server Fehler',
+        status: piRes.statusCode,
+      });
+    }
+
+    const length = piRes.headers['content-length'];
+    res.status(200);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    if (length) res.setHeader('Content-Length', length);
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('X-Pi-Status', 'reachable');
+    piRes.pipe(res);
+  });
+
+  piRequest.on('error', (e) => {
+    sendPiUnavailable(res, host, port, e?.message || 'error');
+  });
+
+  piRequest.on('timeout', () => {
+    piRequest.destroy();
+    sendPiUnavailable(res, host, port, 'timeout');
+  });
+
+  piRequest.end();
+});
+
+app.post('/api/speedtest/local-upload-proxy', authRequired, (req, res) => {
+  if (!usePiSpeedtest()) {
+    const receivedBytes = req.body ? req.body.length : 0;
+    return res.json({ ok: true, bytes: receivedBytes, piStatus: 'disabled' });
+  }
+
+  const http = require('http');
+  const state = readState();
+  const { host, port } = getPiSpeedtestTarget(state);
+  const headers = {
+    'Content-Type': 'application/octet-stream',
+  };
+  const contentLength = req.headers['content-length'];
+  if (contentLength) headers['Content-Length'] = contentLength;
+
+  const options = {
+    hostname: host,
+    port,
+    path: '/speedtest/upload',
+    method: 'POST',
+    headers,
+    timeout: 10000,
+  };
+
+  const piRequest = http.request(options, (piRes) => {
+    res.status(piRes.statusCode || 200);
+    res.setHeader('X-Pi-Status', 'reachable');
+    piRes.pipe(res);
+  });
+
+  piRequest.on('error', (e) => {
+    sendPiUnavailable(res, host, port, e?.message || 'error');
+  });
+
+  piRequest.on('timeout', () => {
+    piRequest.destroy();
+    sendPiUnavailable(res, host, port, 'timeout');
+  });
+
+  req.on('aborted', () => {
+    piRequest.destroy();
+  });
+
+  req.pipe(piRequest);
+});
+
+app.post('/api/speedtest/save', authRequired, (req, res) => {
+  const { download, upload, ping, type, timestamp } = req.body || {};
+  const state = readState();
+
+  const testResult = {
+    id: randomUUID(),
+    download: parseFloat(download) || 0,
+    upload: parseFloat(upload) || 0,
+    ping: parseFloat(ping) || 0,
+    type: type || 'unknown',
+    timestamp: timestamp || Date.now(),
+  };
+
+  state.speedTestHistory = Array.isArray(state.speedTestHistory) ? state.speedTestHistory : [];
+  state.speedTestHistory.unshift(testResult);
+
+  // Keep only last 50 tests
+  if (state.speedTestHistory.length > 50) {
+    state.speedTestHistory = state.speedTestHistory.slice(0, 50);
+  }
+
+  saveState(state);
+  res.json({ ok: true, history: state.speedTestHistory });
+});
+
+app.get('/api/speedtest/history', authRequired, (req, res) => {
+  const state = readState();
+  res.json({ history: state.speedTestHistory || [] });
+});
+
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+function startServer() {
+  const server = app.listen(PORT, () => {
+    console.log(`✅ Server läuft auf http://localhost:${PORT}`);
+  });
+
+  const wss = new WebSocket.Server({ server });
+
+  wss.on('connection', (socket, req) => {
+    const params = new URLSearchParams(req.url.replace('/?', ''));
+    const token = params.get('token');
+
+    if (token) {
+      runtime.sockets.set(token, socket);
+    }
+
+    socket.on('close', () => {
+      if (token) {
+        runtime.sockets.delete(token);
+      }
+    });
+  });
+}
+
+// Server starten
+ensureDataFile();
+startServer();

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lokales Netzwerk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body data-theme="dark">
+    <div class="page">
+      <div class="top-bar">
+        <button class="theme-toggle" id="themeToggle" aria-label="Darstellung wechseln">
+          <span id="themeIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M12 4.5V6.5M12 17.5V19.5M18.364 7.05L17 8.414M7 17L5.636 18.364M19.5 12H17.5M6.5 12H4.5M17 17L18.364 18.364M7 7L5.636 5.636M12 8.5C9.79086 8.5 8 10.2909 8 12.5C8 14.7091 9.79086 16.5 12 16.5C14.2091 16.5 16 14.7091 16 12.5C16 10.2909 14.2091 8.5 12 8.5Z" />
+            </svg>
+          </span>
+          <span>Light / Dark</span>
+        </button>
+        <div class="chip" id="versionChip">Letzte Version: --</div>
+      </div>
+
+      <div class="hero">
+        <h1>Lokales Netzwerk</h1>
+      </div>
+
+      <section class="card login-card" id="loginCard">
+        <div class="section-title">
+          <h3>Login</h3>
+        </div>
+        <div class="login-grid">
+          <div class="input-row">
+            <label for="userInput">Benutzername</label>
+            <input id="userInput" type="text" autocomplete="username" placeholder="Benutzername" />
+          </div>
+          <div class="input-row">
+            <label for="passInput">Passwort</label>
+            <input id="passInput" type="password" autocomplete="current-password" placeholder="Passwort" />
+          </div>
+          <div class="input-row">
+            <label for="tokenInput">Login-Token (optional)</label>
+            <input id="tokenInput" type="text" autocomplete="off" placeholder="Token für dieses Gerät" />
+          </div>
+          <div class="actions">
+            <button class="btn" id="loginBtn">Einloggen</button>
+          </div>
+          <div class="status" id="loginStatus" hidden></div>
+        </div>
+      </section>
+
+      <main id="app" style="display: none">
+        <div class="grid two equal-height" style="margin-bottom: 16px">
+          <section class="card">
+            <div class="section-title">
+              <div class="section-header">
+                <span class="icon-badge" aria-hidden="true">
+                  <svg viewBox="0 0 64 64">
+                    <rect x="8" y="24" width="48" height="16" rx="3" fill="#2d2d2d" />
+                    <circle cx="16" cy="32" r="2.5" fill="#4ade80" />
+                    <circle cx="24" cy="32" r="2.5" fill="#4ade80" />
+                    <circle cx="32" cy="32" r="2.5" fill="#4ade80" />
+                    <circle cx="40" cy="32" r="2.5" fill="#4ade80" />
+                    <circle cx="48" cy="32" r="2.5" fill="#4ade80" />
+                    <rect x="16" y="42" width="5" height="8" rx="1" fill="#2d2d2d" />
+                    <rect x="24" y="42" width="5" height="8" rx="1" fill="#2d2d2d" />
+                    <rect x="32" y="42" width="5" height="8" rx="1" fill="#2d2d2d" />
+                    <rect x="40" y="42" width="5" height="8" rx="1" fill="#2d2d2d" />
+                  </svg>
+                </span>
+                <h3>Switch (8 Ports)</h3>
+              </div>
+            </div>
+            <table class="table" id="switchTable">
+              <thead>
+                <tr>
+                  <th>Port</th>
+                  <th>Belegung</th>
+                  <th>Farbe</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </section>
+
+          <section class="card">
+            <div class="section-title">
+              <div class="section-header">
+                <span class="icon-badge" aria-hidden="true">
+                  <svg viewBox="0 0 64 64">
+                    <rect x="10" y="28" width="44" height="22" rx="6" fill="#3d6aff" />
+                    <rect x="18" y="34" width="6" height="6" rx="2" fill="#e6efff" />
+                    <rect x="28" y="34" width="6" height="6" rx="2" fill="#e6efff" />
+                    <rect x="38" y="34" width="6" height="6" rx="2" fill="#e6efff" />
+                    <path
+                      d="M20 28c4-8 20-8 24 0"
+                      fill="none"
+                      stroke="#9ab4ff"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </span>
+                <h3>WLAN Router</h3>
+              </div>
+            </div>
+            <table class="table" id="routerTable">
+              <thead>
+                <tr>
+                  <th>Port</th>
+                  <th>Belegung</th>
+                  <th>Farbe</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </section>
+        </div>
+
+        <section class="card raspberry-card" style="margin-bottom: 16px">
+          <div class="section-title">
+            <div class="section-header">
+              <span class="icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 64 64">
+                  <circle cx="32" cy="36" r="18" fill="#d63a3a" />
+                  <circle cx="24" cy="32" r="8" fill="#e86a6a" opacity="0.7" />
+                  <path d="M32 10c8 0 14 5 16 12-6 0-12-4-16-12z" fill="#3fa64a" />
+                  <path d="M32 10c-8 0-14 5-16 12 6 0 12-4 16-12z" fill="#4cc063" />
+                </svg>
+              </span>
+              <h3>PiHole</h3>
+            </div>
+          </div>
+          <div class="input-row">
+            <label for="piModel">Modell</label>
+            <input id="piModel" type="text" placeholder="Raspberry Pi Zero 2 W" />
+          </div>
+          <div class="input-row">
+            <label for="piHostname">Hostname</label>
+            <input id="piHostname" type="text" placeholder="raspberrypi" />
+          </div>
+          <div class="input-row">
+            <label for="piIp">LAN-IP</label>
+            <input id="piIp" type="text" placeholder="192.168.1.50" />
+          </div>
+          <div class="input-row">
+            <label for="piVpnIp">VPN-IP</label>
+            <input id="piVpnIp" type="text" placeholder="100.x.x.x" />
+          </div>
+          <div class="input-row">
+            <label for="piMac">MAC-Adresse</label>
+            <input id="piMac" type="text" placeholder="b8:27:eb:xx:xx:xx" />
+          </div>
+          <div class="input-row">
+            <label for="piUser">SSH-User</label>
+            <input id="piUser" type="text" placeholder="pi" />
+          </div>
+          <div class="input-row">
+            <label for="piHoleUrl">Pi-hole Admin URL</label>
+            <input id="piHoleUrl" type="text" placeholder="http://pi.hole/admin" />
+          </div>
+          <div class="input-row">
+            <label for="piHoleRemoteUrl">Pi-hole VPN URL</label>
+            <input id="piHoleRemoteUrl" type="text" placeholder="http://100.x.x.x/admin" />
+          </div>
+          <div class="link-row">
+            <a class="btn link-btn" id="piHoleLink" href="#" target="_blank" rel="noopener">--</a>
+            <a class="btn link-btn" id="piHoleRemoteLink" href="#" target="_blank" rel="noopener">--</a>
+          </div>
+          <div class="status success" id="raspberryStatus" hidden>Gespeichert.</div>
+        </section>
+
+        <section class="card" style="margin-bottom: 16px">
+          <div class="section-title">
+            <div class="section-header">
+              <span class="icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 64 64">
+                  <rect x="10" y="28" width="44" height="22" rx="6" fill="#3d6aff" />
+                  <rect x="18" y="34" width="6" height="6" rx="2" fill="#e6efff" />
+                  <rect x="28" y="34" width="6" height="6" rx="2" fill="#e6efff" />
+                  <rect x="38" y="34" width="6" height="6" rx="2" fill="#e6efff" />
+                  <path
+                    d="M20 28c4-8 20-8 24 0"
+                    fill="none"
+                    stroke="#9ab4ff"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </span>
+              <h3>
+                Speedport Infos
+                <span class="label-hint">(http://speedport.ip funktioniert nicht wegen dem PiHole)</span>
+              </h3>
+            </div>
+          </div>
+          <div class="input-row">
+            <label for="wifiName">WLAN-Name</label>
+            <input id="wifiName" type="text" placeholder="SSID" />
+          </div>
+          <div class="input-row">
+            <label for="wifiPass">WLAN-Passwort (Schlüssel)</label>
+            <input id="wifiPass" type="text" placeholder="Passwort" />
+          </div>
+          <div class="input-row">
+            <label for="serial">Serien-Nummer</label>
+            <input id="serial" type="text" placeholder="Seriennummer" />
+          </div>
+          <div class="input-row">
+            <label for="config">Konfiguration</label>
+            <input id="config" type="text" placeholder="z. B. Profil-Stand" />
+          </div>
+          <div class="input-row">
+            <label for="speedportRemoteUrl">Speedport VPN URL</label>
+            <input id="speedportRemoteUrl" type="text" placeholder="http://192.168.1.1" />
+          </div>
+          <div class="input-row">
+            <label for="devicePass">Gerätepasswort</label>
+            <input id="devicePass" type="text" placeholder="Gerätepasswort" />
+          </div>
+          <div class="input-row">
+            <label for="modemId">Modem-ID</label>
+            <input id="modemId" type="text" placeholder="Modem-ID" />
+          </div>
+          <div class="status success" id="speedportStatus" hidden>Gespeichert.</div>
+          <div class="link-row">
+            <a class="btn link-btn" id="speedportLink" href="#" target="_blank" rel="noopener">--</a>
+            <a class="btn link-btn" id="speedportRemoteLink" href="#" target="_blank" rel="noopener">--</a>
+          </div>
+        </section>
+
+        <section class="card" style="margin-bottom: 16px">
+          <div class="section-title">
+            <div class="section-header">
+              <span class="icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 64 64">
+                  <circle cx="32" cy="32" r="20" fill="none" stroke="#94a3b8" stroke-width="3" />
+                  <path d="M32 32 L32 18" stroke="#475569" stroke-width="3" stroke-linecap="round" />
+                  <path d="M32 32 L42 38" stroke="#475569" stroke-width="3" stroke-linecap="round" />
+                  <circle cx="32" cy="32" r="3" fill="#64748b" />
+                  <path d="M32 12 L32 16 M32 48 L32 52 M12 32 L16 32 M48 32 L52 32" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" />
+                </svg>
+              </span>
+              <h3>Versionen</h3>
+            </div>
+          </div>
+          <div class="grid three" style="gap: 12px">
+            <div class="compact-card" id="versionCard" style="display: none">
+              <div class="section-title">
+                <h3>Port Versionen</h3>
+              </div>
+              <select class="version-select" id="versionSelect"></select>
+              <div class="status" id="versionDetails" style="margin-top: 12px"></div>
+            </div>
+
+            <div class="compact-card" id="speedportVersionCard" style="display: none">
+              <div class="section-title">
+                <h3>Speedport Versionen</h3>
+              </div>
+              <select class="version-select" id="speedportVersionSelect"></select>
+              <div class="status" id="speedportVersionDetails" style="margin-top: 12px"></div>
+            </div>
+
+            <div class="compact-card" id="raspberryVersionCard" style="display: none">
+              <div class="section-title">
+                <h3>Raspberry Versionen</h3>
+              </div>
+              <select class="version-select" id="raspberryVersionSelect"></select>
+              <div class="status" id="raspberryVersionDetails" style="margin-top: 12px"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card" style="margin-bottom: 16px">
+          <div class="section-title">
+            <div class="section-header">
+              <span class="icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 64 64">
+                  <path d="M32 48 A20 20 0 0 1 12 32 A20 20 0 0 1 32 12 A20 20 0 0 1 52 32" fill="none" stroke="#f97316" stroke-width="4" stroke-linecap="round" />
+                  <circle cx="32" cy="32" r="3" fill="#fb923c" />
+                  <path d="M32 32 L45 20" stroke="#ea580c" stroke-width="3" stroke-linecap="round" />
+                  <text x="32" y="52" text-anchor="middle" font-size="10" fill="#fdba74" font-weight="600">Mbit/s</text>
+                </svg>
+              </span>
+              <h3>Internet Geschwindigkeit</h3>
+            </div>
+          </div>
+          <div class="speedtest-container">
+            <div class="speedtest-gauge-wrapper">
+              <svg viewBox="0 0 300 220" class="speedtest-gauge">
+                <!-- Background arc -->
+                <path d="M 30 170 A 120 120 0 0 1 270 170" fill="none" stroke="var(--border)" stroke-width="30" stroke-linecap="round"/>
+
+                <!-- Progress arc -->
+                <path id="speedArc" d="M 30 170 A 120 120 0 0 1 270 170" fill="none" stroke="var(--accent)" stroke-width="30" stroke-linecap="round" stroke-dasharray="377" stroke-dashoffset="377"/>
+
+                <!-- Geschwindigkeits-Labels außen rum -->
+                <text x="10" y="195" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-muted)">0</text>
+                <text x="25" y="75" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-muted)">100</text>
+                <text x="95" y="25" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-muted)">200</text>
+                <text x="150" y="15" text-anchor="middle" font-size="14" font-weight="700" fill="var(--accent)">500</text>
+                <text x="205" y="25" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-muted)">800</text>
+                <text x="275" y="75" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-muted)">1000</text>
+                <text x="290" y="195" text-anchor="middle" font-size="13" font-weight="600" fill="var(--text-muted)">1200+</text>
+
+                <!-- Center circle -->
+                <circle cx="150" cy="170" r="70" fill="var(--surface-2)"/>
+
+                <!-- Speed value -->
+                <text id="speedValue" x="150" y="155" text-anchor="middle" font-size="40" font-weight="700" fill="var(--text)">0</text>
+                <text x="150" y="180" text-anchor="middle" font-size="14" fill="var(--text-muted)">Mbit/s</text>
+                <text id="speedLabel" x="150" y="195" text-anchor="middle" font-size="12" fill="var(--text-muted)">Bereit</text>
+              </svg>
+            </div>
+            <div class="speedtest-note" id="speedtestNotice" aria-live="polite"></div>
+            <div class="speedtest-stats">
+              <div class="speedtest-stat">
+                <span class="speedtest-stat-label">Download</span>
+                <span class="speedtest-stat-value" id="downloadSpeed">-- Mbit/s</span>
+              </div>
+              <div class="speedtest-stat">
+                <span class="speedtest-stat-label">Upload</span>
+                <span class="speedtest-stat-value" id="uploadSpeed">-- Mbit/s</span>
+              </div>
+              <div class="speedtest-stat">
+                <span class="speedtest-stat-label">Ping</span>
+                <span class="speedtest-stat-value" id="pingSpeed">-- ms</span>
+              </div>
+            </div>
+            <div class="speedtest-buttons">
+              <button class="btn" id="startLocalTest">Speed-Test starten</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card full-span" style="margin-bottom: 16px">
+          <div class="section-title">
+            <div class="section-header">
+              <span class="icon-badge" aria-hidden="true">
+                <svg viewBox="0 0 64 64">
+                  <circle cx="32" cy="24" r="10" fill="#8b5cf6" />
+                  <path d="M18 52 C18 40, 46 40, 46 52 Z" fill="#a78bfa" />
+                  <rect x="26" y="38" width="12" height="16" rx="2" fill="#7c3aed" />
+                  <circle cx="32" cy="46" r="3" fill="#c4b5fd" />
+                  <rect x="30" y="46" width="4" height="6" fill="#c4b5fd" />
+                </svg>
+              </span>
+              <h3>Benutzer &amp; Passwort ändern</h3>
+            </div>
+          </div>
+          <form id="credentialForm">
+            <div class="input-row">
+              <label for="newUser">Neuer Benutzer</label>
+              <input id="newUser" type="text" autocomplete="username" />
+            </div>
+            <div class="input-row">
+              <label for="newPass">Neues Passwort</label>
+              <input id="newPass" type="password" autocomplete="new-password" />
+            </div>
+            <div class="actions">
+              <button class="btn" type="submit">Speichern</button>
+              <span class="muted" id="credentialStatus"></span>
+            </div>
+          </form>
+        </section>
+
+      </main>
+
+    </div>
+
+    <div class="overlay" id="logoutOverlay">
+      <div class="overlay-content">
+        <h3>Sitzung beendet</h3>
+        <p id="logoutReason">Ein anderes Gerät hat sich angemeldet.</p>
+        <button class="btn" id="reloginBtn">Erneut einloggen</button>
+      </div>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
