@@ -592,3 +592,29 @@ input:focus {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Footer */
+.site-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 24px 16px;
+  margin-top: 32px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.site-footer a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+}
+
+.site-footer .version {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
