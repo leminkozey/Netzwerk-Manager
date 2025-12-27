@@ -1,5 +1,6 @@
 const els = {
   body: document.body,
+  topBar: document.getElementById('topBar'),
   themeToggle: document.getElementById('themeToggle'),
   versionChip: document.getElementById('versionChip'),
   versionCard: document.getElementById('versionCard'),
@@ -189,6 +190,7 @@ async function handleLogin() {
     applyPayload(body.state);
     connectSocket();
     els.loginCard.style.display = 'none';
+    els.topBar.style.display = 'flex';
     els.app.style.display = 'block';
   } catch (e) {
     console.error(e);
@@ -233,6 +235,7 @@ async function loginWithDeviceToken(token) {
   applyPayload(body.state);
   connectSocket();
   els.loginCard.style.display = 'none';
+  els.topBar.style.display = 'flex';
   els.app.style.display = 'block';
   return { success: true };
 }
