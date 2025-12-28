@@ -674,7 +674,7 @@ input:focus {
   border-radius: 16px;
   width: 90%;
   max-width: 560px;
-  max-height: 90vh;
+  height: 500px;
   overflow: hidden;
   box-shadow: var(--shadow);
   display: flex;
@@ -729,6 +729,7 @@ input:focus {
   flex-direction: column;
   gap: 4px;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .settings-tab {
