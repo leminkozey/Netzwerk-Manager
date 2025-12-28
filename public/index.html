@@ -15,13 +15,14 @@
   <body data-theme="dark">
     <div class="page">
       <div class="top-bar" id="topBar" style="display: none">
-        <button class="theme-toggle" id="themeToggle" aria-label="Darstellung wechseln">
-          <span id="themeIcon">
+        <button class="settings-btn" id="settingsBtn" aria-label="Einstellungen öffnen">
+          <span class="settings-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M12 4.5V6.5M12 17.5V19.5M18.364 7.05L17 8.414M7 17L5.636 18.364M19.5 12H17.5M6.5 12H4.5M17 17L18.364 18.364M7 7L5.636 5.636M12 8.5C9.79086 8.5 8 10.2909 8 12.5C8 14.7091 9.79086 16.5 12 16.5C14.2091 16.5 16 14.7091 16 12.5C16 10.2909 14.2091 8.5 12 8.5Z" />
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" />
             </svg>
           </span>
-          <span>Light / Dark</span>
+          <span class="settings-text">Einstellungen</span>
         </button>
         <div class="chip" id="versionChip">Letzte Version: --</div>
       </div>
@@ -338,44 +339,62 @@
           </div>
         </section>
 
-        <section class="card full-span" style="margin-bottom: 16px">
-          <div class="section-title">
-            <div class="section-header">
-              <span class="icon-badge" aria-hidden="true">
-                <svg viewBox="0 0 64 64">
-                  <circle cx="32" cy="24" r="10" fill="#8b5cf6" />
-                  <path d="M18 52 C18 40, 46 40, 46 52 Z" fill="#a78bfa" />
-                  <rect x="26" y="38" width="12" height="16" rx="2" fill="#7c3aed" />
-                  <circle cx="32" cy="46" r="3" fill="#c4b5fd" />
-                  <rect x="30" y="46" width="4" height="6" fill="#c4b5fd" />
-                </svg>
-              </span>
-              <h3>Benutzer &amp; Passwort ändern</h3>
-            </div>
-          </div>
-          <form id="credentialForm">
-            <div class="input-row">
-              <label for="newUser">Neuer Benutzer</label>
-              <input id="newUser" type="text" autocomplete="username" />
-            </div>
-            <div class="input-row">
-              <label for="newPass">Neues Passwort</label>
-              <input id="newPass" type="password" autocomplete="new-password" />
-            </div>
-            <div class="actions">
-              <button class="btn" type="submit">Speichern</button>
-              <span class="muted" id="credentialStatus"></span>
-            </div>
-          </form>
-        </section>
-
-      </main>
+              </main>
 
       <footer class="site-footer">
         <span>made by <a href="https://github.com/leminkozey" target="_blank" rel="noopener">leminkozey</a></span>
         <span class="version">v1.1</span>
       </footer>
 
+    </div>
+
+    <div class="overlay" id="settingsOverlay">
+      <div class="settings-modal">
+        <div class="settings-header">
+          <h3>Einstellungen</h3>
+          <button class="close-btn" id="closeSettings" aria-label="Schließen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="settings-content">
+          <div class="settings-section">
+            <h4>Design</h4>
+            <div class="setting-row">
+              <label>Theme</label>
+              <div class="toggle-group" id="themeToggleGroup">
+                <button class="toggle-option active" data-value="dark">Dark</button>
+                <button class="toggle-option" data-value="light">Light</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <label>Button-Stil</label>
+              <div class="toggle-group" id="buttonStyleGroup">
+                <button class="toggle-option active" data-value="default">Default</button>
+                <button class="toggle-option" data-value="simple">Simpel</button>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h4>Benutzer & Passwort</h4>
+            <form id="credentialForm">
+              <div class="input-row">
+                <label for="newUser">Neuer Benutzer</label>
+                <input id="newUser" type="text" autocomplete="username" />
+              </div>
+              <div class="input-row">
+                <label for="newPass">Neues Passwort</label>
+                <input id="newPass" type="password" autocomplete="new-password" />
+              </div>
+              <div class="actions">
+                <button class="btn" type="submit">Speichern</button>
+                <span class="muted" id="credentialStatus"></span>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="overlay" id="logoutOverlay">

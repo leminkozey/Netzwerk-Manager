@@ -1,7 +1,11 @@
 const els = {
   body: document.body,
   topBar: document.getElementById('topBar'),
-  themeToggle: document.getElementById('themeToggle'),
+  settingsBtn: document.getElementById('settingsBtn'),
+  settingsOverlay: document.getElementById('settingsOverlay'),
+  closeSettings: document.getElementById('closeSettings'),
+  themeToggleGroup: document.getElementById('themeToggleGroup'),
+  buttonStyleGroup: document.getElementById('buttonStyleGroup'),
   versionChip: document.getElementById('versionChip'),
   versionCard: document.getElementById('versionCard'),
   loginCard: document.getElementById('loginCard'),
@@ -28,7 +32,6 @@ const els = {
   logoutOverlay: document.getElementById('logoutOverlay'),
   logoutReason: document.getElementById('logoutReason'),
   reloginBtn: document.getElementById('reloginBtn'),
-  themeIcon: document.getElementById('themeIcon'),
   raspberryStatus: document.getElementById('raspberryStatus'),
   piHoleLink: document.getElementById('piHoleLink'),
   piHoleRemoteLink: document.getElementById('piHoleRemoteLink'),
@@ -89,6 +92,8 @@ const state = {
 
 const STORAGE_KEYS = {
   deviceToken: 'deviceToken',
+  theme: 'theme',
+  buttonStyle: 'buttonStyle',
 };
 
 function clonePorts(list = []) {
@@ -128,21 +133,58 @@ function pickTextColor(hex) {
   return luminance > 0.6 ? '#0f1526' : '#ffffff';
 }
 
-function applyTheme(theme) {
+function applyTheme(theme, save = false) {
   state.theme = theme;
   document.body.setAttribute('data-theme', theme);
-  els.themeIcon.innerHTML =
-    theme === 'dark'
-      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 3a1 1 0 0 1 1 1v1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v0a1 1 0 0 1-1 1h-1a7 7 0 0 1-7 7v1a1 1 0 0 1-1 1v0a1 1 0 0 1-1-1v-1a7 7 0 0 1-7-7H3a1 1 0 0 1-1-1v0a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7V4a1 1 0 0 1 1-1Z"/></svg>`
-      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 4.5V6.5M12 17.5V19.5M18.364 7.05L17 8.414M7 17L5.636 18.364M19.5 12H17.5M6.5 12H4.5M17 17L18.364 18.364M7 7L5.636 5.636"/><circle cx="12" cy="12" r="4"/></svg>`;
+  if (save) {
+    localStorage.setItem(STORAGE_KEYS.theme, theme);
+  }
+  updateThemeToggleUI(theme);
+}
+
+function updateThemeToggleUI(theme) {
+  if (!els.themeToggleGroup) return;
+  els.themeToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.value === theme);
+  });
+}
+
+function applyButtonStyle(style, save = false) {
+  document.body.setAttribute('data-button-style', style);
+  if (save) {
+    localStorage.setItem(STORAGE_KEYS.buttonStyle, style);
+  }
+  updateButtonStyleUI(style);
+}
+
+function updateButtonStyleUI(style) {
+  if (!els.buttonStyleGroup) return;
+  els.buttonStyleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.value === style);
+  });
+}
+
+function loadLocalSettings() {
+  const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || 'dark';
+  const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || 'default';
+  applyTheme(savedTheme);
+  applyButtonStyle(savedButtonStyle);
+}
+
+function openSettings() {
+  els.settingsOverlay.classList.add('active');
+}
+
+function closeSettings() {
+  els.settingsOverlay.classList.remove('active');
 }
 
 async function bootstrap() {
+  loadLocalSettings();
   try {
     const res = await fetch('/api/bootstrap');
     if (!res.ok) return;
     const data = await res.json();
-    if (data.theme) applyTheme(data.theme);
     updateVersions(data.versions || []);
   } catch (e) {
     console.error(e);
@@ -628,20 +670,6 @@ function showRaspberryStatus() {
   }, 1800);
 }
 
-async function toggleTheme() {
-  const next = state.theme === 'dark' ? 'light' : 'dark';
-  applyTheme(next);
-  renderTables();
-  const res = await fetch('/api/theme', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ theme: next }),
-  });
-  if (!res.ok) return;
-  const body = await res.json();
-  updateVersions(body.versions || state.versions);
-}
-
 function debounce(fn, wait) {
   let t;
   return (...args) => {
@@ -663,7 +691,30 @@ async function relogin() {
 function bindEvents() {
   els.loginBtn.addEventListener('click', handleLogin);
   els.passInput.addEventListener('keyup', (e) => e.key === 'Enter' && handleLogin());
-  els.themeToggle.addEventListener('click', toggleTheme);
+
+  // Settings Modal
+  els.settingsBtn.addEventListener('click', openSettings);
+  els.closeSettings.addEventListener('click', closeSettings);
+  els.settingsOverlay.addEventListener('click', (e) => {
+    if (e.target === els.settingsOverlay) closeSettings();
+  });
+
+  // Theme Toggle
+  els.themeToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const theme = btn.dataset.value;
+      applyTheme(theme, true);
+    });
+  });
+
+  // Button Style Toggle
+  els.buttonStyleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const style = btn.dataset.value;
+      applyButtonStyle(style, true);
+    });
+  });
+
   els.credentialForm.addEventListener('submit', saveCredentials);
   Object.values(speedportInputs).forEach((input) => {
     input.addEventListener('input', () => {
