@@ -945,7 +945,7 @@ const speedTest = {
 
   ensureNonLocalHost() {
     if (!this.isLocalhostHost()) return true;
-    const msg = 'Bitte ueber die LAN-IP oeffnen (nicht localhost).';
+    const msg = 'Bitte über die LAN-IP öffnen (nicht localhost).';
     const notice = document.getElementById('speedtestNotice');
     if (notice) notice.textContent = msg;
     return false;
@@ -955,7 +955,7 @@ const speedTest = {
     const notice = document.getElementById('speedtestNotice');
     if (!notice) return;
     if (this.isLocalhostHost()) {
-      notice.textContent = 'Bitte ueber die LAN-IP oeffnen (nicht localhost).';
+      notice.textContent = 'Bitte über die LAN-IP öffnen (nicht localhost).';
       this.disableButton(true);
       return;
     }
