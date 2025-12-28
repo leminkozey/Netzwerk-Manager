@@ -673,23 +673,26 @@ input:focus {
   background: var(--surface);
   border-radius: 16px;
   width: 90%;
-  max-width: 480px;
+  max-width: 560px;
   max-height: 90vh;
-  overflow-y: auto;
+  overflow: hidden;
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 
 .settings-header h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
 }
 
 .close-btn {
@@ -712,24 +715,71 @@ input:focus {
   height: 20px;
 }
 
-.settings-content {
-  padding: 24px;
+.settings-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
 }
 
-.settings-section {
-  margin-bottom: 24px;
+.settings-sidebar {
+  width: 140px;
+  background: var(--surface-2);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
-.settings-section:last-child {
-  margin-bottom: 0;
-}
-
-.settings-section h4 {
-  margin: 0 0 16px 0;
-  font-size: 0.9rem;
+.settings-tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+  transition: background 0.2s, color 0.2s;
+}
+
+.settings-tab svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.settings-tab:hover {
+  background: var(--border);
+  color: var(--text);
+}
+
+.settings-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.settings-content {
+  flex: 1;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+.settings-panel {
+  display: none;
+}
+
+.settings-panel.active {
+  display: block;
+}
+
+.settings-panel h4 {
+  margin: 0 0 20px 0;
+  font-size: 1rem;
+  color: var(--text);
 }
 
 .setting-row {
@@ -749,9 +799,11 @@ input:focus {
   border-radius: 8px;
   padding: 4px;
   gap: 4px;
+  min-width: 160px;
 }
 
 .toggle-option {
+  flex: 1;
   padding: 8px 16px;
   border: none;
   background: transparent;
@@ -759,6 +811,7 @@ input:focus {
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
+  text-align: center;
   transition: background 0.2s, color 0.2s;
 }
 

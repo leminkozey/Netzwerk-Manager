@@ -358,40 +358,58 @@
             </svg>
           </button>
         </div>
-        <div class="settings-content">
-          <div class="settings-section">
-            <h4>Design</h4>
-            <div class="setting-row">
-              <label>Theme</label>
-              <div class="toggle-group" id="themeToggleGroup">
-                <button class="toggle-option active" data-value="dark">Dark</button>
-                <button class="toggle-option" data-value="light">Light</button>
+        <div class="settings-body">
+          <nav class="settings-sidebar">
+            <button class="settings-tab active" data-tab="design">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+              <span>Design</span>
+            </button>
+            <button class="settings-tab" data-tab="user">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
+              </svg>
+              <span>User</span>
+            </button>
+          </nav>
+          <div class="settings-content">
+            <div class="settings-panel active" id="panel-design">
+              <h4>Design</h4>
+              <div class="setting-row">
+                <label>Theme</label>
+                <div class="toggle-group" id="themeToggleGroup">
+                  <button class="toggle-option active" data-value="dark">Dark</button>
+                  <button class="toggle-option" data-value="light">Light</button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <label>Button-Stil</label>
+                <div class="toggle-group" id="buttonStyleGroup">
+                  <button class="toggle-option active" data-value="default">Default</button>
+                  <button class="toggle-option" data-value="simple">Simpel</button>
+                </div>
               </div>
             </div>
-            <div class="setting-row">
-              <label>Button-Stil</label>
-              <div class="toggle-group" id="buttonStyleGroup">
-                <button class="toggle-option active" data-value="default">Default</button>
-                <button class="toggle-option" data-value="simple">Simpel</button>
-              </div>
+            <div class="settings-panel" id="panel-user">
+              <h4>Benutzer & Passwort</h4>
+              <form id="credentialForm">
+                <div class="input-row">
+                  <label for="newUser">Neuer Benutzer</label>
+                  <input id="newUser" type="text" autocomplete="username" />
+                </div>
+                <div class="input-row">
+                  <label for="newPass">Neues Passwort</label>
+                  <input id="newPass" type="password" autocomplete="new-password" />
+                </div>
+                <div class="actions">
+                  <button class="btn" type="submit">Speichern</button>
+                  <span class="muted" id="credentialStatus"></span>
+                </div>
+              </form>
             </div>
-          </div>
-          <div class="settings-section">
-            <h4>Benutzer & Passwort</h4>
-            <form id="credentialForm">
-              <div class="input-row">
-                <label for="newUser">Neuer Benutzer</label>
-                <input id="newUser" type="text" autocomplete="username" />
-              </div>
-              <div class="input-row">
-                <label for="newPass">Neues Passwort</label>
-                <input id="newPass" type="password" autocomplete="new-password" />
-              </div>
-              <div class="actions">
-                <button class="btn" type="submit">Speichern</button>
-                <span class="muted" id="credentialStatus"></span>
-              </div>
-            </form>
           </div>
         </div>
       </div>

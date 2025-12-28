@@ -4,6 +4,8 @@ const els = {
   settingsBtn: document.getElementById('settingsBtn'),
   settingsOverlay: document.getElementById('settingsOverlay'),
   closeSettings: document.getElementById('closeSettings'),
+  settingsTabs: document.querySelectorAll('.settings-tab'),
+  settingsPanels: document.querySelectorAll('.settings-panel'),
   themeToggleGroup: document.getElementById('themeToggleGroup'),
   buttonStyleGroup: document.getElementById('buttonStyleGroup'),
   versionChip: document.getElementById('versionChip'),
@@ -138,6 +140,8 @@ function applyTheme(theme, save = false) {
   document.body.setAttribute('data-theme', theme);
   if (save) {
     localStorage.setItem(STORAGE_KEYS.theme, theme);
+    // Tabellen neu rendern damit Farben stimmen
+    if (state.token) renderTables();
   }
   updateThemeToggleUI(theme);
 }
@@ -177,6 +181,15 @@ function openSettings() {
 
 function closeSettings() {
   els.settingsOverlay.classList.remove('active');
+}
+
+function switchSettingsTab(tabName) {
+  els.settingsTabs.forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.tab === tabName);
+  });
+  els.settingsPanels.forEach((panel) => {
+    panel.classList.toggle('active', panel.id === `panel-${tabName}`);
+  });
 }
 
 async function bootstrap() {
@@ -317,7 +330,11 @@ function applyPayload(payload) {
   state.raspberryFollowLatest = true;
   state.speedportViewFromLive = true;
   state.speedportFollowLatest = true;
-  if (payload.theme) applyTheme(payload.theme);
+  // Theme nur vom Server übernehmen, wenn kein lokales gespeichert ist
+  const localTheme = localStorage.getItem(STORAGE_KEYS.theme);
+  if (!localTheme && payload.theme) {
+    applyTheme(payload.theme);
+  }
   renderTables();
   updateVersions(state.versions);
   updateRaspberryVersions(state.raspberryVersions);
@@ -697,6 +714,13 @@ function bindEvents() {
   els.closeSettings.addEventListener('click', closeSettings);
   els.settingsOverlay.addEventListener('click', (e) => {
     if (e.target === els.settingsOverlay) closeSettings();
+  });
+
+  // Settings Tabs
+  els.settingsTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      switchSettingsTab(tab.dataset.tab);
+    });
   });
 
   // Theme Toggle
