@@ -1,3 +1,0 @@
-# Jede Zeile: token|Geraetename
-# Beispiel:
-# 123456789-abcd-efgh|MacBook von Max

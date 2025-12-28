@@ -326,7 +326,7 @@ app.get('/api/state', authRequired, (req, res) => {
   res.json(maskStateForClient(state));
 });
 
-app.post('/api/theme', (req, res) => {
+app.post('/api/theme', authRequired, (req, res) => {
   const { theme } = req.body || {};
   if (!['dark', 'light'].includes(theme)) {
     return res.status(400).json({ error: 'Ungültiges Theme' });
