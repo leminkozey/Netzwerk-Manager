@@ -9,7 +9,6 @@ const els = {
   themeToggleGroup: document.getElementById('themeToggleGroup'),
   buttonStyleGroup: document.getElementById('buttonStyleGroup'),
   versionChip: document.getElementById('versionChip'),
-  versionCard: document.getElementById('versionCard'),
   loginCard: document.getElementById('loginCard'),
   loginBtn: document.getElementById('loginBtn'),
   loginStatus: document.getElementById('loginStatus'),
@@ -28,7 +27,6 @@ const els = {
   speedportStatus: document.getElementById('speedportStatus'),
   speedportLink: document.getElementById('speedportLink'),
   speedportRemoteLink: document.getElementById('speedportRemoteLink'),
-  speedportVersionCard: document.getElementById('speedportVersionCard'),
   speedportVersionSelect: document.getElementById('speedportVersionSelect'),
   speedportVersionDetails: document.getElementById('speedportVersionDetails'),
   logoutOverlay: document.getElementById('logoutOverlay'),
@@ -37,7 +35,6 @@ const els = {
   raspberryStatus: document.getElementById('raspberryStatus'),
   piHoleLink: document.getElementById('piHoleLink'),
   piHoleRemoteLink: document.getElementById('piHoleRemoteLink'),
-  raspberryVersionCard: document.getElementById('raspberryVersionCard'),
   raspberryVersionSelect: document.getElementById('raspberryVersionSelect'),
   raspberryVersionDetails: document.getElementById('raspberryVersionDetails'),
 };
@@ -342,13 +339,6 @@ function applyPayload(payload) {
   fillSettings();
   fillSpeedport();
   fillRaspberry();
-  els.versionCard.style.display = 'block';
-  if (els.raspberryVersionCard) {
-    els.raspberryVersionCard.style.display = 'block';
-  }
-  if (els.speedportVersionCard) {
-    els.speedportVersionCard.style.display = 'block';
-  }
 }
 
 function renderTables() {

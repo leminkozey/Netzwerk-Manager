@@ -240,48 +240,6 @@
             <div class="section-header">
               <span class="icon-badge" aria-hidden="true">
                 <svg viewBox="0 0 64 64">
-                  <circle cx="32" cy="32" r="20" fill="none" stroke="#94a3b8" stroke-width="3" />
-                  <path d="M32 32 L32 18" stroke="#475569" stroke-width="3" stroke-linecap="round" />
-                  <path d="M32 32 L42 38" stroke="#475569" stroke-width="3" stroke-linecap="round" />
-                  <circle cx="32" cy="32" r="3" fill="#64748b" />
-                  <path d="M32 12 L32 16 M32 48 L32 52 M12 32 L16 32 M48 32 L52 32" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" />
-                </svg>
-              </span>
-              <h3>Versionen</h3>
-            </div>
-          </div>
-          <div class="grid three" style="gap: 12px">
-            <div class="compact-card" id="versionCard" style="display: none">
-              <div class="section-title">
-                <h3>Port Versionen</h3>
-              </div>
-              <select class="version-select" id="versionSelect"></select>
-              <div class="status" id="versionDetails" style="margin-top: 12px"></div>
-            </div>
-
-            <div class="compact-card" id="speedportVersionCard" style="display: none">
-              <div class="section-title">
-                <h3>Speedport Versionen</h3>
-              </div>
-              <select class="version-select" id="speedportVersionSelect"></select>
-              <div class="status" id="speedportVersionDetails" style="margin-top: 12px"></div>
-            </div>
-
-            <div class="compact-card" id="raspberryVersionCard" style="display: none">
-              <div class="section-title">
-                <h3>Raspberry Versionen</h3>
-              </div>
-              <select class="version-select" id="raspberryVersionSelect"></select>
-              <div class="status" id="raspberryVersionDetails" style="margin-top: 12px"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="card" style="margin-bottom: 16px">
-          <div class="section-title">
-            <div class="section-header">
-              <span class="icon-badge" aria-hidden="true">
-                <svg viewBox="0 0 64 64">
                   <path d="M32 48 A20 20 0 0 1 12 32 A20 20 0 0 1 32 12 A20 20 0 0 1 52 32" fill="none" stroke="#f97316" stroke-width="4" stroke-linecap="round" />
                   <circle cx="32" cy="32" r="3" fill="#fb923c" />
                   <path d="M32 32 L45 20" stroke="#ea580c" stroke-width="3" stroke-linecap="round" />
@@ -374,6 +332,13 @@
               </svg>
               <span>User</span>
             </button>
+            <button class="settings-tab" data-tab="versionen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M12 8v4l3 3" />
+                <circle cx="12" cy="12" r="9" />
+              </svg>
+              <span>Versionen</span>
+            </button>
           </nav>
           <div class="settings-content">
             <div class="settings-panel active" id="panel-design">
@@ -409,6 +374,24 @@
                   <span class="muted" id="credentialStatus"></span>
                 </div>
               </form>
+            </div>
+            <div class="settings-panel" id="panel-versionen">
+              <h4>Versionen</h4>
+              <div class="version-section">
+                <label>Port-Belegungen</label>
+                <select class="version-select" id="versionSelect"></select>
+                <span class="muted version-details" id="versionDetails"></span>
+              </div>
+              <div class="version-section">
+                <label>Speedport</label>
+                <select class="version-select" id="speedportVersionSelect"></select>
+                <span class="muted version-details" id="speedportVersionDetails"></span>
+              </div>
+              <div class="version-section">
+                <label>PiHole / Raspberry</label>
+                <select class="version-select" id="raspberryVersionSelect"></select>
+                <span class="muted version-details" id="raspberryVersionDetails"></span>
+              </div>
             </div>
           </div>
         </div>

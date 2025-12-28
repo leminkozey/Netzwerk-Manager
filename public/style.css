@@ -427,12 +427,12 @@ input:focus {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--surface-2);
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--surface);
   border: 1px solid var(--border);
-  color: var(--text-muted);
-  font-size: 13px;
+  color: var(--text);
+  font-size: 0.9rem;
 }
 
 .compact-card {
@@ -830,4 +830,26 @@ input:focus {
 
 .settings-section .actions {
   margin-top: 16px;
+}
+
+/* Version Section in Settings */
+.version-section {
+  margin-bottom: 20px;
+}
+
+.version-section label {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.version-section .version-select {
+  width: 100%;
+  margin-bottom: 6px;
+}
+
+.version-section .version-details {
+  display: block;
+  font-size: 0.8rem;
 }
