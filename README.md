@@ -45,7 +45,7 @@ admin
 admin
 ```
 
-**Wichtig:** Diese Datei ist nur zum **Einsehen** gedacht. Änderungen am Benutzernamen oder Passwort müssen über die Website selbst vorgenommen werden (Abschnitt "Benutzer & Passwort ändern").
+**Wichtig:** Diese Datei ist nur zum **Einsehen** gedacht. Änderungen am Benutzernamen oder Passwort müssen über die Website selbst vorgenommen werden (Einstellungen → User).
 
 ### Data/LoginToken.txt
 
@@ -81,9 +81,17 @@ Dokumentiere welches Gerät an welchem Port hängt. Jeder Port hat:
 - **Belegung**: Was ist angeschlossen?
 - **Farbe**: Zur visuellen Unterscheidung
 
+### Einstellungen
+
+Über den Zahnrad-Button oben links erreichst du die Einstellungen mit drei Bereichen:
+
+- **Design**: Theme (Dark/Light) und Button-Stil (Default/Simpel) wählen
+- **User**: Benutzername und Passwort ändern
+- **Versionen**: Versionshistorie für Port-Belegungen, Speedport und PiHole/Raspberry einsehen
+
 ### Versionshistorie
 
-Jede Änderung an den Ports, PiHole- oder Speedport-Infos wird automatisch versioniert. Du kannst jederzeit ältere Versionen einsehen und nachvollziehen, was wann geändert wurde.
+Jede Änderung an den Ports, PiHole- oder Speedport-Infos wird automatisch versioniert. Du kannst jederzeit ältere Versionen einsehen (Einstellungen → Versionen) und nachvollziehen, was wann geändert wurde.
 
 ### Speed-Test
 
