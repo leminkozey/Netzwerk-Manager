@@ -306,6 +306,22 @@ function showLoginStatus(text, isError = false) {
   els.loginStatus.className = `status ${isError ? 'alert' : 'success'}`;
 }
 
+function showToast(text, isError = false) {
+  let toast = document.getElementById('globalToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'globalToast';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.className = `toast ${isError ? 'toast-error' : 'toast-success'} toast-visible`;
+  clearTimeout(showToast._timeout);
+  showToast._timeout = setTimeout(() => {
+    toast.classList.remove('toast-visible');
+  }, 3000);
+}
+
 function applyPayload(payload) {
   if (!payload) return;
   setLiveState({
@@ -414,6 +430,7 @@ function renderTables() {
         }
       } catch (err) {
         console.error('Fehler beim Ändern der Farbe:', err);
+        showToast('Farbe konnte nicht gespeichert werden', true);
       }
     });
   });
@@ -605,15 +622,20 @@ async function saveCredentials(e) {
     els.credentialStatus.textContent = 'Bitte Benutzer und Passwort ausfüllen.';
     return;
   }
-  const res = await fetch('/api/settings/credentials', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({ username, password }),
-  });
-  if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
-  els.newUser.value = '';
-  els.newPass.value = '';
-  els.credentialStatus.textContent = 'Gespeichert.';
+  try {
+    const res = await fetch('/api/settings/credentials', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ username, password }),
+    });
+    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    els.newUser.value = '';
+    els.newPass.value = '';
+    els.credentialStatus.textContent = 'Gespeichert.';
+  } catch (err) {
+    console.error('Fehler beim Speichern:', err);
+    showToast('Zugangsdaten konnten nicht gespeichert werden', true);
+  }
 }
 
 const debouncedSpeedportSave = debounce(async () => {
@@ -622,19 +644,24 @@ const debouncedSpeedportSave = debounce(async () => {
   Object.entries(speedportInputs).forEach(([key, input]) => {
     payload[key] = input.value;
   });
-  const res = await fetch('/api/speedport', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
-  const body = await res.json();
-  setLiveState({ speedportInfo: body.speedportInfo });
-  state.speedportInfo = { ...state.live.speedportInfo };
-  state.speedportViewFromLive = true;
-  state.speedportFollowLatest = true;
-  updateSpeedportVersions(body.speedportVersions || state.speedportVersions);
-  showSpeedportStatus();
+  try {
+    const res = await fetch('/api/speedport', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    const body = await res.json();
+    setLiveState({ speedportInfo: body.speedportInfo });
+    state.speedportInfo = { ...state.live.speedportInfo };
+    state.speedportViewFromLive = true;
+    state.speedportFollowLatest = true;
+    updateSpeedportVersions(body.speedportVersions || state.speedportVersions);
+    showSpeedportStatus();
+  } catch (err) {
+    console.error('Fehler beim Speichern:', err);
+    showToast('Speedport konnte nicht gespeichert werden', true);
+  }
 }, 350);
 
 const debouncedRaspberrySave = debounce(async () => {
@@ -643,19 +670,24 @@ const debouncedRaspberrySave = debounce(async () => {
   Object.entries(raspberryInputs).forEach(([key, input]) => {
     payload[key] = input.value;
   });
-  const res = await fetch('/api/raspberry', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(payload),
-  });
-  if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
-  const body = await res.json();
-  setLiveState({ raspberryInfo: body.raspberryInfo });
-  state.raspberryInfo = { ...state.live.raspberryInfo };
-  state.raspberryViewFromLive = true;
-  state.raspberryFollowLatest = true;
-  updateRaspberryVersions(body.raspberryVersions || state.raspberryVersions);
-  showRaspberryStatus();
+  try {
+    const res = await fetch('/api/raspberry', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    const body = await res.json();
+    setLiveState({ raspberryInfo: body.raspberryInfo });
+    state.raspberryInfo = { ...state.live.raspberryInfo };
+    state.raspberryViewFromLive = true;
+    state.raspberryFollowLatest = true;
+    updateRaspberryVersions(body.raspberryVersions || state.raspberryVersions);
+    showRaspberryStatus();
+  } catch (err) {
+    console.error('Fehler beim Speichern:', err);
+    showToast('PiHole konnte nicht gespeichert werden', true);
+  }
 }, 350);
 
 function showSpeedportStatus() {
@@ -868,21 +900,26 @@ async function submitStatusChange(input) {
   if (!group || !id) return;
   if (value === input.dataset.last) return;
   input.dataset.last = value;
-  const res = await fetch('/api/ports/update', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({ group, id, status: value }),
-  });
-  if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
-  const body = await res.json();
-  if (body.switchPorts) {
-    setLiveState(body);
-    state.switchPorts = clonePorts(state.live.switchPorts);
-    state.routerPorts = clonePorts(state.live.routerPorts);
-    state.followLatest = true;
-    state.viewFromLive = true;
-    updateVersions(body.versions || state.versions);
-    renderTables();
+  try {
+    const res = await fetch('/api/ports/update', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ group, id, status: value }),
+    });
+    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    const body = await res.json();
+    if (body.switchPorts) {
+      setLiveState(body);
+      state.switchPorts = clonePorts(state.live.switchPorts);
+      state.routerPorts = clonePorts(state.live.routerPorts);
+      state.followLatest = true;
+      state.viewFromLive = true;
+      updateVersions(body.versions || state.versions);
+      renderTables();
+    }
+  } catch (err) {
+    console.error('Fehler beim Speichern:', err);
+    showToast('Port konnte nicht gespeichert werden', true);
   }
 }
 

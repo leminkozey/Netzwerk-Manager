@@ -83,11 +83,12 @@ Dokumentiere welches Gerät an welchem Port hängt. Jeder Port hat:
 
 ### Einstellungen
 
-Über den Zahnrad-Button oben links erreichst du die Einstellungen mit drei Bereichen:
+Über den Zahnrad-Button oben links erreichst du die Einstellungen mit vier Bereichen:
 
 - **Design**: Theme (Dark/Light) und Button-Stil (Default/Simpel) wählen
-- **User**: Benutzername und Passwort ändern
 - **Versionen**: Versionshistorie für Port-Belegungen, Speedport und PiHole/Raspberry einsehen
+- **User**: Benutzername und Passwort ändern
+- **Credits**: Entwickler-Info und Link zum Repository
 
 ### Versionshistorie
 
