@@ -961,3 +961,10 @@ input:focus {
 .logout-btn:hover {
   background: #b91c1c;
 }
+
+/* Disabled Button */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}

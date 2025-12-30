@@ -236,7 +236,11 @@ async function handleLogin() {
     });
     const body = await res.json();
     if (!res.ok || !body.success) {
-      showLoginStatus('Login fehlgeschlagen', true);
+      if (body.locked && body.remainingMs) {
+        startLockoutTimer(body.remainingMs);
+      } else {
+        showLoginStatus(body.message || 'Login fehlgeschlagen', true);
+      }
       return;
     }
     state.token = body.token;
@@ -249,6 +253,29 @@ async function handleLogin() {
     console.error(e);
     showLoginStatus('Server nicht erreichbar.', true);
   }
+}
+
+function startLockoutTimer(remainingMs) {
+  clearInterval(startLockoutTimer._interval);
+  els.loginBtn.disabled = true;
+
+  function update() {
+    const now = Date.now();
+    const left = lockoutEnd - now;
+    if (left <= 0) {
+      clearInterval(startLockoutTimer._interval);
+      els.loginBtn.disabled = false;
+      showLoginStatus('Sperre aufgehoben. Erneut versuchen.', false);
+      return;
+    }
+    const min = Math.floor(left / 60000);
+    const sec = Math.floor((left % 60000) / 1000);
+    showLoginStatus(`Gesperrt. Noch ${min}:${sec.toString().padStart(2, '0')} Min`, true);
+  }
+
+  const lockoutEnd = Date.now() + remainingMs;
+  update();
+  startLockoutTimer._interval = setInterval(update, 1000);
 }
 
 function connectSocket() {

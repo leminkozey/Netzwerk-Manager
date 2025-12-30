@@ -12,12 +12,54 @@ const USER_FILE = path.join(DATA_DIR, 'Nutzer');
 const LOGIN_TOKEN_FILE = path.join(DATA_DIR, 'LoginToken.txt');
 const MAX_VERSIONS = 100;
 
+// Rate-Limiting Konstanten
+const MAX_ATTEMPTS = 5;
+const BASE_LOCKOUT_MS = 5 * 60 * 1000; // 5 Minuten
+
 // Runtime data not persisted
 const runtime = {
   activeSession: null,
-  failedAttempts: 0,
+  loginAttempts: new Map(), // IP -> { count, lockedUntil, lockoutLevel }
   sockets: new Map(), // token -> WebSocket
 };
+
+function getClientIp(req) {
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function getAttemptData(ip) {
+  if (!runtime.loginAttempts.has(ip)) {
+    runtime.loginAttempts.set(ip, { count: 0, lockedUntil: 0, lockoutLevel: 1 });
+  }
+  return runtime.loginAttempts.get(ip);
+}
+
+function isLocked(ip) {
+  const data = getAttemptData(ip);
+  if (data.lockedUntil > Date.now()) {
+    return { locked: true, remainingMs: data.lockedUntil - Date.now() };
+  }
+  return { locked: false, remainingMs: 0 };
+}
+
+function recordFailedAttempt(ip) {
+  const data = getAttemptData(ip);
+  data.count += 1;
+
+  if (data.count >= MAX_ATTEMPTS) {
+    // Eskalierende Sperre: 5min, 10min, 15min, etc.
+    const lockoutMs = BASE_LOCKOUT_MS * data.lockoutLevel;
+    data.lockedUntil = Date.now() + lockoutMs;
+    data.lockoutLevel += 1;
+    data.count = 0;
+    return { locked: true, lockoutMs };
+  }
+  return { locked: false, attemptsLeft: MAX_ATTEMPTS - data.count };
+}
+
+function resetAttempts(ip) {
+  runtime.loginAttempts.set(ip, { count: 0, lockedUntil: 0, lockoutLevel: 1 });
+}
 
 // Raw body parser für Upload-Tests (muss VOR json() kommen)
 app.use('/api/speedtest/upload', express.raw({ type: '*/*', limit: '50mb' }));
@@ -272,6 +314,20 @@ app.get('/api/bootstrap', (req, res) => {
 
 app.post('/api/login', (req, res) => {
   const { username, password, deviceName = 'Unbekanntes Gerät', deviceToken } = req.body || {};
+  const clientIp = getClientIp(req);
+
+  // Rate-Limiting Check
+  const lockStatus = isLocked(clientIp);
+  if (lockStatus.locked) {
+    const remainingMin = Math.ceil(lockStatus.remainingMs / 60000);
+    return res.status(429).json({
+      success: false,
+      locked: true,
+      remainingMs: lockStatus.remainingMs,
+      message: `Zu viele Fehlversuche. Bitte ${remainingMin} Min warten.`,
+    });
+  }
+
   const state = readState();
   const fileCredentials = readCredentialsFile();
   if (fileCredentials) {
@@ -284,16 +340,25 @@ app.post('/api/login', (req, res) => {
   const isWhitelisted = deviceToken && (state.deviceTokens.includes(deviceToken) || fileTokenList.includes(deviceToken));
 
   if (!isWhitelisted && (username !== state.credentials.username || password !== state.credentials.password)) {
-    runtime.failedAttempts += 1;
+    const result = recordFailedAttempt(clientIp);
+    if (result.locked) {
+      const lockoutMin = Math.ceil(result.lockoutMs / 60000);
+      return res.status(429).json({
+        success: false,
+        locked: true,
+        remainingMs: result.lockoutMs,
+        message: `Zu viele Fehlversuche. ${lockoutMin} Min gesperrt.`,
+      });
+    }
     return res.status(401).json({
       success: false,
-      failedAttempts: runtime.failedAttempts,
-      lockout: runtime.failedAttempts >= 3,
-      message: 'Falsche Zugangsdaten',
+      attemptsLeft: result.attemptsLeft,
+      message: `Falsche Zugangsdaten. Noch ${result.attemptsLeft} Versuche.`,
     });
   }
 
-  runtime.failedAttempts = 0;
+  // Erfolgreicher Login - Reset
+  resetAttempts(clientIp);
   const token = randomUUID();
   const loginAt = Date.now();
   const matchedFileToken = fileTokenEntries.find((t) => t.token === deviceToken);
