@@ -942,3 +942,22 @@ input:focus {
   background: #22c55e;
   color: #fff;
 }
+
+/* Settings Divider */
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0 16px;
+}
+
+/* Logout Button */
+.logout-btn {
+  width: 100%;
+  background: #dc2626;
+  border-color: #b91c1c;
+  color: #fff;
+}
+
+.logout-btn:hover {
+  background: #b91c1c;
+}

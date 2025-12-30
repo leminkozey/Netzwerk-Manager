@@ -37,6 +37,7 @@ const els = {
   piHoleRemoteLink: document.getElementById('piHoleRemoteLink'),
   raspberryVersionSelect: document.getElementById('raspberryVersionSelect'),
   raspberryVersionDetails: document.getElementById('raspberryVersionDetails'),
+  logoutBtn: document.getElementById('logoutBtn'),
 };
 
 const speedportInputs = {
@@ -727,6 +728,21 @@ async function relogin() {
   els.passInput.value = '';
 }
 
+function handleLogout() {
+  state.token = null;
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
+  }
+  closeSettings();
+  els.app.style.display = 'none';
+  els.topBar.style.display = 'none';
+  els.loginCard.style.display = 'block';
+  els.userInput.value = '';
+  els.passInput.value = '';
+  els.loginStatus.hidden = true;
+}
+
 function bindEvents() {
   els.loginBtn.addEventListener('click', handleLogin);
   els.passInput.addEventListener('keyup', (e) => e.key === 'Enter' && handleLogin());
@@ -786,6 +802,7 @@ function bindEvents() {
     );
   }
   els.reloginBtn.addEventListener('click', relogin);
+  els.logoutBtn.addEventListener('click', handleLogout);
 }
 
 bootstrap().then(() => {
