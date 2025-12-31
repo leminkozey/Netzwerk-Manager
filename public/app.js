@@ -38,6 +38,12 @@ const els = {
   raspberryVersionSelect: document.getElementById('raspberryVersionSelect'),
   raspberryVersionDetails: document.getElementById('raspberryVersionDetails'),
   logoutBtn: document.getElementById('logoutBtn'),
+  timeoutOverlay: document.getElementById('timeoutOverlay'),
+  timeoutSettingsBtn: document.getElementById('timeoutSettingsBtn'),
+  timeoutLoginBtn: document.getElementById('timeoutLoginBtn'),
+  timeoutToggleGroup: document.getElementById('timeoutToggleGroup'),
+  timeoutMinutesRow: document.getElementById('timeoutMinutesRow'),
+  timeoutMinutes: document.getElementById('timeoutMinutes'),
 };
 
 const speedportInputs = {
@@ -88,13 +94,27 @@ const state = {
   speedportActiveVersionId: null,
   speedportFollowLatest: true,
   socket: null,
+  sessionTimeoutEnabled: true,
+  sessionTimeoutMinutes: 5,
+  sessionTimer: null,
+  redirectToSettings: false,
 };
 
 const STORAGE_KEYS = {
   deviceToken: 'deviceToken',
   theme: 'theme',
   buttonStyle: 'buttonStyle',
+  sessionTimeoutEnabled: 'sessionTimeoutEnabled',
+  sessionTimeoutMinutes: 'sessionTimeoutMinutes',
 };
+
+function debounce(fn, wait) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), wait);
+  };
+}
 
 function clonePorts(list = []) {
   return list.map((p) => ({ ...p }));
@@ -171,6 +191,7 @@ function loadLocalSettings() {
   const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || 'default';
   applyTheme(savedTheme);
   applyButtonStyle(savedButtonStyle);
+  loadSessionSettings();
 }
 
 function openSettings() {
@@ -249,6 +270,12 @@ async function handleLogin() {
     els.loginCard.style.display = 'none';
     els.topBar.style.display = 'flex';
     els.app.style.display = 'block';
+    startSessionTimer();
+    if (state.redirectToSettings) {
+      state.redirectToSettings = false;
+      openSettings();
+      switchSettingsTab('session');
+    }
   } catch (e) {
     console.error(e);
     showLoginStatus('Server nicht erreichbar.', true);
@@ -317,11 +344,18 @@ async function loginWithDeviceToken(token) {
   els.loginCard.style.display = 'none';
   els.topBar.style.display = 'flex';
   els.app.style.display = 'block';
+  startSessionTimer();
+  if (state.redirectToSettings) {
+    state.redirectToSettings = false;
+    openSettings();
+    switchSettingsTab('session');
+  }
   return { success: true };
 }
 
 function handleForceLogout(deviceName, timeMs) {
   state.token = null;
+  stopSessionTimer();
   if (state.socket) state.socket.close();
   const at = timeMs ? new Date(timeMs) : new Date();
   els.logoutReason.textContent = `ein: ${deviceName || 'anderes Gerät'} hat sich um ${at.toLocaleTimeString()} eingeloggt.`;
@@ -737,14 +771,6 @@ function showRaspberryStatus() {
   }, 1800);
 }
 
-function debounce(fn, wait) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), wait);
-  };
-}
-
 async function relogin() {
   els.logoutOverlay.classList.remove('active');
   const token = getStoredDeviceToken();
@@ -757,6 +783,7 @@ async function relogin() {
 
 function handleLogout() {
   state.token = null;
+  stopSessionTimer();
   if (state.socket) {
     state.socket.close();
     state.socket = null;
@@ -768,6 +795,86 @@ function handleLogout() {
   els.userInput.value = '';
   els.passInput.value = '';
   els.loginStatus.hidden = true;
+}
+
+// Session Timeout
+function startSessionTimer() {
+  stopSessionTimer();
+  if (!state.sessionTimeoutEnabled || !state.token) return;
+  const ms = state.sessionTimeoutMinutes * 60 * 1000;
+  state.sessionTimer = setTimeout(() => {
+    showTimeoutPopup();
+  }, ms);
+}
+
+function stopSessionTimer() {
+  if (state.sessionTimer) {
+    clearTimeout(state.sessionTimer);
+    state.sessionTimer = null;
+  }
+}
+
+const resetSessionTimer = debounce(() => {
+  if (state.sessionTimeoutEnabled && state.token) {
+    startSessionTimer();
+  }
+}, 1000);
+
+function showTimeoutPopup() {
+  state.token = null;
+  stopSessionTimer();
+  if (state.socket) {
+    state.socket.close();
+    state.socket = null;
+  }
+  els.app.style.display = 'none';
+  els.topBar.style.display = 'none';
+  els.timeoutOverlay.classList.add('active');
+}
+
+function handleTimeoutSettings() {
+  els.timeoutOverlay.classList.remove('active');
+  state.redirectToSettings = true;
+  els.loginCard.style.display = 'block';
+  els.userInput.value = '';
+  els.passInput.value = '';
+  els.loginStatus.hidden = true;
+}
+
+function handleTimeoutLogin() {
+  els.timeoutOverlay.classList.remove('active');
+  state.redirectToSettings = false;
+  els.loginCard.style.display = 'block';
+  els.userInput.value = '';
+  els.passInput.value = '';
+  els.loginStatus.hidden = true;
+}
+
+function loadSessionSettings() {
+  const savedEnabled = localStorage.getItem(STORAGE_KEYS.sessionTimeoutEnabled);
+  const savedMinutes = localStorage.getItem(STORAGE_KEYS.sessionTimeoutMinutes);
+  state.sessionTimeoutEnabled = savedEnabled !== 'false';
+  state.sessionTimeoutMinutes = parseInt(savedMinutes, 10) || 5;
+  updateTimeoutUI();
+}
+
+function saveSessionSettings() {
+  localStorage.setItem(STORAGE_KEYS.sessionTimeoutEnabled, state.sessionTimeoutEnabled);
+  localStorage.setItem(STORAGE_KEYS.sessionTimeoutMinutes, state.sessionTimeoutMinutes);
+}
+
+function updateTimeoutUI() {
+  if (!els.timeoutToggleGroup) return;
+  els.timeoutToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+    const isOn = btn.dataset.value === 'on';
+    btn.classList.toggle('active', isOn === state.sessionTimeoutEnabled);
+  });
+  if (els.timeoutMinutesRow) {
+    els.timeoutMinutesRow.classList.toggle('hidden', !state.sessionTimeoutEnabled);
+  }
+  if (els.timeoutMinutes) {
+    els.timeoutMinutes.value = state.sessionTimeoutMinutes;
+  }
 }
 
 function bindEvents() {
@@ -830,6 +937,40 @@ function bindEvents() {
   }
   els.reloginBtn.addEventListener('click', relogin);
   els.logoutBtn.addEventListener('click', handleLogout);
+
+  // Session Timeout Popup
+  els.timeoutSettingsBtn.addEventListener('click', handleTimeoutSettings);
+  els.timeoutLoginBtn.addEventListener('click', handleTimeoutLogin);
+
+  // Session Timeout Settings
+  els.timeoutToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.sessionTimeoutEnabled = btn.dataset.value === 'on';
+      saveSessionSettings();
+      updateTimeoutUI();
+      if (state.sessionTimeoutEnabled && state.token) {
+        startSessionTimer();
+      } else {
+        stopSessionTimer();
+      }
+    });
+  });
+
+  els.timeoutMinutes.addEventListener('change', () => {
+    let val = parseInt(els.timeoutMinutes.value, 10);
+    if (isNaN(val) || val < 1) val = 1;
+    if (val > 60) val = 60;
+    els.timeoutMinutes.value = val;
+    state.sessionTimeoutMinutes = val;
+    saveSessionSettings();
+    if (state.sessionTimeoutEnabled && state.token) {
+      startSessionTimer();
+    }
+  });
+
+  // Reset timer on user activity
+  document.addEventListener('click', resetSessionTimer);
+  document.addEventListener('keydown', resetSessionTimer);
 }
 
 bootstrap().then(() => {

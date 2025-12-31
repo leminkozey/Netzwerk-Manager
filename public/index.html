@@ -293,8 +293,7 @@
             </div>
           </div>
         </section>
-
-              </main>
+      </main>
 
       <footer class="site-footer">
         <span>made by <a href="https://github.com/leminkozey" target="_blank" rel="noopener">leminkozey</a></span>
@@ -328,6 +327,13 @@
                 <circle cx="12" cy="12" r="9" />
               </svg>
               <span>Versionen</span>
+            </button>
+            <button class="settings-tab" data-tab="session">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 6v6l4 2" />
+              </svg>
+              <span>Session</span>
             </button>
             <button class="settings-tab" data-tab="user">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -363,6 +369,39 @@
                 </div>
               </div>
             </div>
+            <div class="settings-panel" id="panel-versionen">
+              <h4>Versionen</h4>
+              <div class="version-section">
+                <label>Port-Belegungen</label>
+                <select class="version-select" id="versionSelect"></select>
+                <span class="muted version-details" id="versionDetails"></span>
+              </div>
+              <div class="version-section">
+                <label>Speedport</label>
+                <select class="version-select" id="speedportVersionSelect"></select>
+                <span class="muted version-details" id="speedportVersionDetails"></span>
+              </div>
+              <div class="version-section">
+                <label>PiHole / Raspberry</label>
+                <select class="version-select" id="raspberryVersionSelect"></select>
+                <span class="muted version-details" id="raspberryVersionDetails"></span>
+              </div>
+            </div>
+            <div class="settings-panel" id="panel-session">
+              <h4>Session Timeout</h4>
+              <p class="setting-description">Automatisch ausloggen nach Inaktivitaet.</p>
+              <div class="setting-row">
+                <label>Timeout aktivieren</label>
+                <div class="toggle-group" id="timeoutToggleGroup">
+                  <button class="toggle-option" data-value="off">Aus</button>
+                  <button class="toggle-option active" data-value="on">An</button>
+                </div>
+              </div>
+              <div class="setting-row" id="timeoutMinutesRow">
+                <label>Minuten bis Timeout</label>
+                <input type="number" id="timeoutMinutes" class="timeout-input" value="5" min="1" max="60" />
+              </div>
+            </div>
             <div class="settings-panel" id="panel-user">
               <h4>Benutzer & Passwort</h4>
               <form id="credentialForm">
@@ -381,24 +420,6 @@
               </form>
               <hr class="settings-divider" />
               <button class="btn logout-btn" id="logoutBtn">Ausloggen</button>
-            </div>
-            <div class="settings-panel" id="panel-versionen">
-              <h4>Versionen</h4>
-              <div class="version-section">
-                <label>Port-Belegungen</label>
-                <select class="version-select" id="versionSelect"></select>
-                <span class="muted version-details" id="versionDetails"></span>
-              </div>
-              <div class="version-section">
-                <label>Speedport</label>
-                <select class="version-select" id="speedportVersionSelect"></select>
-                <span class="muted version-details" id="speedportVersionDetails"></span>
-              </div>
-              <div class="version-section">
-                <label>PiHole / Raspberry</label>
-                <select class="version-select" id="raspberryVersionSelect"></select>
-                <span class="muted version-details" id="raspberryVersionDetails"></span>
-              </div>
             </div>
             <div class="settings-panel" id="panel-credits">
               <div class="credits-content">
@@ -421,6 +442,17 @@
         <h3>Sitzung beendet</h3>
         <p id="logoutReason">Ein anderes Gerät hat sich angemeldet.</p>
         <button class="btn" id="reloginBtn">Erneut einloggen</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="timeoutOverlay">
+      <div class="overlay-content">
+        <h3>Session abgelaufen</h3>
+        <p class="timeout-hint">Du kannst die Zeit in den Einstellungen anpassen oder deaktivieren.</p>
+        <div class="timeout-buttons">
+          <button class="btn secondary" id="timeoutSettingsBtn">Einstellungen</button>
+          <button class="btn" id="timeoutLoginBtn">Login</button>
+        </div>
       </div>
     </div>
 
