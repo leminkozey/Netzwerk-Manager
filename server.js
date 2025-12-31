@@ -745,15 +745,48 @@ function startServer() {
     const params = new URLSearchParams(req.url.replace('/?', ''));
     const token = params.get('token');
 
+    socket.isAlive = true;
+
     if (token) {
       runtime.sockets.set(token, socket);
     }
+
+    socket.on('pong', () => {
+      socket.isAlive = true;
+    });
 
     socket.on('close', () => {
       if (token) {
         runtime.sockets.delete(token);
       }
     });
+
+    socket.on('error', () => {
+      socket.isAlive = false;
+    });
+  });
+
+  // Heartbeat: Prüfe alle 30 Sekunden ob Verbindungen noch leben
+  const heartbeatInterval = setInterval(() => {
+    // Ping/Pong Check
+    wss.clients.forEach((socket) => {
+      if (socket.isAlive === false) {
+        return socket.terminate();
+      }
+      socket.isAlive = false;
+      socket.ping();
+    });
+
+    // Cleanup: Entferne tote Einträge aus runtime.sockets
+    for (const [token, socket] of runtime.sockets.entries()) {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        runtime.sockets.delete(token);
+      }
+    }
+  }, 30000);
+
+  wss.on('close', () => {
+    clearInterval(heartbeatInterval);
   });
 }
 
