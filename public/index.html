@@ -297,7 +297,7 @@
 
       <footer class="site-footer">
         <span>made by <a href="https://github.com/leminkozey" target="_blank" rel="noopener">leminkozey</a></span>
-        <span class="version">v1.4.0</span>
+        <span class="version">v1.5.0</span>
       </footer>
 
     </div>
@@ -321,12 +321,13 @@
               </svg>
               <span>Design</span>
             </button>
-            <button class="settings-tab" data-tab="versionen">
+            <button class="settings-tab" data-tab="daten">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path d="M12 8v4l3 3" />
-                <circle cx="12" cy="12" r="9" />
+                <path d="M4 7v10c0 1 1 2 2 2h12c1 0 2-1 2-2V7" />
+                <path d="M4 7c0-1 1-2 2-2h12c1 0 2 1 2 2" />
+                <path d="M12 11v6M9 14l3 3 3-3" />
               </svg>
-              <span>Versionen</span>
+              <span>Daten</span>
             </button>
             <button class="settings-tab" data-tab="session">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -369,7 +370,7 @@
                 </div>
               </div>
             </div>
-            <div class="settings-panel" id="panel-versionen">
+            <div class="settings-panel" id="panel-daten">
               <h4>Versionen</h4>
               <div class="version-section">
                 <label>Port-Belegungen</label>
@@ -385,6 +386,16 @@
                 <label>PiHole / Raspberry</label>
                 <select class="version-select" id="raspberryVersionSelect"></select>
                 <span class="muted version-details" id="raspberryVersionDetails"></span>
+              </div>
+              <hr class="settings-divider" />
+              <h4>Export / Import</h4>
+              <p class="setting-description">Exportiere oder importiere alle Daten (inkl. Credentials).</p>
+              <div class="export-import-buttons">
+                <button class="btn" id="exportBtn">Daten exportieren</button>
+                <label class="btn secondary import-label">
+                  Daten importieren
+                  <input type="file" id="importFile" accept=".json" hidden />
+                </label>
               </div>
             </div>
             <div class="settings-panel" id="panel-session">
@@ -426,7 +437,7 @@
                 <img class="credits-avatar" src="https://github.com/leminkozey.png" alt="leminkozey" />
                 <span class="credits-label">made by</span>
                 <a class="credits-name" href="https://github.com/leminkozey" target="_blank" rel="noopener">leminkozey</a>
-                <span class="credits-version">v1.4.0</span>
+                <span class="credits-version">v1.5.0</span>
                 <a class="credits-repo" href="https://github.com/leminkozey/netzwerk-manager" target="_blank" rel="noopener">
                   Bleibe immer aktuell
                 </a>

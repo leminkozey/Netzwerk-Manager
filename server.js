@@ -730,6 +730,52 @@ app.get('/api/speedtest/history', authRequired, (req, res) => {
   res.json({ history: state.speedTestHistory || [] });
 });
 
+app.get('/api/export', authRequired, (req, res) => {
+  const state = readState();
+  const exportData = {
+    exportedAt: new Date().toISOString(),
+    version: '1.5.0',
+    data: state,
+  };
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', 'attachment; filename="netzwerk-manager-backup.json"');
+  res.json(exportData);
+});
+
+app.post('/api/import', authRequired, (req, res) => {
+  const { data } = req.body || {};
+  if (!data || typeof data !== 'object') {
+    return res.status(400).json({ error: 'Ungueltige Daten' });
+  }
+
+  // Validiere wichtige Felder
+  if (!data.switchPorts && !data.routerPorts && !data.credentials) {
+    return res.status(400).json({ error: 'Keine gueltigen Netzwerk-Manager Daten' });
+  }
+
+  // Merge mit Default-State um fehlende Felder zu ergaenzen
+  const currentState = readState();
+  const newState = {
+    ...defaultState,
+    ...data,
+    credentials: { ...defaultState.credentials, ...(data.credentials || {}) },
+    speedportInfo: { ...defaultState.speedportInfo, ...(data.speedportInfo || {}) },
+    raspberryInfo: { ...defaultState.raspberryInfo, ...(data.raspberryInfo || {}) },
+    switchPorts: data.switchPorts || currentState.switchPorts,
+    routerPorts: data.routerPorts || currentState.routerPorts,
+    versions: Array.isArray(data.versions) ? data.versions : [],
+    speedportVersions: Array.isArray(data.speedportVersions) ? data.speedportVersions : [],
+    raspberryVersions: Array.isArray(data.raspberryVersions) ? data.raspberryVersions : [],
+    deviceTokens: Array.isArray(data.deviceTokens) ? data.deviceTokens : [],
+    speedTestHistory: Array.isArray(data.speedTestHistory) ? data.speedTestHistory : [],
+  };
+
+  saveState(newState);
+  writeCredentialsFile(newState.credentials);
+
+  res.json({ ok: true, message: 'Daten erfolgreich importiert' });
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

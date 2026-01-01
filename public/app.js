@@ -44,6 +44,8 @@ const els = {
   timeoutToggleGroup: document.getElementById('timeoutToggleGroup'),
   timeoutMinutesRow: document.getElementById('timeoutMinutesRow'),
   timeoutMinutes: document.getElementById('timeoutMinutes'),
+  exportBtn: document.getElementById('exportBtn'),
+  importFile: document.getElementById('importFile'),
 };
 
 const speedportInputs = {
@@ -877,6 +879,61 @@ function updateTimeoutUI() {
   }
 }
 
+// Export/Import
+async function handleExport() {
+  try {
+    const res = await fetch('/api/export', { headers: authHeaders() });
+    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    if (!res.ok) {
+      showToast('Export fehlgeschlagen', true);
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `netzwerk-manager-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Daten exportiert');
+  } catch (e) {
+    console.error('Export error:', e);
+    showToast('Export fehlgeschlagen', true);
+  }
+}
+
+async function handleImport(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const json = JSON.parse(text);
+    const data = json.data || json;
+
+    if (!confirm('Alle Daten werden ueberschrieben. Fortfahren?')) {
+      return;
+    }
+
+    const res = await fetch('/api/import', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ data }),
+    });
+    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    const body = await res.json();
+    if (!res.ok) {
+      showToast(body.error || 'Import fehlgeschlagen', true);
+      return;
+    }
+    showToast('Daten importiert - Seite wird neu geladen');
+    setTimeout(() => location.reload(), 1500);
+  } catch (e) {
+    console.error('Import error:', e);
+    showToast('Ungueltige JSON-Datei', true);
+  }
+}
+
 function bindEvents() {
   els.loginBtn.addEventListener('click', handleLogin);
   els.passInput.addEventListener('keyup', (e) => e.key === 'Enter' && handleLogin());
@@ -971,6 +1028,13 @@ function bindEvents() {
   // Reset timer on user activity
   document.addEventListener('click', resetSessionTimer);
   document.addEventListener('keydown', resetSessionTimer);
+
+  // Export/Import
+  els.exportBtn.addEventListener('click', handleExport);
+  els.importFile.addEventListener('change', (e) => {
+    handleImport(e.target.files[0]);
+    e.target.value = '';
+  });
 }
 
 bootstrap().then(() => {

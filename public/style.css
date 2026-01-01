@@ -982,6 +982,21 @@ input:focus {
   margin-bottom: 16px;
 }
 
+/* Export/Import Buttons */
+.export-import-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+.export-import-buttons .btn {
+  flex: 1;
+}
+
+.import-label {
+  cursor: pointer;
+  text-align: center;
+}
+
 .timeout-buttons {
   display: flex;
   justify-content: space-between;
