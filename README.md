@@ -83,16 +83,39 @@ Dokumentiere welches Gerät an welchem Port hängt. Jeder Port hat:
 
 ### Einstellungen
 
-Über den Zahnrad-Button oben links erreichst du die Einstellungen mit vier Bereichen:
+Über den Zahnrad-Button oben links erreichst du die Einstellungen:
 
 - **Design**: Theme (Dark/Light) und Button-Stil (Default/Simpel) wählen
-- **Versionen**: Versionshistorie für Port-Belegungen, Speedport und PiHole/Raspberry einsehen
-- **User**: Benutzername und Passwort ändern
+- **Daten**: Versionshistorie einsehen + Export/Import
+- **Session**: Automatisches Ausloggen nach Inaktivität (einstellbar)
+- **User**: Benutzername und Passwort ändern, Logout
 - **Credits**: Entwickler-Info und Link zum Repository
 
 ### Versionshistorie
 
-Jede Änderung an den Ports, PiHole- oder Speedport-Infos wird automatisch versioniert. Du kannst jederzeit ältere Versionen einsehen (Einstellungen → Versionen) und nachvollziehen, was wann geändert wurde.
+Jede Änderung an den Ports, PiHole- oder Speedport-Infos wird automatisch versioniert. Du kannst jederzeit ältere Versionen einsehen (Einstellungen → Daten) und nachvollziehen, was wann geändert wurde.
+
+### Daten exportieren / importieren
+
+Du kannst alle Daten als JSON-Datei sichern und wiederherstellen:
+
+**Export:**
+1. Einstellungen → Daten
+2. "Daten exportieren" klicken
+3. JSON-Datei wird heruntergeladen (enthält alle Einstellungen inkl. Zugangsdaten)
+
+**Import:**
+1. Einstellungen → Daten
+2. "Daten importieren" klicken
+3. JSON-Datei auswählen
+4. Bestätigen - Seite lädt neu mit importierten Daten
+
+**Hinweis:** Beim Import werden alle bestehenden Daten überschrieben.
+
+### Sicherheit
+
+- **Rate-Limiting**: Nach 5 falschen Login-Versuchen wird die IP gesperrt (5 Min, dann eskalierend)
+- **Session-Timeout**: Automatisches Ausloggen nach Inaktivität (einstellbar in Einstellungen → Session)
 
 ### Speed-Test
 
