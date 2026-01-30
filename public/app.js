@@ -6,8 +6,10 @@ const els = {
   closeSettings: document.getElementById('closeSettings'),
   settingsTabs: document.querySelectorAll('.settings-tab'),
   settingsPanels: document.querySelectorAll('.settings-panel'),
-  themeToggleGroup: document.getElementById('themeToggleGroup'),
+  themeSwitcher: document.getElementById('themeSwitcher'),
   buttonStyleGroup: document.getElementById('buttonStyleGroup'),
+  glowStrength: document.getElementById('glowStrength'),
+  accentPicker: document.getElementById('accentPicker'),
   versionChip: document.getElementById('versionChip'),
   loginCard: document.getElementById('loginCard'),
   loginBtn: document.getElementById('loginBtn'),
@@ -72,6 +74,8 @@ const raspberryInputs = {
 const state = {
   token: null,
   theme: 'dark',
+  glowStrength: 1,
+  accent: '#00d4ff',
   versions: [],
   switchPorts: [],
   routerPorts: [],
@@ -106,8 +110,17 @@ const STORAGE_KEYS = {
   deviceToken: 'deviceToken',
   theme: 'theme',
   buttonStyle: 'buttonStyle',
+  glowStrength: 'glowStrength',
+  accent: 'accent',
   sessionTimeoutEnabled: 'sessionTimeoutEnabled',
   sessionTimeoutMinutes: 'sessionTimeoutMinutes',
+};
+
+const defaults = {
+  theme: 'dark',
+  buttonStyle: 'default',
+  glowStrength: 1,
+  accent: '#00d4ff',
 };
 
 function debounce(fn, wait) {
@@ -155,21 +168,113 @@ function pickTextColor(hex) {
   return luminance > 0.6 ? '#0f1526' : '#ffffff';
 }
 
+function getSystemTheme() {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 function applyTheme(theme, save = false) {
   state.theme = theme;
-  document.body.setAttribute('data-theme', theme);
+  const effectiveTheme = theme === 'system' ? getSystemTheme() : theme;
+  document.body.setAttribute('data-theme', effectiveTheme);
   if (save) {
     localStorage.setItem(STORAGE_KEYS.theme, theme);
     // Tabellen neu rendern damit Farben stimmen
     if (state.token) renderTables();
   }
-  updateThemeToggleUI(theme);
+  updateThemeSwitcherUI(theme);
 }
 
-function updateThemeToggleUI(theme) {
-  if (!els.themeToggleGroup) return;
-  els.themeToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+function updateThemeSwitcherUI(theme) {
+  if (!els.themeSwitcher) return;
+  const options = ['dark', 'system', 'light'];
+  const position = options.indexOf(theme);
+  els.themeSwitcher.setAttribute('data-position', position >= 0 ? position : 0);
+  els.themeSwitcher.querySelectorAll('.theme-option').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.value === theme);
+  });
+}
+
+// Legacy alias for compatibility
+function updateThemeToggleUI(theme) {
+  updateThemeSwitcherUI(theme);
+}
+
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
+    : { r: 0, g: 212, b: 255 };
+}
+
+function applyGlowStrength(value) {
+  const numeric = Number(value);
+  const safeValue = Number.isNaN(numeric) ? defaults.glowStrength : numeric;
+  state.glowStrength = Math.min(2, Math.max(0, safeValue));
+  document.documentElement.style.setProperty('--glow-strength', String(state.glowStrength));
+  document.body.style.setProperty('--glow-strength', String(state.glowStrength));
+  updateGlowSliderUI(state.glowStrength);
+}
+
+function updateGlowSliderUI(value) {
+  const slider = els.glowStrength;
+  if (!slider) return;
+  const numeric = Number(value);
+  const safeValue = Number.isNaN(numeric) ? defaults.glowStrength : numeric;
+  slider.value = String(safeValue);
+  const percent = Math.round((safeValue / 2) * 100);
+  slider.style.setProperty('--glow-percent', `${percent}%`);
+  slider.style.setProperty('--glow-thumb-icon', buildGlowThumbIcon(safeValue));
+}
+
+function buildGlowThumbIcon(value) {
+  const clamped = Math.min(2, Math.max(0, Number(value)));
+  let lines = '';
+  if (clamped > 0) {
+    const minRay = 1.4;
+    const maxRay = 4.6;
+    const inner = 6;
+    const rayLength = minRay + (maxRay - minRay) * (clamped / 2);
+    const outer = inner + rayLength;
+    const diagInner = inner * Math.SQRT1_2;
+    const diagOuter = outer * Math.SQRT1_2;
+    const fmt = (num) => Number(num.toFixed(2));
+    const line = (x1, y1, x2, y2) =>
+      `<line x1='${fmt(x1)}' y1='${fmt(y1)}' x2='${fmt(x2)}' y2='${fmt(y2)}'/>`;
+    lines = [
+      line(12, 12 - inner, 12, 12 - outer),
+      line(12, 12 + inner, 12, 12 + outer),
+      line(12 - inner, 12, 12 - outer, 12),
+      line(12 + inner, 12, 12 + outer, 12),
+      line(12 - diagInner, 12 - diagInner, 12 - diagOuter, 12 - diagOuter),
+      line(12 + diagInner, 12 - diagInner, 12 + diagOuter, 12 - diagOuter),
+      line(12 - diagInner, 12 + diagInner, 12 - diagOuter, 12 + diagOuter),
+      line(12 + diagInner, 12 + diagInner, 12 + diagOuter, 12 + diagOuter),
+    ].join('');
+  }
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round'><circle cx='12' cy='12' r='4' fill='none'/>${lines}</svg>`;
+  const encoded = encodeURIComponent(svg);
+  return `url("data:image/svg+xml,${encoded}")`;
+}
+
+function applyAccentColor(hex) {
+  state.accent = hex || defaults.accent;
+  const rgb = hexToRgb(state.accent);
+  const accentVars = {
+    '--accent': state.accent,
+    '--accent-strong': state.accent,
+    '--accent-rgb': `${rgb.r} ${rgb.g} ${rgb.b}`,
+  };
+  for (const [key, value] of Object.entries(accentVars)) {
+    document.documentElement.style.setProperty(key, value);
+    document.body.style.setProperty(key, value);
+  }
+  updateAccentPickerUI(state.accent);
+}
+
+function updateAccentPickerUI(accent) {
+  if (!els.accentPicker) return;
+  els.accentPicker.querySelectorAll('.accent-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.color === accent);
   });
 }
 
@@ -189,10 +294,15 @@ function updateButtonStyleUI(style) {
 }
 
 function loadLocalSettings() {
-  const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || 'dark';
-  const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || 'default';
+  const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || defaults.theme;
+  const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || defaults.buttonStyle;
+  const savedGlowStrength = localStorage.getItem(STORAGE_KEYS.glowStrength);
+  const savedAccent = localStorage.getItem(STORAGE_KEYS.accent) || defaults.accent;
+
   applyTheme(savedTheme);
   applyButtonStyle(savedButtonStyle);
+  applyGlowStrength(savedGlowStrength !== null ? Number(savedGlowStrength) : defaults.glowStrength);
+  applyAccentColor(savedAccent);
   loadSessionSettings();
 }
 
@@ -952,12 +1062,21 @@ function bindEvents() {
     });
   });
 
-  // Theme Toggle
-  els.themeToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const theme = btn.dataset.value;
-      applyTheme(theme, true);
+  // Theme Switcher (3-way)
+  if (els.themeSwitcher) {
+    els.themeSwitcher.querySelectorAll('.theme-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.value;
+        applyTheme(theme, true);
+      });
     });
+  }
+
+  // Listen for system theme changes
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (state.theme === 'system') {
+      applyTheme('system');
+    }
   });
 
   // Button Style Toggle
@@ -967,6 +1086,30 @@ function bindEvents() {
       applyButtonStyle(style, true);
     });
   });
+
+  // Glow Strength Slider
+  if (els.glowStrength) {
+    els.glowStrength.addEventListener('input', (e) => {
+      const nextValue = Number(e.target.value);
+      applyGlowStrength(nextValue);
+    });
+    els.glowStrength.addEventListener('change', () => {
+      localStorage.setItem(STORAGE_KEYS.glowStrength, String(state.glowStrength));
+      showToast('Gespeichert');
+    });
+  }
+
+  // Accent Color Picker
+  if (els.accentPicker) {
+    els.accentPicker.querySelectorAll('.accent-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const color = btn.dataset.color;
+        applyAccentColor(color);
+        localStorage.setItem(STORAGE_KEYS.accent, color);
+        showToast('Gespeichert');
+      });
+    });
+  }
 
   els.credentialForm.addEventListener('submit', saveCredentials);
   Object.values(speedportInputs).forEach((input) => {
