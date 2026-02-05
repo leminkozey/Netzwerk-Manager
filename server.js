@@ -1186,6 +1186,14 @@ app.get('/api/windows-pc', authRequired, (req, res) => {
   });
 });
 
+// GET password - reveal SSH password (authenticated)
+app.get('/api/windows-pc/password', authRequired, (req, res) => {
+  const config = readWindowsPCConfig();
+  res.json({
+    password: config.sshPassword || '',
+  });
+});
+
 // POST config - with input validation
 app.post('/api/windows-pc', authRequired, (req, res) => {
   const clientIp = getClientIp(req);

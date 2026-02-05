@@ -923,6 +923,7 @@ async function handleLogin() {
     els.topBar.style.display = 'flex';
     els.app.style.display = 'block';
     startSessionTimer();
+    windowsPC.init();
     if (state.redirectToSettings) {
       state.redirectToSettings = false;
       openSettings();
@@ -997,6 +998,7 @@ async function loginWithDeviceToken(token) {
   els.topBar.style.display = 'flex';
   els.app.style.display = 'block';
   startSessionTimer();
+  windowsPC.init();
   if (state.redirectToSettings) {
     state.redirectToSettings = false;
     openSettings();
@@ -2204,8 +2206,16 @@ speedTest.updateHostNotice();
 const windowsPC = {
   config: null,
   statusInterval: null,
+  initialized: false,
 
   async init() {
+    // Prevent multiple initializations
+    if (this.initialized) {
+      // Just refresh status if already initialized
+      this.checkStatus();
+      return;
+    }
+    this.initialized = true;
     await this.loadConfig();
     this.bindEvents();
     this.startStatusCheck();
@@ -2237,11 +2247,12 @@ const windowsPC = {
     if (macEl) macEl.textContent = this.config.macAddress || '--';
     if (userEl) userEl.textContent = this.config.sshUser || '--';
 
-    // Password is never sent from server - only show if configured
+    // Password display
     if (passEl) {
-      const masked = passEl.querySelector('.password-masked');
-      if (masked) {
-        masked.textContent = this.config.hasPassword ? i18n.t('pc.passwordSet') : i18n.t('pc.passwordNotSet');
+      const passText = passEl.querySelector('.password-text');
+      if (passText && !this.passwordRevealed) {
+        passText.textContent = this.config.hasPassword ? i18n.t('pc.passwordSet') : i18n.t('pc.passwordNotSet');
+        passText.classList.remove('revealed');
       }
     }
   },
@@ -2249,6 +2260,7 @@ const windowsPC = {
   bindEvents() {
     const wakeBtn = document.getElementById('pcWakeBtn');
     const shutdownBtn = document.getElementById('pcShutdownBtn');
+    const passwordToggle = document.getElementById('pcPasswordToggle');
 
     if (wakeBtn) {
       wakeBtn.addEventListener('click', () => this.wake());
@@ -2257,11 +2269,58 @@ const windowsPC = {
     if (shutdownBtn) {
       shutdownBtn.addEventListener('click', () => this.shutdown());
     }
+
+    if (passwordToggle) {
+      passwordToggle.addEventListener('click', () => this.togglePassword());
+    }
+  },
+
+  passwordRevealed: false,
+  cachedPassword: null,
+
+  async togglePassword() {
+    const passEl = document.getElementById('pcSshPassValue');
+    const passText = passEl?.querySelector('.password-text');
+    const eyeIcon = document.querySelector('#pcPasswordToggle .eye-icon');
+    const eyeOffIcon = document.querySelector('#pcPasswordToggle .eye-off-icon');
+
+    if (!passText) return;
+
+    if (this.passwordRevealed) {
+      // Hide password
+      passText.textContent = this.config.hasPassword ? i18n.t('pc.passwordSet') : i18n.t('pc.passwordNotSet');
+      passText.classList.remove('revealed');
+      if (eyeIcon) eyeIcon.style.display = '';
+      if (eyeOffIcon) eyeOffIcon.style.display = 'none';
+      this.passwordRevealed = false;
+    } else {
+      // Show password - fetch from server if not cached
+      if (!this.cachedPassword) {
+        try {
+          const res = await fetch('/api/windows-pc/password', { headers: authHeaders() });
+          if (res.ok) {
+            const data = await res.json();
+            this.cachedPassword = data.password;
+          }
+        } catch (e) {
+          console.error('Failed to fetch password:', e);
+          return;
+        }
+      }
+      passText.textContent = this.cachedPassword || i18n.t('pc.passwordNotSet');
+      passText.classList.add('revealed');
+      if (eyeIcon) eyeIcon.style.display = 'none';
+      if (eyeOffIcon) eyeOffIcon.style.display = '';
+      this.passwordRevealed = true;
+    }
   },
 
   startStatusCheck() {
+    // Clear any existing interval first
+    this.stopStatusCheck();
     this.checkStatus();
-    this.statusInterval = setInterval(() => this.checkStatus(), 10000);
+    // Check every 5 seconds for more responsive updates
+    this.statusInterval = setInterval(() => this.checkStatus(), 5000);
   },
 
   stopStatusCheck() {

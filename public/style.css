@@ -2054,11 +2054,40 @@ label {
 .pc-password {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 
-.password-masked {
+.password-text {
   letter-spacing: 0.1em;
   color: var(--text-muted);
+}
+
+.password-text.revealed {
+  letter-spacing: normal;
+  color: var(--text);
+}
+
+.password-toggle-btn {
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.password-toggle-btn:hover {
+  color: var(--accent);
+}
+
+.password-toggle-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
 @media (max-width: 640px) {

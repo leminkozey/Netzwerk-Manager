@@ -74,7 +74,7 @@ const siteConfig = {
   // Links erscheinen in der Topbar mit Favicon
   // Favicon wird automatisch via Google Favicon Service geholt
   headerLinks: [
-    { name: 'Github', url: 'https://github.com' },
+    { name: 'Github', url: 'https://github.com/leminkozey' },
     { name: 'KanBan', url: 'https://leminkanban.de'},
   ],
 };
