@@ -4,6 +4,10 @@ node_modules/
 # Laufzeit-Daten (wird automatisch erstellt)
 Data/state.json
 
+# Sensible Daten
+Data/Nutzer
+Data/LoginToken.txt
+
 # macOS
 .DS_Store
 
@@ -17,3 +21,4 @@ yarn-error.log*
 .idea/
 *.swp
 *.swo
+*.code-workspace
