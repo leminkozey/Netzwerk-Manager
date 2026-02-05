@@ -54,4 +54,13 @@ const siteConfig = {
       // credits: immer sichtbar (kann nicht deaktiviert werden)
     },
   },
+
+  // ══════════════════════════════════════════════
+  // HEADER LINKS
+  // ══════════════════════════════════════════════
+  // Links erscheinen in der Topbar mit Favicon
+  // Favicon wird automatisch via Google Favicon Service geholt
+  headerLinks: [
+    { name: 'Github', url: 'https://github.com' },
+  ],
 };
