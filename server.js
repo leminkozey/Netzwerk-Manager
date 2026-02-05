@@ -246,7 +246,7 @@ function ensureLoginTokenFile() {
   const sample = [
     '# Jede Zeile: token|Geraetename',
     '# Beispiel:',
-    '# 123456789|MacBook von Manu',
+    '# 123456789|MacBook von Max',
     '',
   ].join('\n');
   fs.writeFileSync(LOGIN_TOKEN_FILE, sample, 'utf-8');
@@ -284,7 +284,7 @@ function usePiSpeedtest() {
 }
 
 function getPiSpeedtestTarget(state) {
-  const host = process.env.PI_SPEEDTEST_HOST || state.raspberryInfo?.ipAddress || '192.168.2.124';
+  const host = process.env.PI_SPEEDTEST_HOST || state.raspberryInfo?.ipAddress || '192.168.1.1';
   const port = parseInt(process.env.PI_SPEEDTEST_PORT, 10) || 8080;
   return { host, port };
 }

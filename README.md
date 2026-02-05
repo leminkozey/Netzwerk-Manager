@@ -73,6 +73,59 @@ node -e "console.log(require('crypto').randomUUID())"
 
 Den generierten Token dann in `Data/LoginToken.txt` eintragen mit einem Geräte-Namen.
 
+### Website-Konfiguration (config.js)
+
+Die Datei `public/config.js` ermöglicht umfangreiche Anpassungen der Website ohne Code-Änderungen.
+
+**Animationen steuern:**
+```javascript
+animations: {
+  enabled: true,          // Master-Schalter (false = alle Animationen aus)
+  heroGradient: true,     // Titel-Farbverlauf-Animation
+  fadeIn: true,           // Einblend-Effekte
+  modalSlide: true,       // Modal-Einblendung
+  panelFade: true,        // Settings-Panel-Wechsel
+  themeSwitcher: true,    // Theme-Button-Animationen
+},
+```
+
+**Design-Defaults festlegen:**
+```javascript
+defaults: {
+  theme: 'dark',          // 'dark' | 'light' | 'system'
+  buttonStyle: 'default', // 'default' | 'simple'
+  language: 'de',         // 'de' | 'en'
+  accentColor: '#00d4ff', // Hex-Farbe
+  glow: {
+    enabled: true,        // Glow-Effekt an/aus
+    strength: 1,          // Wert 0-2
+  },
+  sessionTimeout: {
+    enabled: true,        // Timeout an/aus
+    minutes: 5,           // Minuten bis Timeout (1-60)
+  },
+},
+```
+
+**Einstellungen-Sichtbarkeit:**
+```javascript
+settings: {
+  showSettingsButton: true,  // Einstellungen-Button anzeigen
+  tabs: {
+    design: true,            // Design-Tab
+    daten: true,             // Daten-Tab (Export/Import)
+    session: true,           // Session-Tab
+    user: true,              // User-Tab
+    // credits: immer sichtbar
+  },
+},
+```
+
+**Hinweise:**
+- Wenn `config.js` nicht geladen werden kann, werden sichere Defaults verwendet
+- Benutzer-Einstellungen (localStorage) haben Vorrang vor Config-Defaults
+- Der Credits-Tab kann nicht deaktiviert werden
+
 ## Features
 
 ### Port-Verwaltung
