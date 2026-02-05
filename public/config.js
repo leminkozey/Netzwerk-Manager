@@ -75,6 +75,6 @@ const siteConfig = {
   // Favicon wird automatisch via Google Favicon Service geholt
   headerLinks: [
     { name: 'Github', url: 'https://github.com' },
-    // { name: 'KanBan', url: 'https://leminkanban.de'},
+    { name: 'KanBan', url: 'https://leminkanban.de'},
   ],
 };
