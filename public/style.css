@@ -177,6 +177,42 @@ a:hover {
   transition: all 0.2s ease;
 }
 
+/* Header Links */
+.header-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: #1a2332;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.header-link:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(26, 35, 50, 0.9);
+}
+
+.header-link img {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Hero Section
    ═══════════════════════════════════════════════════════════════════ */
