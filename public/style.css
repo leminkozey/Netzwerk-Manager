@@ -1732,6 +1732,43 @@ label {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Animation Controls (via config.js)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Master Animation Off - Focus-Indikatoren bleiben für Accessibility */
+[data-animations="off"] *:not(:focus),
+[data-animations="off"] *:not(:focus)::before,
+[data-animations="off"] *:not(:focus)::after {
+  animation: none !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* Einzelne Animationen */
+[data-animation-hero="off"] .hero h1 {
+  animation: none !important;
+}
+
+[data-animation-fade="off"] .card,
+[data-animation-fade="off"] .top-bar,
+[data-animation-fade="off"] .overlay {
+  animation: none !important;
+}
+
+[data-animation-modal="off"] .settings-modal,
+[data-animation-modal="off"] .overlay-content {
+  animation: none !important;
+}
+
+[data-animation-panel="off"] .settings-panel.active {
+  animation: none !important;
+}
+
+[data-animation-theme="off"] .theme-option svg,
+[data-animation-theme="off"] .theme-option.active svg {
+  animation: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Actions Row
    ═══════════════════════════════════════════════════════════════════ */
 

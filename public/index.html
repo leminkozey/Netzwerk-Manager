@@ -587,6 +587,11 @@
       </div>
     </div>
 
+    <script>
+      // Fallback falls config.js nicht geladen werden kann
+      window.siteConfig = window.siteConfig || null;
+    </script>
+    <script src="config.js" onerror="console.warn('config.js konnte nicht geladen werden - verwende Defaults')"></script>
     <script src="app.js"></script>
   </body>
 </html>

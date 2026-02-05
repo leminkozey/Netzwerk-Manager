@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const i18n = {
-  currentLang: localStorage.getItem('lang') || 'de',
+  currentLang: localStorage.getItem('lang') || (typeof siteConfig !== 'undefined' ? siteConfig.defaults?.language : null) || 'de',
 
   translations: {
     de: {
@@ -427,11 +427,34 @@ const STORAGE_KEYS = {
   sessionTimeoutMinutes: 'sessionTimeoutMinutes',
 };
 
+// Config-basierte Defaults mit Fallback und Validierung
+const configDefaults = typeof siteConfig !== 'undefined' ? siteConfig.defaults : null;
+
+function validateTheme(theme) {
+  const validThemes = ['dark', 'light', 'system'];
+  return validThemes.includes(theme) ? theme : 'dark';
+}
+
+function validateGlowStrength(value) {
+  const num = Number(value);
+  if (Number.isNaN(num)) return 1;
+  return Math.min(2, Math.max(0, num));
+}
+
+function validateTimeoutMinutes(value) {
+  const num = parseInt(value, 10);
+  if (Number.isNaN(num) || num < 1) return 5;
+  return Math.min(60, num);
+}
+
 const defaults = {
-  theme: 'dark',
-  buttonStyle: 'default',
-  glowStrength: 1,
-  accent: '#00d4ff',
+  theme: validateTheme(configDefaults?.theme),
+  buttonStyle: configDefaults?.buttonStyle === 'simple' ? 'simple' : 'default',
+  glowStrength: configDefaults?.glow?.enabled !== false ? validateGlowStrength(configDefaults?.glow?.strength ?? 1) : 0,
+  accent: /^#[0-9A-Fa-f]{6}$/.test(configDefaults?.accentColor) ? configDefaults.accentColor : '#00d4ff',
+  language: configDefaults?.language === 'en' ? 'en' : 'de',
+  sessionTimeoutEnabled: configDefaults?.sessionTimeout?.enabled !== false,
+  sessionTimeoutMinutes: validateTimeoutMinutes(configDefaults?.sessionTimeout?.minutes ?? 5),
 };
 
 function debounce(fn, wait) {
@@ -630,6 +653,7 @@ function updateButtonStyleUI(style) {
 }
 
 function loadLocalSettings() {
+  // Config-Defaults verwenden wenn keine localStorage-Werte vorhanden
   const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || defaults.theme;
   const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || defaults.buttonStyle;
   const savedGlowStrength = localStorage.getItem(STORAGE_KEYS.glowStrength);
@@ -640,6 +664,92 @@ function loadLocalSettings() {
   applyGlowStrength(savedGlowStrength !== null ? Number(savedGlowStrength) : defaults.glowStrength);
   applyAccentColor(savedAccent);
   loadSessionSettings();
+
+  // Config-basierte Sichtbarkeit und Animationen anwenden
+  applyConfigVisibility();
+  applyAnimationConfig();
+}
+
+function applyConfigVisibility() {
+  if (typeof siteConfig === 'undefined') return;
+
+  // Settings-Button nur ausblenden wenn EXPLIZIT auf false gesetzt
+  if (siteConfig.settings?.showSettingsButton === false) {
+    const settingsBtn = document.getElementById('settingsBtn');
+    if (settingsBtn) {
+      settingsBtn.style.display = 'none';
+    }
+  }
+
+  // Tabs ein/ausblenden basierend auf Config
+  // Credits-Tab kann nicht deaktiviert werden
+  // Tabs werden nur versteckt wenn EXPLIZIT auf false gesetzt
+  // Nur erlaubte Tab-Namen akzeptieren (Schutz vor Selector-Injection)
+  const allowedTabs = ['design', 'daten', 'session', 'user'];
+  const tabs = siteConfig.settings?.tabs || {};
+  Object.entries(tabs).forEach(([tab, visible]) => {
+    if (visible === false && allowedTabs.includes(tab)) {
+      // Tab-Button ausblenden
+      const tabBtn = document.querySelector(`.settings-tab[data-tab="${tab}"]`);
+      if (tabBtn) {
+        tabBtn.style.display = 'none';
+      }
+      // Panel ausblenden
+      const panel = document.getElementById(`panel-${tab}`);
+      if (panel) {
+        panel.style.display = 'none';
+      }
+    }
+  });
+
+  // Falls der erste Tab versteckt ist, aktiviere den nächsten sichtbaren
+  const visibleTabs = Array.from(document.querySelectorAll('.settings-tab')).filter(
+    (tab) => tab.style.display !== 'none'
+  );
+  if (visibleTabs.length > 0) {
+    const firstVisible = visibleTabs[0];
+    if (!firstVisible.classList.contains('active')) {
+      // Deaktiviere alle Tabs und Panels
+      document.querySelectorAll('.settings-tab').forEach((t) => t.classList.remove('active'));
+      document.querySelectorAll('.settings-panel').forEach((p) => p.classList.remove('active'));
+      // Aktiviere den ersten sichtbaren
+      firstVisible.classList.add('active');
+      const panelId = `panel-${firstVisible.dataset.tab}`;
+      const panel = document.getElementById(panelId);
+      if (panel) {
+        panel.classList.add('active');
+      }
+    }
+  }
+}
+
+function applyAnimationConfig() {
+  if (typeof siteConfig === 'undefined') return;
+
+  const animations = siteConfig.animations || {};
+
+  // Master-Schalter
+  if (!animations.enabled) {
+    document.body.setAttribute('data-animations', 'off');
+    return;
+  }
+
+  // Einzelne Animationen
+  if (!animations.heroGradient) {
+    document.body.setAttribute('data-animation-hero', 'off');
+  }
+  if (!animations.fadeIn) {
+    document.body.setAttribute('data-animation-fade', 'off');
+  }
+  if (!animations.modalSlide) {
+    document.body.setAttribute('data-animation-modal', 'off');
+  }
+  if (!animations.panelFade) {
+    document.body.setAttribute('data-animation-panel', 'off');
+  }
+  if (!animations.themeSwitcher) {
+    document.body.setAttribute('data-animation-theme', 'off');
+  }
 }
 
 function openSettings() {
@@ -1312,8 +1422,9 @@ function handleTimeoutLogin() {
 function loadSessionSettings() {
   const savedEnabled = localStorage.getItem(STORAGE_KEYS.sessionTimeoutEnabled);
   const savedMinutes = localStorage.getItem(STORAGE_KEYS.sessionTimeoutMinutes);
-  state.sessionTimeoutEnabled = savedEnabled !== 'false';
-  state.sessionTimeoutMinutes = parseInt(savedMinutes, 10) || 5;
+  // Config-Defaults verwenden wenn keine localStorage-Werte vorhanden
+  state.sessionTimeoutEnabled = savedEnabled !== null ? savedEnabled !== 'false' : defaults.sessionTimeoutEnabled;
+  state.sessionTimeoutMinutes = savedMinutes !== null ? parseInt(savedMinutes, 10) : defaults.sessionTimeoutMinutes;
   updateTimeoutUI();
 }
 
