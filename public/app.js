@@ -640,16 +640,21 @@ function loadLocalSettings() {
   applyGlowStrength(savedGlowStrength !== null ? Number(savedGlowStrength) : defaults.glowStrength);
   applyAccentColor(savedAccent);
   loadSessionSettings();
-
-  // Initialize toggle sliders after DOM is ready
-  requestAnimationFrame(() => {
-    updateToggleSlider(els.buttonStyleGroup);
-    updateToggleSlider(els.timeoutToggleGroup);
-  });
 }
 
 function openSettings() {
   els.settingsOverlay.classList.add('active');
+
+  // Initialize toggle sliders after modal becomes visible
+  // Must wait for display:flex to apply before measuring offsetWidth
+  requestAnimationFrame(() => {
+    updateToggleSlider(els.buttonStyleGroup);
+    updateToggleSlider(els.timeoutToggleGroup);
+    const languageGroup = document.getElementById('languageGroup');
+    if (languageGroup) {
+      updateToggleSlider(languageGroup);
+    }
+  });
 }
 
 function closeSettings() {
@@ -1467,8 +1472,6 @@ function bindEvents() {
     languageGroup.querySelectorAll('.toggle-option').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.value === i18n.currentLang);
     });
-    // Initialize slider position after DOM is ready
-    requestAnimationFrame(() => updateToggleSlider(languageGroup));
 
     languageGroup.querySelectorAll('.toggle-option').forEach((btn) => {
       btn.addEventListener('click', () => {
