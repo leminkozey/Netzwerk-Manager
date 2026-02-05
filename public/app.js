@@ -597,11 +597,36 @@ function applyButtonStyle(style, save = false) {
   updateButtonStyleUI(style);
 }
 
+function updateToggleSlider(group) {
+  if (!group) return;
+  const slider = group.querySelector('.toggle-slider');
+  if (!slider) return;
+
+  const activeBtn = group.querySelector('.toggle-option.active');
+  if (!activeBtn) return;
+
+  // Calculate position and width
+  const buttons = Array.from(group.querySelectorAll('.toggle-option'));
+  const activeIndex = buttons.indexOf(activeBtn);
+  let offsetX = 0;
+
+  for (let i = 0; i < activeIndex; i++) {
+    offsetX += buttons[i].offsetWidth + 3; // 3px gap
+  }
+
+  slider.style.width = `${activeBtn.offsetWidth}px`;
+  slider.style.transform = `translateX(${offsetX}px)`;
+}
+
 function updateButtonStyleUI(style) {
   if (!els.buttonStyleGroup) return;
+  const options = ['default', 'simple'];
+  const position = options.indexOf(style);
+  els.buttonStyleGroup.setAttribute('data-position', position >= 0 ? position : 0);
   els.buttonStyleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.value === style);
   });
+  updateToggleSlider(els.buttonStyleGroup);
 }
 
 function loadLocalSettings() {
@@ -615,6 +640,12 @@ function loadLocalSettings() {
   applyGlowStrength(savedGlowStrength !== null ? Number(savedGlowStrength) : defaults.glowStrength);
   applyAccentColor(savedAccent);
   loadSessionSettings();
+
+  // Initialize toggle sliders after DOM is ready
+  requestAnimationFrame(() => {
+    updateToggleSlider(els.buttonStyleGroup);
+    updateToggleSlider(els.timeoutToggleGroup);
+  });
 }
 
 function openSettings() {
@@ -1288,10 +1319,13 @@ function saveSessionSettings() {
 
 function updateTimeoutUI() {
   if (!els.timeoutToggleGroup) return;
+  // Options are "off" (position 0) and "on" (position 1)
+  els.timeoutToggleGroup.setAttribute('data-position', state.sessionTimeoutEnabled ? 1 : 0);
   els.timeoutToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
     const isOn = btn.dataset.value === 'on';
     btn.classList.toggle('active', isOn === state.sessionTimeoutEnabled);
   });
+  updateToggleSlider(els.timeoutToggleGroup);
   if (els.timeoutMinutesRow) {
     els.timeoutMinutesRow.classList.toggle('hidden', !state.sessionTimeoutEnabled);
   }
@@ -1395,6 +1429,7 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       const style = btn.dataset.value;
       applyButtonStyle(style, true);
+      updateToggleSlider(els.buttonStyleGroup);
     });
   });
 
@@ -1425,18 +1460,26 @@ function bindEvents() {
   // Language Switcher
   const languageGroup = document.getElementById('languageGroup');
   if (languageGroup) {
-    // Set initial active state based on saved language
+    // Set initial active state and position based on saved language
+    const langOptions = ['de', 'en'];
+    const initialLangPos = langOptions.indexOf(i18n.currentLang);
+    languageGroup.setAttribute('data-position', initialLangPos >= 0 ? initialLangPos : 0);
     languageGroup.querySelectorAll('.toggle-option').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.value === i18n.currentLang);
     });
+    // Initialize slider position after DOM is ready
+    requestAnimationFrame(() => updateToggleSlider(languageGroup));
 
     languageGroup.querySelectorAll('.toggle-option').forEach((btn) => {
       btn.addEventListener('click', () => {
         const lang = btn.dataset.value;
+        const position = langOptions.indexOf(lang);
+        languageGroup.setAttribute('data-position', position >= 0 ? position : 0);
         i18n.setLanguage(lang);
         languageGroup.querySelectorAll('.toggle-option').forEach((b) => {
           b.classList.toggle('active', b.dataset.value === lang);
         });
+        updateToggleSlider(languageGroup);
         showToast(i18n.t('msg.saved'));
       });
     });
@@ -1479,6 +1522,7 @@ function bindEvents() {
       state.sessionTimeoutEnabled = btn.dataset.value === 'on';
       saveSessionSettings();
       updateTimeoutUI();
+      updateToggleSlider(els.timeoutToggleGroup);
       if (state.sessionTimeoutEnabled && state.token) {
         startSessionTimer();
       } else {
