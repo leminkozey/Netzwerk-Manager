@@ -190,13 +190,13 @@ a:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 8px 14px;
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-secondary);
-  background: #1a2332;
+  background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   transition: all 0.2s ease;
 }
@@ -204,13 +204,24 @@ a:hover {
 .header-link:hover {
   border-color: var(--accent);
   color: var(--text);
-  background: rgba(26, 35, 50, 0.9);
+  background: var(--surface-elevated);
+  transform: scale(1.08);
+  box-shadow: 0 0 calc(16px * var(--glow-strength)) var(--accent-glow);
+}
+
+.header-link:active {
+  transform: scale(0.95);
 }
 
 .header-link img {
   width: 16px;
   height: 16px;
   border-radius: 2px;
+  transition: transform 0.2s ease;
+}
+
+.header-link:hover img {
+  transform: scale(1.1);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

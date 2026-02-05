@@ -668,6 +668,7 @@ function loadLocalSettings() {
   // Config-basierte Sichtbarkeit und Animationen anwenden
   applyConfigVisibility();
   applyAnimationConfig();
+  renderHeaderLinks();
 }
 
 function applyConfigVisibility() {
@@ -750,6 +751,40 @@ function applyAnimationConfig() {
   if (!animations.themeSwitcher) {
     document.body.setAttribute('data-animation-theme', 'off');
   }
+}
+
+function renderHeaderLinks() {
+  if (typeof siteConfig === 'undefined') return;
+
+  const links = siteConfig.headerLinks || [];
+  const container = document.getElementById('headerLinks');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  links.forEach(link => {
+    if (!link.name || !link.url) return;
+
+    const a = document.createElement('a');
+    a.href = link.url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.className = 'header-link';
+
+    // Favicon via Google Favicon Service
+    const domain = new URL(link.url).hostname;
+    const img = document.createElement('img');
+    img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    img.alt = '';
+    img.loading = 'lazy';
+
+    const span = document.createElement('span');
+    span.textContent = link.name;
+
+    a.appendChild(img);
+    a.appendChild(span);
+    container.appendChild(a);
+  });
 }
 
 function openSettings() {
