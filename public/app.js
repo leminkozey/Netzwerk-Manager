@@ -797,14 +797,27 @@ function renderHeaderLinks() {
   links.forEach(link => {
     if (!link.name || !link.url) return;
 
+    // Security: Only allow http/https URLs to prevent javascript: XSS
+    let url;
+    try {
+      url = new URL(link.url);
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        console.warn('Blocked non-http(s) URL in header links:', link.url);
+        return;
+      }
+    } catch (e) {
+      console.warn('Invalid URL in header links:', link.url);
+      return;
+    }
+
     const a = document.createElement('a');
-    a.href = link.url;
+    a.href = url.href; // Use parsed URL for safety
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.className = 'header-link';
 
     // Favicon via Google Favicon Service
-    const domain = new URL(link.url).hostname;
+    const domain = url.hostname;
     const img = document.createElement('img');
     img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
     img.alt = '';
@@ -1055,54 +1068,59 @@ function applyPayload(payload) {
   fillRaspberry();
 }
 
+// Helper to create port table row safely (prevents XSS)
+function createPortRow(port, group) {
+  const textColor = pickTextColor(port.color);
+  const tr = document.createElement('tr');
+
+  // Label cell - using textContent for XSS safety
+  const labelTd = document.createElement('td');
+  labelTd.style.background = port.color;
+  labelTd.style.color = textColor;
+  labelTd.textContent = port.label; // Safe - auto-escaped
+  tr.appendChild(labelTd);
+
+  // Status input cell
+  const statusTd = document.createElement('td');
+  const statusInput = document.createElement('input');
+  statusInput.className = 'inline-input status-input';
+  statusInput.type = 'text';
+  statusInput.value = port.status; // Safe - setting value property
+  statusInput.placeholder = 'Nicht belegt';
+  statusInput.dataset.group = group;
+  statusInput.dataset.id = port.id;
+  statusInput.dataset.last = port.status;
+  statusInput.setAttribute('aria-label', `${port.label} Belegung`);
+  statusTd.appendChild(statusInput);
+  tr.appendChild(statusTd);
+
+  // Color input cell
+  const colorTd = document.createElement('td');
+  const colorInput = document.createElement('input');
+  colorInput.className = 'color-input';
+  colorInput.type = 'color';
+  colorInput.value = port.color;
+  colorInput.dataset.group = group;
+  colorInput.dataset.id = port.id;
+  colorInput.setAttribute('aria-label', `${port.label} Farbe`);
+  colorTd.appendChild(colorInput);
+  tr.appendChild(colorTd);
+
+  return tr;
+}
+
 function renderTables() {
   els.switchTableBody.innerHTML = '';
   els.routerTableBody.innerHTML = '';
+
+  // Render switch ports using safe DOM methods
   state.switchPorts.forEach((port) => {
-    const textColor = pickTextColor(port.color);
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="background:${port.color};color:${textColor}">${port.label}</td>
-      <td>
-        <input
-          class="inline-input status-input"
-          type="text"
-          value="${port.status}"
-          placeholder="Nicht belegt"
-          data-group="switch"
-          data-id="${port.id}"
-          data-last="${port.status}"
-          aria-label="${port.label} Belegung"
-        />
-      </td>
-      <td>
-        <input class="color-input" type="color" value="${port.color}" data-group="switch" data-id="${port.id}" aria-label="${port.label} Farbe" />
-      </td>
-    `;
-    els.switchTableBody.appendChild(tr);
+    els.switchTableBody.appendChild(createPortRow(port, 'switch'));
   });
 
+  // Render router ports using safe DOM methods
   state.routerPorts.forEach((port) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td style="background:${port.color};color:${pickTextColor(port.color)}">${port.label}</td>
-      <td>
-        <input
-          class="inline-input status-input"
-          type="text"
-          value="${port.status}"
-          placeholder="Nicht belegt"
-          data-group="router"
-          data-id="${port.id}"
-          data-last="${port.status}"
-          aria-label="${port.label} Belegung"
-        />
-      </td>
-      <td>
-        <input class="color-input" type="color" value="${port.color}" data-group="router" data-id="${port.id}" aria-label="${port.label} Farbe" />
-      </td>
-    `;
-    els.routerTableBody.appendChild(tr);
+    els.routerTableBody.appendChild(createPortRow(port, 'router'));
   });
 
   document.querySelectorAll('.color-input').forEach((input) => {

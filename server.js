@@ -1,10 +1,74 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { randomUUID } = require('crypto');
+const crypto = require('crypto');
+const { randomUUID } = crypto;
 const WebSocket = require('ws');
 const dgram = require('dgram');
 const { spawn } = require('child_process');
+
+// ═══════════════════════════════════════════════════════════════════
+// Security Utilities
+// ═══════════════════════════════════════════════════════════════════
+
+// Constant-time string comparison to prevent timing attacks
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) {
+    // Still do comparison to maintain constant time
+    crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// Simple password hashing (for local network use)
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored || !stored.includes(':')) return false;
+  const [salt, hash] = stored.split(':');
+  const testHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  return timingSafeEqual(hash, testHash);
+}
+
+// Check if stored password is hashed or plaintext (for migration)
+function isHashedPassword(stored) {
+  return typeof stored === 'string' && stored.includes(':') && stored.length > 100;
+}
+
+// HTML escape to prevent XSS
+function escapeHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// Validate IP is not internal/dangerous for SSRF protection
+function isAllowedProxyTarget(ip) {
+  if (!ip) return false;
+  // Block localhost
+  if (ip === '127.0.0.1' || ip === 'localhost' || ip === '::1') return false;
+  // Block link-local
+  if (ip.startsWith('169.254.')) return false;
+  // Block cloud metadata endpoints
+  if (ip === '169.254.169.254') return false;
+  // Allow private network ranges (expected for local network manager)
+  return true;
+}
+
+// Session token expiration (24 hours)
+const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 const app = express();
 const PORT = process.env.PORT || 5055;
@@ -21,13 +85,31 @@ const BASE_LOCKOUT_MS = 5 * 60 * 1000; // 5 Minuten
 
 // Runtime data not persisted
 const runtime = {
-  activeSession: null,
+  activeSession: null, // { token, deviceName, loginAt, expiresAt }
   loginAttempts: new Map(), // IP -> { count, lockedUntil, lockoutLevel }
   sockets: new Map(), // token -> WebSocket
 };
 
+// Check if session is expired
+function isSessionValid() {
+  if (!runtime.activeSession) return false;
+  if (Date.now() > runtime.activeSession.expiresAt) {
+    runtime.activeSession = null;
+    return false;
+  }
+  return true;
+}
+
+// Only trust X-Forwarded-For when explicitly configured (set TRUST_PROXY=1)
+const TRUST_PROXY = process.env.TRUST_PROXY === '1';
+
 function getClientIp(req) {
-  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip || req.socket?.remoteAddress || 'unknown';
+  // Only trust X-Forwarded-For if behind a known reverse proxy
+  if (TRUST_PROXY && req.headers['x-forwarded-for']) {
+    return req.headers['x-forwarded-for'].split(',')[0].trim();
+  }
+  // Direct connection - use socket address
+  return req.ip || req.socket?.remoteAddress || 'unknown';
 }
 
 function getAttemptData(ip) {
@@ -67,6 +149,27 @@ function resetAttempts(ip) {
 // Raw body parser für Upload-Tests (muss VOR json() kommen)
 app.use('/api/speedtest/upload', express.raw({ type: '*/*', limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
+
+// Security headers middleware
+app.use((req, res, next) => {
+  // Content Security Policy to prevent XSS
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: https://www.google.com https://github.com",
+    "connect-src 'self' ws: wss:",
+  ].join('; '));
+  // Prevent clickjacking
+  res.setHeader('X-Frame-Options', 'DENY');
+  // Prevent MIME type sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // XSS protection for older browsers
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const defaultState = {
@@ -125,7 +228,12 @@ function ensureDataFile() {
   if (!fs.existsSync(DATA_FILE)) {
     const initial = { ...defaultState, versions: [] };
     fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2));
-    writeCredentialsFile(initial.credentials);
+    // Write initial credentials with plaintext (default: admin/admin)
+    writeCredentialsFile({
+      username: initial.credentials.username,
+      password: initial.credentials.password,
+      plaintext: initial.credentials.password, // Initial password is plaintext
+    });
   } else {
     const existing = readState();
     const fileCredentials = readCredentialsFile();
@@ -225,9 +333,16 @@ function addRaspberryVersion(state, summary, snapshot) {
   }
 }
 
+// Credentials file format:
+// Line 1: username
+// Line 2: hashed password (for secure comparison)
+// Line 3: plaintext password (for admin reference - optional)
 function writeCredentialsFile(credentials) {
   if (!credentials) return;
-  const content = `${credentials.username ?? ''}\n${credentials.password ?? ''}\n`;
+  const username = credentials.username ?? '';
+  const password = credentials.password ?? '';
+  const plaintext = credentials.plaintext ?? ''; // Original plaintext if available
+  const content = `${username}\n${password}\n${plaintext}\n`;
   fs.writeFileSync(USER_FILE, content, 'utf-8');
 }
 
@@ -301,9 +416,14 @@ function sendPiUnavailable(res, host, port, reason) {
 function authRequired(req, res, next) {
   const header = req.headers.authorization || '';
   const token = header.replace('Bearer ', '').trim();
-  if (!runtime.activeSession || runtime.activeSession.token !== token) {
+
+  // Check session exists, token matches, and not expired
+  if (!isSessionValid() || !timingSafeEqual(runtime.activeSession.token, token)) {
     return res.status(401).json({ error: 'Unauthenticated' });
   }
+
+  // Extend session on activity
+  runtime.activeSession.expiresAt = Date.now() + SESSION_EXPIRY_MS;
   return next();
 }
 
@@ -478,7 +598,7 @@ function shutdownWindowsPC(config) {
     }
 
     // Use spawn with argument array to prevent command injection
-    // sshpass reads password from environment variable (safer than command line)
+    // Use SSHPASS environment variable instead of -p flag (hidden from ps)
     const sshArgs = [
       '-o', 'StrictHostKeyChecking=accept-new',
       '-o', 'ConnectTimeout=5',
@@ -488,9 +608,11 @@ function shutdownWindowsPC(config) {
       'shutdown /s /t 0'
     ];
 
-    const sshpass = spawn('sshpass', ['-p', sshPassword, 'ssh', ...sshArgs], {
+    // -e flag reads password from SSHPASS environment variable
+    // This keeps the password hidden from process listings (ps aux)
+    const sshpass = spawn('sshpass', ['-e', 'ssh', ...sshArgs], {
       timeout: 15000,
-      env: { ...process.env },
+      env: { ...process.env, SSHPASS: sshPassword },
     });
 
     let stderr = '';
@@ -553,7 +675,21 @@ app.post('/api/login', (req, res) => {
 
   const isWhitelisted = deviceToken && (state.deviceTokens.includes(deviceToken) || fileTokenList.includes(deviceToken));
 
-  if (!isWhitelisted && (username !== state.credentials.username || password !== state.credentials.password)) {
+  // Use timing-safe comparison for credentials
+  const storedPassword = state.credentials.password;
+  let passwordValid = false;
+
+  if (isHashedPassword(storedPassword)) {
+    // Compare against hashed password
+    passwordValid = verifyPassword(password, storedPassword);
+  } else {
+    // Legacy plaintext comparison (will be migrated on next password change)
+    passwordValid = timingSafeEqual(password || '', storedPassword || '');
+  }
+
+  const usernameValid = timingSafeEqual(username || '', state.credentials.username || '');
+
+  if (!isWhitelisted && (!usernameValid || !passwordValid)) {
     const result = recordFailedAttempt(clientIp);
     if (result.locked) {
       const lockoutMin = Math.ceil(result.lockoutMs / 60000);
@@ -575,10 +711,11 @@ app.post('/api/login', (req, res) => {
   resetAttempts(clientIp);
   const token = randomUUID();
   const loginAt = Date.now();
+  const expiresAt = loginAt + SESSION_EXPIRY_MS;
   const matchedFileToken = fileTokenEntries.find((t) => t.token === deviceToken);
   const effectiveDeviceName = matchedFileToken?.name || deviceName || 'Unbekanntes Gerät';
   const previousSession = runtime.activeSession;
-  runtime.activeSession = { token, deviceName: effectiveDeviceName, loginAt };
+  runtime.activeSession = { token, deviceName: effectiveDeviceName, loginAt, expiresAt };
 
   if (previousSession && previousSession.token !== token) {
     const prevSocket = runtime.sockets.get(previousSession.token);
@@ -683,11 +820,21 @@ app.post('/api/settings/credentials', authRequired, (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich' });
   }
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'Passwort muss mindestens 4 Zeichen lang sein' });
+  }
+
   const state = readState();
   state.credentials.username = username;
-  state.credentials.password = password;
+  // Hash the password for secure storage in state.json
+  state.credentials.password = hashPassword(password);
   saveState(state);
-  writeCredentialsFile(state.credentials);
+  // Write to Nutzer file with plaintext backup (only in file, not in state.json)
+  writeCredentialsFile({
+    username,
+    password: state.credentials.password, // hashed
+    plaintext: password, // original for admin reference
+  });
   res.json({ ok: true, username });
 });
 
@@ -753,8 +900,12 @@ app.get('/api/versions', authRequired, (req, res) => {
   res.json({ versions: state.versions });
 });
 
+// Maximum allowed speedtest size (50 MB) to prevent DoS
+const MAX_SPEEDTEST_SIZE_MB = 50;
+
 app.get('/api/speedtest/download', authRequired, (req, res) => {
-  const sizeMB = parseInt(req.query.size) || 1;
+  // Cap size to prevent memory exhaustion DoS
+  const sizeMB = Math.min(Math.max(parseInt(req.query.size) || 1, 1), MAX_SPEEDTEST_SIZE_MB);
   const sizeBytes = sizeMB * 1024 * 1024;
 
   // Generate random data for download test
@@ -785,6 +936,11 @@ app.get('/api/speedtest/local-ping', authRequired, (req, res) => {
   const state = readState();
   const { host, port } = getPiSpeedtestTarget(state);
 
+  // SSRF protection - validate target IP
+  if (!isAllowedProxyTarget(host)) {
+    return res.status(400).json({ error: 'Ungültige Ziel-IP-Adresse' });
+  }
+
   const options = {
     hostname: host,
     port,
@@ -811,7 +967,8 @@ app.get('/api/speedtest/local-ping', authRequired, (req, res) => {
 });
 
 app.get('/api/speedtest/local-download-proxy', authRequired, async (req, res) => {
-  const sizeMB = parseInt(req.query.size, 10) || 1;
+  // Cap size to prevent DoS
+  const sizeMB = Math.min(Math.max(parseInt(req.query.size, 10) || 1, 1), MAX_SPEEDTEST_SIZE_MB);
 
   if (!usePiSpeedtest()) {
     const sizeBytes = sizeMB * 1024 * 1024;
@@ -829,6 +986,11 @@ app.get('/api/speedtest/local-download-proxy', authRequired, async (req, res) =>
   const http = require('http');
   const state = readState();
   const { host, port } = getPiSpeedtestTarget(state);
+
+  // SSRF protection - validate target IP
+  if (!isAllowedProxyTarget(host)) {
+    return res.status(400).json({ error: 'Ungültige Ziel-IP-Adresse' });
+  }
 
   const options = {
     hostname: host,
@@ -877,6 +1039,12 @@ app.post('/api/speedtest/local-upload-proxy', authRequired, (req, res) => {
   const http = require('http');
   const state = readState();
   const { host, port } = getPiSpeedtestTarget(state);
+
+  // SSRF protection - validate target IP
+  if (!isAllowedProxyTarget(host)) {
+    return res.status(400).json({ error: 'Ungültige Ziel-IP-Adresse' });
+  }
+
   const headers = {
     'Content-Type': 'application/octet-stream',
   };
@@ -963,31 +1131,42 @@ app.post('/api/import', authRequired, (req, res) => {
   }
 
   // Validiere wichtige Felder
-  if (!data.switchPorts && !data.routerPorts && !data.credentials) {
+  if (!data.switchPorts && !data.routerPorts && !data.speedportInfo && !data.raspberryInfo) {
     return res.status(400).json({ error: 'Keine gueltigen Netzwerk-Manager Daten' });
+  }
+
+  // Sanitize imported string data to prevent XSS
+  function sanitizePort(port) {
+    return {
+      ...port,
+      label: escapeHtml(port.label),
+      status: escapeHtml(port.status),
+    };
   }
 
   // Merge mit Default-State um fehlende Felder zu ergaenzen
   const currentState = readState();
   const newState = {
     ...defaultState,
-    ...data,
-    credentials: { ...defaultState.credentials, ...(data.credentials || {}) },
+    // SECURITY: Never import credentials from external files!
+    credentials: currentState.credentials, // Keep existing credentials
     speedportInfo: { ...defaultState.speedportInfo, ...(data.speedportInfo || {}) },
     raspberryInfo: { ...defaultState.raspberryInfo, ...(data.raspberryInfo || {}) },
-    switchPorts: data.switchPorts || currentState.switchPorts,
-    routerPorts: data.routerPorts || currentState.routerPorts,
+    // Sanitize port data
+    switchPorts: (data.switchPorts || currentState.switchPorts).map(sanitizePort),
+    routerPorts: (data.routerPorts || currentState.routerPorts).map(sanitizePort),
     versions: Array.isArray(data.versions) ? data.versions : [],
     speedportVersions: Array.isArray(data.speedportVersions) ? data.speedportVersions : [],
     raspberryVersions: Array.isArray(data.raspberryVersions) ? data.raspberryVersions : [],
-    deviceTokens: Array.isArray(data.deviceTokens) ? data.deviceTokens : [],
+    // SECURITY: Never import device tokens from external files!
+    deviceTokens: currentState.deviceTokens, // Keep existing tokens
     speedTestHistory: Array.isArray(data.speedTestHistory) ? data.speedTestHistory : [],
   };
 
   saveState(newState);
-  writeCredentialsFile(newState.credentials);
+  // Note: credentials not written since we keep the existing ones
 
-  res.json({ ok: true, message: 'Daten erfolgreich importiert' });
+  res.json({ ok: true, message: 'Daten erfolgreich importiert (Zugangsdaten wurden nicht geändert)' });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1149,7 +1328,8 @@ function startServer() {
 
     socket.isAlive = true;
 
-    if (token) {
+    // SECURITY: Only store socket if token matches active session
+    if (token && isSessionValid() && timingSafeEqual(runtime.activeSession.token, token)) {
       runtime.sockets.set(token, socket);
     }
 
@@ -1190,6 +1370,26 @@ function startServer() {
   wss.on('close', () => {
     clearInterval(heartbeatInterval);
   });
+
+  // Memory cleanup: Remove old rate limiting entries every hour
+  setInterval(() => {
+    const now = Date.now();
+    const oneHourAgo = now - 3600000;
+
+    // Cleanup login attempts
+    for (const [ip, data] of runtime.loginAttempts.entries()) {
+      if (data.lockedUntil < oneHourAgo && data.count === 0) {
+        runtime.loginAttempts.delete(ip);
+      }
+    }
+
+    // Cleanup PC control limits
+    for (const [ip, data] of pcControlLimits.entries()) {
+      if (data.lastAction < oneHourAgo) {
+        pcControlLimits.delete(ip);
+      }
+    }
+  }, 3600000); // Every hour
 }
 
 // Server starten
