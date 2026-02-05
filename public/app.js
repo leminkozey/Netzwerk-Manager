@@ -667,6 +667,7 @@ function loadLocalSettings() {
 
   // Config-basierte Sichtbarkeit und Animationen anwenden
   applyConfigVisibility();
+  applyCardsVisibility();
   applyAnimationConfig();
   renderHeaderLinks();
 }
@@ -720,6 +721,37 @@ function applyConfigVisibility() {
       if (panel) {
         panel.classList.add('active');
       }
+    }
+  }
+}
+
+function applyCardsVisibility() {
+  if (typeof siteConfig === 'undefined') return;
+
+  const cards = siteConfig.cards || {};
+  const cardMap = {
+    switch: 'switchCard',
+    router: 'routerCard',
+    pihole: 'piholeCard',
+    speedport: 'speedportCard',
+    speedtest: 'speedtestCard',
+    windowsPc: 'windowsPcCard',
+  };
+
+  Object.entries(cards).forEach(([key, visible]) => {
+    if (visible === false && cardMap[key]) {
+      const card = document.getElementById(cardMap[key]);
+      if (card) {
+        card.style.display = 'none';
+      }
+    }
+  });
+
+  // Wenn beide Switch und Router versteckt sind, verstecke auch das Grid
+  if (cards.switch === false && cards.router === false) {
+    const networkGrid = document.getElementById('networkGrid');
+    if (networkGrid) {
+      networkGrid.style.display = 'none';
     }
   }
 }

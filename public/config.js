@@ -56,12 +56,25 @@ const siteConfig = {
   },
 
   // ══════════════════════════════════════════════
+  // CARDS SICHTBARKEIT
+  // ══════════════════════════════════════════════
+  // Einzelne Cards ein/ausblenden
+  cards: {
+    switch: true,               // Switch (8 Ports)
+    router: true,               // WLAN Router
+    pihole: true,               // PiHole
+    speedport: true,            // Speedport Infos
+    speedtest: true,            // Internet Geschwindigkeit
+    windowsPc: true,            // Windows PC
+  },
+
+  // ══════════════════════════════════════════════
   // HEADER LINKS
   // ══════════════════════════════════════════════
   // Links erscheinen in der Topbar mit Favicon
   // Favicon wird automatisch via Google Favicon Service geholt
   headerLinks: [
     { name: 'Github', url: 'https://github.com' },
-    { name: 'KanBan', url: 'https://leminkanban.de'},
+    // { name: 'KanBan', url: 'https://leminkanban.de'},
   ],
 };
