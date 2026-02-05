@@ -1700,3 +1700,234 @@ label {
 .center-card {
   width: min(420px, 100%);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Windows PC Control Card
+   ═══════════════════════════════════════════════════════════════════ */
+
+.windows-pc-card .section-title {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.windows-icon {
+  background: linear-gradient(135deg, rgba(0, 164, 239, 0.15), rgba(127, 186, 0, 0.15)) !important;
+  border-color: rgba(0, 164, 239, 0.3) !important;
+}
+
+.windows-pc-card:hover .windows-icon {
+  background: linear-gradient(135deg, rgba(0, 164, 239, 0.25), rgba(127, 186, 0, 0.25)) !important;
+  box-shadow: 0 0 calc(12px * var(--glow-strength)) rgba(0, 164, 239, 0.3);
+}
+
+.pc-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.pc-status .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.pc-status.online {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.pc-status.online .status-dot {
+  background: #22c55e;
+  box-shadow: 0 0 calc(8px * var(--glow-strength)) var(--status-ok-glow);
+}
+
+.pc-status.online .status-text {
+  color: #22c55e;
+}
+
+.pc-status.offline {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.pc-status.offline .status-dot {
+  background: #6b7280;
+}
+
+.pc-status.offline .status-text {
+  color: var(--text-muted);
+}
+
+.pc-control-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.pc-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px 0;
+}
+
+.pc-wake-btn,
+.pc-shutdown-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.3s var(--ease-spring);
+}
+
+.pc-wake-btn svg,
+.pc-shutdown-btn svg {
+  width: 32px;
+  height: 32px;
+}
+
+.pc-wake-btn {
+  background: rgba(34, 197, 94, 0.1);
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+  box-shadow: none;
+}
+
+.pc-wake-btn:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+  transform: scale(1.08);
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(34, 197, 94, 0.3);
+}
+
+.pc-wake-btn:active {
+  transform: scale(0.95);
+}
+
+.pc-shutdown-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  box-shadow: none;
+}
+
+.pc-shutdown-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  transform: scale(1.08);
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(239, 68, 68, 0.3);
+}
+
+.pc-shutdown-btn:active {
+  transform: scale(0.95);
+}
+
+.pc-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.pc-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color 0.2s ease;
+}
+
+.pc-info-item:hover {
+  border-color: var(--border-glow);
+}
+
+.pc-info-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pc-info-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-all;
+}
+
+.pc-password {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.password-masked {
+  letter-spacing: 0.1em;
+}
+
+.password-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.password-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.password-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 640px) {
+  .pc-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pc-buttons {
+    flex-direction: row;
+    gap: 20px;
+  }
+
+  .pc-wake-btn,
+  .pc-shutdown-btn {
+    width: 100px;
+    height: 100px;
+  }
+}

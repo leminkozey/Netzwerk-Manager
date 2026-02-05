@@ -3,6 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 const WebSocket = require('ws');
+const dgram = require('dgram');
+const { exec } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 5055;
@@ -10,6 +12,7 @@ const DATA_DIR = path.join(__dirname, 'Data');
 const DATA_FILE = path.join(DATA_DIR, 'state.json');
 const USER_FILE = path.join(DATA_DIR, 'Nutzer');
 const LOGIN_TOKEN_FILE = path.join(DATA_DIR, 'LoginToken.txt');
+const WINDOWS_PC_FILE = path.join(DATA_DIR, 'WindowsPC.json');
 const MAX_VERSIONS = 100;
 
 // Rate-Limiting Konstanten
@@ -302,6 +305,103 @@ function authRequired(req, res, next) {
     return res.status(401).json({ error: 'Unauthenticated' });
   }
   return next();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Windows PC Functions
+// ═══════════════════════════════════════════════════════════════════
+
+function readWindowsPCConfig() {
+  if (!fs.existsSync(WINDOWS_PC_FILE)) {
+    const defaultConfig = {
+      macAddress: '',
+      ipAddress: '',
+      sshUser: '',
+      sshPassword: '',
+      sshPort: 22,
+      name: 'Windows PC',
+    };
+    fs.writeFileSync(WINDOWS_PC_FILE, JSON.stringify(defaultConfig, null, 2));
+    return defaultConfig;
+  }
+  return JSON.parse(fs.readFileSync(WINDOWS_PC_FILE, 'utf-8'));
+}
+
+function saveWindowsPCConfig(config) {
+  fs.writeFileSync(WINDOWS_PC_FILE, JSON.stringify(config, null, 2));
+}
+
+function sendWakeOnLan(macAddress) {
+  return new Promise((resolve, reject) => {
+    const mac = macAddress.replace(/[:-]/g, '');
+    if (mac.length !== 12) {
+      return reject(new Error('Ungültige MAC-Adresse'));
+    }
+
+    // Magic Packet: 6x 0xFF + 16x MAC-Adresse
+    const macBuffer = Buffer.from(mac, 'hex');
+    const magicPacket = Buffer.alloc(102);
+
+    // 6 bytes of 0xFF
+    for (let i = 0; i < 6; i++) {
+      magicPacket[i] = 0xff;
+    }
+
+    // 16 repetitions of MAC address
+    for (let i = 0; i < 16; i++) {
+      macBuffer.copy(magicPacket, 6 + i * 6);
+    }
+
+    const socket = dgram.createSocket('udp4');
+    socket.once('error', (err) => {
+      socket.close();
+      reject(err);
+    });
+
+    socket.bind(() => {
+      socket.setBroadcast(true);
+      socket.send(magicPacket, 0, magicPacket.length, 9, '255.255.255.255', (err) => {
+        socket.close();
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  });
+}
+
+function pingHost(ipAddress) {
+  return new Promise((resolve) => {
+    const isWindows = process.platform === 'win32';
+    const cmd = isWindows
+      ? `ping -n 1 -w 2000 ${ipAddress}`
+      : `ping -c 1 -W 2 ${ipAddress}`;
+
+    exec(cmd, (error) => {
+      resolve(!error);
+    });
+  });
+}
+
+function shutdownWindowsPC(config) {
+  return new Promise((resolve, reject) => {
+    const { ipAddress, sshUser, sshPassword, sshPort } = config;
+
+    // Use sshpass for password authentication
+    const cmd = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${sshPort} ${sshUser}@${ipAddress} "shutdown /s /t 0"`;
+
+    exec(cmd, { timeout: 15000 }, (error, stdout, stderr) => {
+      if (error) {
+        // SSH connection might close before we get response (which is expected on shutdown)
+        if (stderr.includes('Connection') || error.killed) {
+          resolve(); // Shutdown was likely successful
+        } else {
+          reject(new Error(stderr || error.message));
+        }
+      } else {
+        resolve();
+      }
+    });
+  });
 }
 
 app.get('/api/bootstrap', (req, res) => {
@@ -774,6 +874,75 @@ app.post('/api/import', authRequired, (req, res) => {
   writeCredentialsFile(newState.credentials);
 
   res.json({ ok: true, message: 'Daten erfolgreich importiert' });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Windows PC Endpoints
+// ═══════════════════════════════════════════════════════════════════
+
+app.get('/api/windows-pc', authRequired, (req, res) => {
+  const config = readWindowsPCConfig();
+  res.json({
+    name: config.name,
+    ipAddress: config.ipAddress,
+    macAddress: config.macAddress,
+    sshUser: config.sshUser,
+    sshPassword: config.sshPassword,
+    sshPort: config.sshPort,
+  });
+});
+
+app.post('/api/windows-pc', authRequired, (req, res) => {
+  const { name, ipAddress, macAddress, sshUser, sshPassword, sshPort } = req.body || {};
+  const config = readWindowsPCConfig();
+
+  if (name !== undefined) config.name = name;
+  if (ipAddress !== undefined) config.ipAddress = ipAddress;
+  if (macAddress !== undefined) config.macAddress = macAddress;
+  if (sshUser !== undefined) config.sshUser = sshUser;
+  if (sshPassword !== undefined) config.sshPassword = sshPassword;
+  if (sshPort !== undefined) config.sshPort = parseInt(sshPort, 10) || 22;
+
+  saveWindowsPCConfig(config);
+  res.json({ ok: true, config });
+});
+
+app.get('/api/windows-pc/status', authRequired, async (req, res) => {
+  const config = readWindowsPCConfig();
+  if (!config.ipAddress) {
+    return res.json({ online: false, error: 'Keine IP konfiguriert' });
+  }
+
+  const online = await pingHost(config.ipAddress);
+  res.json({ online });
+});
+
+app.post('/api/windows-pc/wake', authRequired, async (req, res) => {
+  const config = readWindowsPCConfig();
+  if (!config.macAddress) {
+    return res.status(400).json({ success: false, message: 'Keine MAC-Adresse konfiguriert' });
+  }
+
+  try {
+    await sendWakeOnLan(config.macAddress);
+    res.json({ success: true, message: 'Wake-on-LAN Paket gesendet!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+app.post('/api/windows-pc/shutdown', authRequired, async (req, res) => {
+  const config = readWindowsPCConfig();
+  if (!config.ipAddress || !config.sshUser || !config.sshPassword) {
+    return res.status(400).json({ success: false, message: 'SSH-Zugangsdaten nicht vollständig' });
+  }
+
+  try {
+    await shutdownWindowsPC(config);
+    res.json({ success: true, message: 'Shutdown-Befehl gesendet!' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 });
 
 app.use((req, res) => {

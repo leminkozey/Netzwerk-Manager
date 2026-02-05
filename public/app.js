@@ -1619,3 +1619,187 @@ if (startTestBtn) {
 }
 
 speedTest.updateHostNotice();
+
+// ═══════════════════════════════════════════════════════════════════
+// Windows PC Control
+// ═══════════════════════════════════════════════════════════════════
+
+const windowsPC = {
+  config: null,
+  statusInterval: null,
+  passwordVisible: false,
+
+  async init() {
+    await this.loadConfig();
+    this.bindEvents();
+    this.startStatusCheck();
+  },
+
+  async loadConfig() {
+    if (!state.token) return;
+
+    try {
+      const res = await fetch('/api/windows-pc', { headers: authHeaders() });
+      if (res.ok) {
+        this.config = await res.json();
+        this.updateUI();
+      }
+    } catch (e) {
+      console.error('Failed to load Windows PC config:', e);
+    }
+  },
+
+  updateUI() {
+    if (!this.config) return;
+
+    const ipEl = document.getElementById('pcIpValue');
+    const macEl = document.getElementById('pcMacValue');
+    const userEl = document.getElementById('pcSshUserValue');
+    const passEl = document.getElementById('pcSshPassValue');
+
+    if (ipEl) ipEl.textContent = this.config.ipAddress || '--';
+    if (macEl) macEl.textContent = this.config.macAddress || '--';
+    if (userEl) userEl.textContent = this.config.sshUser || '--';
+
+    if (passEl) {
+      const masked = passEl.querySelector('.password-masked');
+      if (masked) {
+        masked.textContent = this.passwordVisible
+          ? (this.config.sshPassword || '--')
+          : '••••••••••••••';
+      }
+    }
+  },
+
+  bindEvents() {
+    const wakeBtn = document.getElementById('pcWakeBtn');
+    const shutdownBtn = document.getElementById('pcShutdownBtn');
+    const passToggle = document.getElementById('pcPassToggle');
+
+    if (wakeBtn) {
+      wakeBtn.addEventListener('click', () => this.wake());
+    }
+
+    if (shutdownBtn) {
+      shutdownBtn.addEventListener('click', () => this.shutdown());
+    }
+
+    if (passToggle) {
+      passToggle.addEventListener('click', () => this.togglePassword());
+    }
+  },
+
+  togglePassword() {
+    this.passwordVisible = !this.passwordVisible;
+    this.updateUI();
+
+    const toggle = document.getElementById('pcPassToggle');
+    if (toggle) {
+      const eyeIcon = toggle.querySelector('.eye-icon');
+      const eyeOffIcon = toggle.querySelector('.eye-off-icon');
+      if (eyeIcon && eyeOffIcon) {
+        eyeIcon.style.display = this.passwordVisible ? 'none' : 'block';
+        eyeOffIcon.style.display = this.passwordVisible ? 'block' : 'none';
+      }
+    }
+  },
+
+  startStatusCheck() {
+    this.checkStatus();
+    this.statusInterval = setInterval(() => this.checkStatus(), 10000);
+  },
+
+  stopStatusCheck() {
+    if (this.statusInterval) {
+      clearInterval(this.statusInterval);
+      this.statusInterval = null;
+    }
+  },
+
+  async checkStatus() {
+    if (!state.token) return;
+
+    try {
+      const res = await fetch('/api/windows-pc/status', { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        this.updateStatusUI(data.online);
+      }
+    } catch (e) {
+      this.updateStatusUI(false);
+    }
+  },
+
+  updateStatusUI(online) {
+    const statusEl = document.getElementById('pcStatus');
+    const textEl = document.getElementById('pcStatusText');
+
+    if (statusEl) {
+      statusEl.classList.remove('online', 'offline');
+      statusEl.classList.add(online ? 'online' : 'offline');
+    }
+
+    if (textEl) {
+      textEl.textContent = online ? 'Online' : 'Offline';
+    }
+  },
+
+  async wake() {
+    if (!state.token) return;
+
+    const btn = document.getElementById('pcWakeBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/windows-pc/wake', {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+
+      const data = await res.json();
+      showToast(data.message, !data.success);
+    } catch (e) {
+      showToast('Verbindungsfehler', true);
+    }
+
+    if (btn) btn.disabled = false;
+  },
+
+  async shutdown() {
+    if (!state.token) return;
+
+    const btn = document.getElementById('pcShutdownBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/windows-pc/shutdown', {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+
+      const data = await res.json();
+      showToast(data.message, !data.success);
+    } catch (e) {
+      showToast('Verbindungsfehler', true);
+    }
+
+    if (btn) btn.disabled = false;
+  },
+};
+
+// Hook into login success - watch for app becoming visible
+const appObserver = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+      const app = document.getElementById('app');
+      if (app && app.style.display !== 'none' && state.token) {
+        windowsPC.init();
+      }
+    }
+  });
+});
+
+const appEl = document.getElementById('app');
+if (appEl) {
+  appObserver.observe(appEl, { attributes: true });
+}
