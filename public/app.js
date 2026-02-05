@@ -1,3 +1,314 @@
+// ═══════════════════════════════════════════════════════════════════
+// Internationalization (i18n)
+// ═══════════════════════════════════════════════════════════════════
+
+const i18n = {
+  currentLang: localStorage.getItem('lang') || 'de',
+
+  translations: {
+    de: {
+      // General
+      'app.title': 'Lokales Netzwerk',
+      'app.settings': 'Einstellungen',
+      'app.lastVersion': 'Letzte Version',
+
+      // Login
+      'login.title': 'Login',
+      'login.username': 'Benutzername',
+      'login.password': 'Passwort',
+      'login.token': 'Login-Token (optional)',
+      'login.tokenPlaceholder': 'Token für dieses Gerät',
+      'login.button': 'Einloggen',
+
+      // Tables
+      'table.port': 'Port',
+      'table.assignment': 'Belegung',
+      'table.color': 'Farbe',
+
+      // Cards
+      'card.switch': 'Switch (8 Ports)',
+      'card.router': 'WLAN Router',
+      'card.pihole': 'PiHole',
+      'card.speedport': 'Speedport Infos',
+      'card.speedtest': 'Internet Geschwindigkeit',
+      'card.windowspc': 'Windows PC',
+
+      // Raspberry/PiHole
+      'pi.model': 'Modell',
+      'pi.hostname': 'Hostname',
+      'pi.lanIp': 'LAN-IP',
+      'pi.vpnIp': 'VPN-IP',
+      'pi.mac': 'MAC-Adresse',
+      'pi.sshUser': 'SSH-User',
+      'pi.piholeUrl': 'Pi-hole Admin URL',
+      'pi.piholeVpnUrl': 'Pi-hole VPN URL',
+
+      // Speedport
+      'speedport.wifiName': 'WLAN-Name',
+      'speedport.wifiPassword': 'WLAN-Passwort (Schlüssel)',
+      'speedport.serial': 'Serien-Nummer',
+      'speedport.config': 'Konfiguration',
+      'speedport.vpnUrl': 'Speedport VPN URL',
+      'speedport.devicePassword': 'Gerätepasswort',
+      'speedport.modemId': 'Modem-ID',
+
+      // Speedtest
+      'speedtest.download': 'Download',
+      'speedtest.upload': 'Upload',
+      'speedtest.ping': 'Ping',
+      'speedtest.ready': 'Bereit',
+      'speedtest.start': 'Speed-Test starten',
+      'speedtest.starting': 'Speed-Test startet...',
+      'speedtest.measuringPing': 'Messe Ping...',
+      'speedtest.measuringDownload': 'Messe Download...',
+      'speedtest.measuringUpload': 'Messe Upload...',
+      'speedtest.complete': 'Test abgeschlossen ✓',
+
+      // Windows PC
+      'pc.status.online': 'Online',
+      'pc.status.offline': 'Offline',
+      'pc.status.checking': 'Prüfe...',
+      'pc.wake': 'Wake',
+      'pc.shutdown': 'Shutdown',
+      'pc.ip': 'IP-Adresse',
+      'pc.mac': 'MAC-Adresse',
+      'pc.sshUser': 'SSH-User',
+      'pc.sshPassword': 'SSH-Passwort',
+      'pc.passwordSet': '••••••••••••',
+      'pc.passwordNotSet': 'Nicht gesetzt',
+      'pc.wakeSuccess': 'Wake-on-LAN Paket gesendet!',
+      'pc.shutdownSuccess': 'Shutdown-Befehl gesendet!',
+      'pc.connectionError': 'Verbindungsfehler',
+      'pc.rateLimited': 'Zu viele Anfragen. Bitte warten.',
+
+      // Settings
+      'settings.title': 'Einstellungen',
+      'settings.design': 'Design',
+      'settings.data': 'Daten',
+      'settings.session': 'Session',
+      'settings.user': 'User',
+      'settings.credits': 'Credits',
+      'settings.theme': 'Theme',
+      'settings.buttonStyle': 'Button-Stil',
+      'settings.glowStrength': 'Glow-Stärke',
+      'settings.accentColor': 'Akzentfarbe',
+      'settings.language': 'Sprache',
+      'settings.versions': 'Versionen',
+      'settings.portAssignments': 'Port-Belegungen',
+      'settings.exportImport': 'Export / Import',
+      'settings.exportDesc': 'Exportiere oder importiere alle Daten (inkl. Credentials).',
+      'settings.export': 'Daten exportieren',
+      'settings.import': 'Daten importieren',
+      'settings.sessionTimeout': 'Session Timeout',
+      'settings.sessionDesc': 'Automatisch ausloggen nach Inaktivität.',
+      'settings.timeoutEnable': 'Timeout aktivieren',
+      'settings.timeoutMinutes': 'Minuten bis Timeout',
+      'settings.userPassword': 'Benutzer & Passwort',
+      'settings.newUser': 'Neuer Benutzer',
+      'settings.newPassword': 'Neues Passwort',
+      'settings.save': 'Speichern',
+      'settings.logout': 'Ausloggen',
+      'settings.on': 'An',
+      'settings.off': 'Aus',
+      'settings.default': 'Default',
+      'settings.simple': 'Simpel',
+
+      // Overlays
+      'overlay.sessionEnded': 'Sitzung beendet',
+      'overlay.anotherDevice': 'Ein anderes Gerät hat sich angemeldet.',
+      'overlay.relogin': 'Erneut einloggen',
+      'overlay.sessionExpired': 'Session abgelaufen',
+      'overlay.sessionHint': 'Du kannst die Zeit in den Einstellungen anpassen oder deaktivieren.',
+
+      // Messages
+      'msg.saved': 'Gespeichert.',
+      'msg.error': 'Fehler',
+      'msg.success': 'Erfolg',
+    },
+
+    en: {
+      // General
+      'app.title': 'Local Network',
+      'app.settings': 'Settings',
+      'app.lastVersion': 'Last Version',
+
+      // Login
+      'login.title': 'Login',
+      'login.username': 'Username',
+      'login.password': 'Password',
+      'login.token': 'Login Token (optional)',
+      'login.tokenPlaceholder': 'Token for this device',
+      'login.button': 'Log in',
+
+      // Tables
+      'table.port': 'Port',
+      'table.assignment': 'Assignment',
+      'table.color': 'Color',
+
+      // Cards
+      'card.switch': 'Switch (8 Ports)',
+      'card.router': 'WiFi Router',
+      'card.pihole': 'PiHole',
+      'card.speedport': 'Speedport Info',
+      'card.speedtest': 'Internet Speed',
+      'card.windowspc': 'Windows PC',
+
+      // Raspberry/PiHole
+      'pi.model': 'Model',
+      'pi.hostname': 'Hostname',
+      'pi.lanIp': 'LAN IP',
+      'pi.vpnIp': 'VPN IP',
+      'pi.mac': 'MAC Address',
+      'pi.sshUser': 'SSH User',
+      'pi.piholeUrl': 'Pi-hole Admin URL',
+      'pi.piholeVpnUrl': 'Pi-hole VPN URL',
+
+      // Speedport
+      'speedport.wifiName': 'WiFi Name',
+      'speedport.wifiPassword': 'WiFi Password (Key)',
+      'speedport.serial': 'Serial Number',
+      'speedport.config': 'Configuration',
+      'speedport.vpnUrl': 'Speedport VPN URL',
+      'speedport.devicePassword': 'Device Password',
+      'speedport.modemId': 'Modem ID',
+
+      // Speedtest
+      'speedtest.download': 'Download',
+      'speedtest.upload': 'Upload',
+      'speedtest.ping': 'Ping',
+      'speedtest.ready': 'Ready',
+      'speedtest.start': 'Start Speed Test',
+      'speedtest.starting': 'Speed test starting...',
+      'speedtest.measuringPing': 'Measuring ping...',
+      'speedtest.measuringDownload': 'Measuring download...',
+      'speedtest.measuringUpload': 'Measuring upload...',
+      'speedtest.complete': 'Test complete ✓',
+
+      // Windows PC
+      'pc.status.online': 'Online',
+      'pc.status.offline': 'Offline',
+      'pc.status.checking': 'Checking...',
+      'pc.wake': 'Wake',
+      'pc.shutdown': 'Shutdown',
+      'pc.ip': 'IP Address',
+      'pc.mac': 'MAC Address',
+      'pc.sshUser': 'SSH User',
+      'pc.sshPassword': 'SSH Password',
+      'pc.passwordSet': '••••••••••••',
+      'pc.passwordNotSet': 'Not set',
+      'pc.wakeSuccess': 'Wake-on-LAN packet sent!',
+      'pc.shutdownSuccess': 'Shutdown command sent!',
+      'pc.connectionError': 'Connection error',
+      'pc.rateLimited': 'Too many requests. Please wait.',
+
+      // Settings
+      'settings.title': 'Settings',
+      'settings.design': 'Design',
+      'settings.data': 'Data',
+      'settings.session': 'Session',
+      'settings.user': 'User',
+      'settings.credits': 'Credits',
+      'settings.theme': 'Theme',
+      'settings.buttonStyle': 'Button Style',
+      'settings.glowStrength': 'Glow Strength',
+      'settings.accentColor': 'Accent Color',
+      'settings.language': 'Language',
+      'settings.versions': 'Versions',
+      'settings.portAssignments': 'Port Assignments',
+      'settings.exportImport': 'Export / Import',
+      'settings.exportDesc': 'Export or import all data (including credentials).',
+      'settings.export': 'Export Data',
+      'settings.import': 'Import Data',
+      'settings.sessionTimeout': 'Session Timeout',
+      'settings.sessionDesc': 'Automatically log out after inactivity.',
+      'settings.timeoutEnable': 'Enable Timeout',
+      'settings.timeoutMinutes': 'Minutes until Timeout',
+      'settings.userPassword': 'User & Password',
+      'settings.newUser': 'New Username',
+      'settings.newPassword': 'New Password',
+      'settings.save': 'Save',
+      'settings.logout': 'Log out',
+      'settings.on': 'On',
+      'settings.off': 'Off',
+      'settings.default': 'Default',
+      'settings.simple': 'Simple',
+
+      // Overlays
+      'overlay.sessionEnded': 'Session Ended',
+      'overlay.anotherDevice': 'Another device has logged in.',
+      'overlay.relogin': 'Log in again',
+      'overlay.sessionExpired': 'Session Expired',
+      'overlay.sessionHint': 'You can adjust the timeout in settings or disable it.',
+
+      // Messages
+      'msg.saved': 'Saved.',
+      'msg.error': 'Error',
+      'msg.success': 'Success',
+    },
+  },
+
+  t(key) {
+    return this.translations[this.currentLang]?.[key] || this.translations.de[key] || key;
+  },
+
+  setLanguage(lang) {
+    if (!this.translations[lang]) return;
+    this.currentLang = lang;
+    localStorage.setItem('lang', lang);
+    document.documentElement.lang = lang;
+    this.updateDOM();
+  },
+
+  updateDOM() {
+    // Update all elements with data-i18n attribute
+    document.querySelectorAll('[data-i18n]').forEach((el) => {
+      const key = el.getAttribute('data-i18n');
+      const translation = this.t(key);
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.placeholder = translation;
+      } else {
+        el.textContent = translation;
+      }
+    });
+
+    // Update elements with data-i18n-placeholder
+    document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      el.placeholder = this.t(key);
+    });
+
+    // Update title
+    document.title = this.t('app.title');
+
+    // Update dynamic content
+    this.updateDynamicContent();
+  },
+
+  updateDynamicContent() {
+    // Update speedtest labels
+    const speedLabel = document.getElementById('speedLabel');
+    if (speedLabel && speedLabel.textContent === 'Bereit') {
+      speedLabel.textContent = this.t('speedtest.ready');
+    }
+
+    // Update PC status
+    const pcStatusText = document.getElementById('pcStatusText');
+    if (pcStatusText) {
+      const text = pcStatusText.textContent;
+      if (text === 'Online' || text === 'Offline' || text === 'Prüfe...' || text === 'Checking...') {
+        if (text === 'Online') pcStatusText.textContent = this.t('pc.status.online');
+        else if (text === 'Offline') pcStatusText.textContent = this.t('pc.status.offline');
+        else pcStatusText.textContent = this.t('pc.status.checking');
+      }
+    }
+  },
+
+  init() {
+    document.documentElement.lang = this.currentLang;
+    this.updateDOM();
+  },
+};
+
 const els = {
   body: document.body,
   topBar: document.getElementById('topBar'),
@@ -6,8 +317,10 @@ const els = {
   closeSettings: document.getElementById('closeSettings'),
   settingsTabs: document.querySelectorAll('.settings-tab'),
   settingsPanels: document.querySelectorAll('.settings-panel'),
-  themeToggleGroup: document.getElementById('themeToggleGroup'),
+  themeSwitcher: document.getElementById('themeSwitcher'),
   buttonStyleGroup: document.getElementById('buttonStyleGroup'),
+  glowStrength: document.getElementById('glowStrength'),
+  accentPicker: document.getElementById('accentPicker'),
   versionChip: document.getElementById('versionChip'),
   loginCard: document.getElementById('loginCard'),
   loginBtn: document.getElementById('loginBtn'),
@@ -72,6 +385,8 @@ const raspberryInputs = {
 const state = {
   token: null,
   theme: 'dark',
+  glowStrength: 1,
+  accent: '#00d4ff',
   versions: [],
   switchPorts: [],
   routerPorts: [],
@@ -106,8 +421,17 @@ const STORAGE_KEYS = {
   deviceToken: 'deviceToken',
   theme: 'theme',
   buttonStyle: 'buttonStyle',
+  glowStrength: 'glowStrength',
+  accent: 'accent',
   sessionTimeoutEnabled: 'sessionTimeoutEnabled',
   sessionTimeoutMinutes: 'sessionTimeoutMinutes',
+};
+
+const defaults = {
+  theme: 'dark',
+  buttonStyle: 'default',
+  glowStrength: 1,
+  accent: '#00d4ff',
 };
 
 function debounce(fn, wait) {
@@ -155,21 +479,113 @@ function pickTextColor(hex) {
   return luminance > 0.6 ? '#0f1526' : '#ffffff';
 }
 
+function getSystemTheme() {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 function applyTheme(theme, save = false) {
   state.theme = theme;
-  document.body.setAttribute('data-theme', theme);
+  const effectiveTheme = theme === 'system' ? getSystemTheme() : theme;
+  document.body.setAttribute('data-theme', effectiveTheme);
   if (save) {
     localStorage.setItem(STORAGE_KEYS.theme, theme);
     // Tabellen neu rendern damit Farben stimmen
     if (state.token) renderTables();
   }
-  updateThemeToggleUI(theme);
+  updateThemeSwitcherUI(theme);
 }
 
-function updateThemeToggleUI(theme) {
-  if (!els.themeToggleGroup) return;
-  els.themeToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+function updateThemeSwitcherUI(theme) {
+  if (!els.themeSwitcher) return;
+  const options = ['dark', 'system', 'light'];
+  const position = options.indexOf(theme);
+  els.themeSwitcher.setAttribute('data-position', position >= 0 ? position : 0);
+  els.themeSwitcher.querySelectorAll('.theme-option').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.value === theme);
+  });
+}
+
+// Legacy alias for compatibility
+function updateThemeToggleUI(theme) {
+  updateThemeSwitcherUI(theme);
+}
+
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
+    : { r: 0, g: 212, b: 255 };
+}
+
+function applyGlowStrength(value) {
+  const numeric = Number(value);
+  const safeValue = Number.isNaN(numeric) ? defaults.glowStrength : numeric;
+  state.glowStrength = Math.min(2, Math.max(0, safeValue));
+  document.documentElement.style.setProperty('--glow-strength', String(state.glowStrength));
+  document.body.style.setProperty('--glow-strength', String(state.glowStrength));
+  updateGlowSliderUI(state.glowStrength);
+}
+
+function updateGlowSliderUI(value) {
+  const slider = els.glowStrength;
+  if (!slider) return;
+  const numeric = Number(value);
+  const safeValue = Number.isNaN(numeric) ? defaults.glowStrength : numeric;
+  slider.value = String(safeValue);
+  const percent = Math.round((safeValue / 2) * 100);
+  slider.style.setProperty('--glow-percent', `${percent}%`);
+  slider.style.setProperty('--glow-thumb-icon', buildGlowThumbIcon(safeValue));
+}
+
+function buildGlowThumbIcon(value) {
+  const clamped = Math.min(2, Math.max(0, Number(value)));
+  let lines = '';
+  if (clamped > 0) {
+    const minRay = 1.4;
+    const maxRay = 4.6;
+    const inner = 6;
+    const rayLength = minRay + (maxRay - minRay) * (clamped / 2);
+    const outer = inner + rayLength;
+    const diagInner = inner * Math.SQRT1_2;
+    const diagOuter = outer * Math.SQRT1_2;
+    const fmt = (num) => Number(num.toFixed(2));
+    const line = (x1, y1, x2, y2) =>
+      `<line x1='${fmt(x1)}' y1='${fmt(y1)}' x2='${fmt(x2)}' y2='${fmt(y2)}'/>`;
+    lines = [
+      line(12, 12 - inner, 12, 12 - outer),
+      line(12, 12 + inner, 12, 12 + outer),
+      line(12 - inner, 12, 12 - outer, 12),
+      line(12 + inner, 12, 12 + outer, 12),
+      line(12 - diagInner, 12 - diagInner, 12 - diagOuter, 12 - diagOuter),
+      line(12 + diagInner, 12 - diagInner, 12 + diagOuter, 12 - diagOuter),
+      line(12 - diagInner, 12 + diagInner, 12 - diagOuter, 12 + diagOuter),
+      line(12 + diagInner, 12 + diagInner, 12 + diagOuter, 12 + diagOuter),
+    ].join('');
+  }
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.6' stroke-linecap='round'><circle cx='12' cy='12' r='4' fill='none'/>${lines}</svg>`;
+  const encoded = encodeURIComponent(svg);
+  return `url("data:image/svg+xml,${encoded}")`;
+}
+
+function applyAccentColor(hex) {
+  state.accent = hex || defaults.accent;
+  const rgb = hexToRgb(state.accent);
+  const accentVars = {
+    '--accent': state.accent,
+    '--accent-strong': state.accent,
+    '--accent-rgb': `${rgb.r} ${rgb.g} ${rgb.b}`,
+  };
+  for (const [key, value] of Object.entries(accentVars)) {
+    document.documentElement.style.setProperty(key, value);
+    document.body.style.setProperty(key, value);
+  }
+  updateAccentPickerUI(state.accent);
+}
+
+function updateAccentPickerUI(accent) {
+  if (!els.accentPicker) return;
+  els.accentPicker.querySelectorAll('.accent-option').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.color === accent);
   });
 }
 
@@ -181,23 +597,64 @@ function applyButtonStyle(style, save = false) {
   updateButtonStyleUI(style);
 }
 
+function updateToggleSlider(group) {
+  if (!group) return;
+  const slider = group.querySelector('.toggle-slider');
+  if (!slider) return;
+
+  const activeBtn = group.querySelector('.toggle-option.active');
+  if (!activeBtn) return;
+
+  // Calculate position and width
+  const buttons = Array.from(group.querySelectorAll('.toggle-option'));
+  const activeIndex = buttons.indexOf(activeBtn);
+  let offsetX = 0;
+
+  for (let i = 0; i < activeIndex; i++) {
+    offsetX += buttons[i].offsetWidth + 3; // 3px gap
+  }
+
+  slider.style.width = `${activeBtn.offsetWidth}px`;
+  slider.style.transform = `translateX(${offsetX}px)`;
+}
+
 function updateButtonStyleUI(style) {
   if (!els.buttonStyleGroup) return;
+  const options = ['default', 'simple'];
+  const position = options.indexOf(style);
+  els.buttonStyleGroup.setAttribute('data-position', position >= 0 ? position : 0);
   els.buttonStyleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.value === style);
   });
+  updateToggleSlider(els.buttonStyleGroup);
 }
 
 function loadLocalSettings() {
-  const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || 'dark';
-  const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || 'default';
+  const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || defaults.theme;
+  const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || defaults.buttonStyle;
+  const savedGlowStrength = localStorage.getItem(STORAGE_KEYS.glowStrength);
+  const savedAccent = localStorage.getItem(STORAGE_KEYS.accent) || defaults.accent;
+
   applyTheme(savedTheme);
   applyButtonStyle(savedButtonStyle);
+  applyGlowStrength(savedGlowStrength !== null ? Number(savedGlowStrength) : defaults.glowStrength);
+  applyAccentColor(savedAccent);
   loadSessionSettings();
 }
 
 function openSettings() {
   els.settingsOverlay.classList.add('active');
+
+  // Initialize toggle sliders after modal becomes visible
+  // Must wait for display:flex to apply before measuring offsetWidth
+  requestAnimationFrame(() => {
+    updateToggleSlider(els.buttonStyleGroup);
+    updateToggleSlider(els.timeoutToggleGroup);
+    const languageGroup = document.getElementById('languageGroup');
+    if (languageGroup) {
+      updateToggleSlider(languageGroup);
+    }
+  });
 }
 
 function closeSettings() {
@@ -867,10 +1324,13 @@ function saveSessionSettings() {
 
 function updateTimeoutUI() {
   if (!els.timeoutToggleGroup) return;
+  // Options are "off" (position 0) and "on" (position 1)
+  els.timeoutToggleGroup.setAttribute('data-position', state.sessionTimeoutEnabled ? 1 : 0);
   els.timeoutToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
     const isOn = btn.dataset.value === 'on';
     btn.classList.toggle('active', isOn === state.sessionTimeoutEnabled);
   });
+  updateToggleSlider(els.timeoutToggleGroup);
   if (els.timeoutMinutesRow) {
     els.timeoutMinutesRow.classList.toggle('hidden', !state.sessionTimeoutEnabled);
   }
@@ -952,12 +1412,21 @@ function bindEvents() {
     });
   });
 
-  // Theme Toggle
-  els.themeToggleGroup.querySelectorAll('.toggle-option').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const theme = btn.dataset.value;
-      applyTheme(theme, true);
+  // Theme Switcher (3-way)
+  if (els.themeSwitcher) {
+    els.themeSwitcher.querySelectorAll('.theme-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const theme = btn.dataset.value;
+        applyTheme(theme, true);
+      });
     });
+  }
+
+  // Listen for system theme changes
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (state.theme === 'system') {
+      applyTheme('system');
+    }
   });
 
   // Button Style Toggle
@@ -965,8 +1434,59 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       const style = btn.dataset.value;
       applyButtonStyle(style, true);
+      updateToggleSlider(els.buttonStyleGroup);
     });
   });
+
+  // Glow Strength Slider
+  if (els.glowStrength) {
+    els.glowStrength.addEventListener('input', (e) => {
+      const nextValue = Number(e.target.value);
+      applyGlowStrength(nextValue);
+    });
+    els.glowStrength.addEventListener('change', () => {
+      localStorage.setItem(STORAGE_KEYS.glowStrength, String(state.glowStrength));
+      showToast(i18n.t('msg.saved'));
+    });
+  }
+
+  // Accent Color Picker
+  if (els.accentPicker) {
+    els.accentPicker.querySelectorAll('.accent-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const color = btn.dataset.color;
+        applyAccentColor(color);
+        localStorage.setItem(STORAGE_KEYS.accent, color);
+        showToast(i18n.t('msg.saved'));
+      });
+    });
+  }
+
+  // Language Switcher
+  const languageGroup = document.getElementById('languageGroup');
+  if (languageGroup) {
+    // Set initial active state and position based on saved language
+    const langOptions = ['de', 'en'];
+    const initialLangPos = langOptions.indexOf(i18n.currentLang);
+    languageGroup.setAttribute('data-position', initialLangPos >= 0 ? initialLangPos : 0);
+    languageGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.value === i18n.currentLang);
+    });
+
+    languageGroup.querySelectorAll('.toggle-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const lang = btn.dataset.value;
+        const position = langOptions.indexOf(lang);
+        languageGroup.setAttribute('data-position', position >= 0 ? position : 0);
+        i18n.setLanguage(lang);
+        languageGroup.querySelectorAll('.toggle-option').forEach((b) => {
+          b.classList.toggle('active', b.dataset.value === lang);
+        });
+        updateToggleSlider(languageGroup);
+        showToast(i18n.t('msg.saved'));
+      });
+    });
+  }
 
   els.credentialForm.addEventListener('submit', saveCredentials);
   Object.values(speedportInputs).forEach((input) => {
@@ -1005,6 +1525,7 @@ function bindEvents() {
       state.sessionTimeoutEnabled = btn.dataset.value === 'on';
       saveSessionSettings();
       updateTimeoutUI();
+      updateToggleSlider(els.timeoutToggleGroup);
       if (state.sessionTimeoutEnabled && state.token) {
         startSessionTimer();
       } else {
@@ -1413,33 +1934,33 @@ const speedTest = {
     const pingEl = document.getElementById('pingSpeed');
 
     this.updateGauge(0);
-    this.updateLabel('Speed-Test startet...');
+    this.updateLabel(i18n.t('speedtest.starting'));
     const notice = document.getElementById('speedtestNotice');
     if (notice) notice.textContent = '';
 
     // Ping Test
-    this.updateLabel('Messe Ping...');
+    this.updateLabel(i18n.t('speedtest.measuringPing'));
     const ping = await this.measureLocalPing();
     if (pingEl) pingEl.textContent = `${ping.toFixed(1)} ms`;
 
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Download Test
-    this.updateLabel('Messe Download...');
+    this.updateLabel(i18n.t('speedtest.measuringDownload'));
     const download = await this.measureLocalDownload();
     if (downloadEl) downloadEl.textContent = `${download.toFixed(1)} Mbit/s`;
 
     await new Promise(resolve => setTimeout(resolve, 300));
 
     // Upload Test
-    this.updateLabel('Messe Upload...');
+    this.updateLabel(i18n.t('speedtest.measuringUpload'));
     const upload = await this.measureLocalUpload();
     if (uploadEl) uploadEl.textContent = `${upload.toFixed(1)} Mbit/s`;
 
     // Show final result
     const finalSpeed = Math.max(download, upload);
     this.updateGauge(finalSpeed, 2000);
-    this.updateLabel('Test abgeschlossen ✓');
+    this.updateLabel(i18n.t('speedtest.complete'));
 
     this.isRunning = false;
     this.disableButton(false);
@@ -1476,3 +1997,168 @@ if (startTestBtn) {
 }
 
 speedTest.updateHostNotice();
+
+// ═══════════════════════════════════════════════════════════════════
+// Windows PC Control
+// ═══════════════════════════════════════════════════════════════════
+
+const windowsPC = {
+  config: null,
+  statusInterval: null,
+
+  async init() {
+    await this.loadConfig();
+    this.bindEvents();
+    this.startStatusCheck();
+  },
+
+  async loadConfig() {
+    if (!state.token) return;
+
+    try {
+      const res = await fetch('/api/windows-pc', { headers: authHeaders() });
+      if (res.ok) {
+        this.config = await res.json();
+        this.updateUI();
+      }
+    } catch (e) {
+      console.error('Failed to load Windows PC config:', e);
+    }
+  },
+
+  updateUI() {
+    if (!this.config) return;
+
+    const ipEl = document.getElementById('pcIpValue');
+    const macEl = document.getElementById('pcMacValue');
+    const userEl = document.getElementById('pcSshUserValue');
+    const passEl = document.getElementById('pcSshPassValue');
+
+    if (ipEl) ipEl.textContent = this.config.ipAddress || '--';
+    if (macEl) macEl.textContent = this.config.macAddress || '--';
+    if (userEl) userEl.textContent = this.config.sshUser || '--';
+
+    // Password is never sent from server - only show if configured
+    if (passEl) {
+      const masked = passEl.querySelector('.password-masked');
+      if (masked) {
+        masked.textContent = this.config.hasPassword ? i18n.t('pc.passwordSet') : i18n.t('pc.passwordNotSet');
+      }
+    }
+  },
+
+  bindEvents() {
+    const wakeBtn = document.getElementById('pcWakeBtn');
+    const shutdownBtn = document.getElementById('pcShutdownBtn');
+
+    if (wakeBtn) {
+      wakeBtn.addEventListener('click', () => this.wake());
+    }
+
+    if (shutdownBtn) {
+      shutdownBtn.addEventListener('click', () => this.shutdown());
+    }
+  },
+
+  startStatusCheck() {
+    this.checkStatus();
+    this.statusInterval = setInterval(() => this.checkStatus(), 10000);
+  },
+
+  stopStatusCheck() {
+    if (this.statusInterval) {
+      clearInterval(this.statusInterval);
+      this.statusInterval = null;
+    }
+  },
+
+  async checkStatus() {
+    if (!state.token) return;
+
+    try {
+      const res = await fetch('/api/windows-pc/status', { headers: authHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        this.updateStatusUI(data.online);
+      }
+    } catch (e) {
+      this.updateStatusUI(false);
+    }
+  },
+
+  updateStatusUI(online) {
+    const statusEl = document.getElementById('pcStatus');
+    const textEl = document.getElementById('pcStatusText');
+
+    if (statusEl) {
+      statusEl.classList.remove('online', 'offline');
+      statusEl.classList.add(online ? 'online' : 'offline');
+    }
+
+    if (textEl) {
+      textEl.textContent = online ? i18n.t('pc.status.online') : i18n.t('pc.status.offline');
+    }
+  },
+
+  async wake() {
+    if (!state.token) return;
+
+    const btn = document.getElementById('pcWakeBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/windows-pc/wake', {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+
+      const data = await res.json();
+      showToast(data.success ? i18n.t('pc.wakeSuccess') : data.message, !data.success);
+    } catch (e) {
+      showToast(i18n.t('pc.connectionError'), true);
+    }
+
+    if (btn) btn.disabled = false;
+  },
+
+  async shutdown() {
+    if (!state.token) return;
+
+    const btn = document.getElementById('pcShutdownBtn');
+    if (btn) btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/windows-pc/shutdown', {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+
+      const data = await res.json();
+      showToast(data.success ? i18n.t('pc.shutdownSuccess') : data.message, !data.success);
+    } catch (e) {
+      showToast(i18n.t('pc.connectionError'), true);
+    }
+
+    if (btn) btn.disabled = false;
+  },
+};
+
+// Hook into login success - watch for app becoming visible
+const appObserver = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+      const app = document.getElementById('app');
+      if (app && app.style.display !== 'none' && state.token) {
+        windowsPC.init();
+      }
+    }
+  });
+});
+
+const appEl = document.getElementById('app');
+if (appEl) {
+  appObserver.observe(appEl, { attributes: true });
+}
+
+// Initialize internationalization
+i18n.init();

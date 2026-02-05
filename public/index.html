@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="style.css" />
@@ -22,34 +22,34 @@
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z" />
             </svg>
           </span>
-          <span class="settings-text">Einstellungen</span>
+          <span class="settings-text" data-i18n="app.settings">Einstellungen</span>
         </button>
         <div class="chip" id="versionChip">Letzte Version: --</div>
       </div>
 
       <div class="hero">
-        <h1>Lokales Netzwerk</h1>
+        <h1 data-i18n="app.title">Lokales Netzwerk</h1>
       </div>
 
       <section class="card login-card" id="loginCard">
         <div class="section-title">
-          <h3>Login</h3>
+          <h3 data-i18n="login.title">Login</h3>
         </div>
         <div class="login-grid">
           <div class="input-row">
-            <label for="userInput">Benutzername</label>
-            <input id="userInput" type="text" autocomplete="username" placeholder="Benutzername" />
+            <label for="userInput" data-i18n="login.username">Benutzername</label>
+            <input id="userInput" type="text" autocomplete="username" data-i18n-placeholder="login.username" placeholder="Benutzername" />
           </div>
           <div class="input-row">
-            <label for="passInput">Passwort</label>
-            <input id="passInput" type="password" autocomplete="current-password" placeholder="Passwort" />
+            <label for="passInput" data-i18n="login.password">Passwort</label>
+            <input id="passInput" type="password" autocomplete="current-password" data-i18n-placeholder="login.password" placeholder="Passwort" />
           </div>
           <div class="input-row">
-            <label for="tokenInput">Login-Token (optional)</label>
-            <input id="tokenInput" type="text" autocomplete="off" placeholder="Token für dieses Gerät" />
+            <label for="tokenInput" data-i18n="login.token">Login-Token (optional)</label>
+            <input id="tokenInput" type="text" autocomplete="off" data-i18n-placeholder="login.tokenPlaceholder" placeholder="Token für dieses Gerät" />
           </div>
           <div class="actions">
-            <button class="btn" id="loginBtn">Einloggen</button>
+            <button class="btn" id="loginBtn" data-i18n="login.button">Einloggen</button>
           </div>
           <div class="status" id="loginStatus" hidden></div>
         </div>
@@ -74,15 +74,15 @@
                     <rect x="40" y="42" width="5" height="8" rx="1" fill="#2d2d2d" />
                   </svg>
                 </span>
-                <h3>Switch (8 Ports)</h3>
+                <h3 data-i18n="card.switch">Switch (8 Ports)</h3>
               </div>
             </div>
             <table class="table" id="switchTable">
               <thead>
                 <tr>
-                  <th>Port</th>
-                  <th>Belegung</th>
-                  <th>Farbe</th>
+                  <th data-i18n="table.port">Port</th>
+                  <th data-i18n="table.assignment">Belegung</th>
+                  <th data-i18n="table.color">Farbe</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -107,15 +107,15 @@
                     />
                   </svg>
                 </span>
-                <h3>WLAN Router</h3>
+                <h3 data-i18n="card.router">WLAN Router</h3>
               </div>
             </div>
             <table class="table" id="routerTable">
               <thead>
                 <tr>
-                  <th>Port</th>
-                  <th>Belegung</th>
-                  <th>Farbe</th>
+                  <th data-i18n="table.port">Port</th>
+                  <th data-i18n="table.assignment">Belegung</th>
+                  <th data-i18n="table.color">Farbe</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -134,39 +134,39 @@
                   <path d="M32 10c-8 0-14 5-16 12 6 0 12-4 16-12z" fill="#4cc063" />
                 </svg>
               </span>
-              <h3>PiHole</h3>
+              <h3 data-i18n="card.pihole">PiHole</h3>
             </div>
           </div>
           <div class="input-row">
-            <label for="piModel">Modell</label>
+            <label for="piModel" data-i18n="pi.model">Modell</label>
             <input id="piModel" type="text" placeholder="Raspberry Pi Zero 2 W" />
           </div>
           <div class="input-row">
-            <label for="piHostname">Hostname</label>
+            <label for="piHostname" data-i18n="pi.hostname">Hostname</label>
             <input id="piHostname" type="text" placeholder="raspberrypi" />
           </div>
           <div class="input-row">
-            <label for="piIp">LAN-IP</label>
+            <label for="piIp" data-i18n="pi.lanIp">LAN-IP</label>
             <input id="piIp" type="text" placeholder="192.168.1.50" />
           </div>
           <div class="input-row">
-            <label for="piVpnIp">VPN-IP</label>
+            <label for="piVpnIp" data-i18n="pi.vpnIp">VPN-IP</label>
             <input id="piVpnIp" type="text" placeholder="100.x.x.x" />
           </div>
           <div class="input-row">
-            <label for="piMac">MAC-Adresse</label>
+            <label for="piMac" data-i18n="pi.mac">MAC-Adresse</label>
             <input id="piMac" type="text" placeholder="b8:27:eb:xx:xx:xx" />
           </div>
           <div class="input-row">
-            <label for="piUser">SSH-User</label>
+            <label for="piUser" data-i18n="pi.sshUser">SSH-User</label>
             <input id="piUser" type="text" placeholder="pi" />
           </div>
           <div class="input-row">
-            <label for="piHoleUrl">Pi-hole Admin URL</label>
+            <label for="piHoleUrl" data-i18n="pi.piholeUrl">Pi-hole Admin URL</label>
             <input id="piHoleUrl" type="text" placeholder="http://pi.hole/admin" />
           </div>
           <div class="input-row">
-            <label for="piHoleRemoteUrl">Pi-hole VPN URL</label>
+            <label for="piHoleRemoteUrl" data-i18n="pi.piholeVpnUrl">Pi-hole VPN URL</label>
             <input id="piHoleRemoteUrl" type="text" placeholder="http://100.x.x.x/admin" />
           </div>
           <div class="link-row">
@@ -194,35 +194,35 @@
                   />
                 </svg>
               </span>
-              <h3>Speedport Infos</h3>
+              <h3 data-i18n="card.speedport">Speedport Infos</h3>
             </div>
           </div>
           <div class="input-row">
-            <label for="wifiName">WLAN-Name</label>
+            <label for="wifiName" data-i18n="speedport.wifiName">WLAN-Name</label>
             <input id="wifiName" type="text" placeholder="SSID" />
           </div>
           <div class="input-row">
-            <label for="wifiPass">WLAN-Passwort (Schlüssel)</label>
+            <label for="wifiPass" data-i18n="speedport.wifiPassword">WLAN-Passwort (Schlüssel)</label>
             <input id="wifiPass" type="text" placeholder="Passwort" />
           </div>
           <div class="input-row">
-            <label for="serial">Serien-Nummer</label>
+            <label for="serial" data-i18n="speedport.serial">Serien-Nummer</label>
             <input id="serial" type="text" placeholder="Seriennummer" />
           </div>
           <div class="input-row">
-            <label for="config">Konfiguration</label>
+            <label for="config" data-i18n="speedport.config">Konfiguration</label>
             <input id="config" type="text" placeholder="z. B. Profil-Stand" />
           </div>
           <div class="input-row">
-            <label for="speedportRemoteUrl">Speedport VPN URL</label>
+            <label for="speedportRemoteUrl" data-i18n="speedport.vpnUrl">Speedport VPN URL</label>
             <input id="speedportRemoteUrl" type="text" placeholder="http://192.168.1.1" />
           </div>
           <div class="input-row">
-            <label for="devicePass">Gerätepasswort</label>
+            <label for="devicePass" data-i18n="speedport.devicePassword">Gerätepasswort</label>
             <input id="devicePass" type="text" placeholder="Gerätepasswort" />
           </div>
           <div class="input-row">
-            <label for="modemId">Modem-ID</label>
+            <label for="modemId" data-i18n="speedport.modemId">Modem-ID</label>
             <input id="modemId" type="text" placeholder="Modem-ID" />
           </div>
           <div class="status success" id="speedportStatus" hidden>Gespeichert.</div>
@@ -243,7 +243,7 @@
                   <text x="32" y="52" text-anchor="middle" font-size="10" fill="#fdba74" font-weight="600">Mbit/s</text>
                 </svg>
               </span>
-              <h3>Internet Geschwindigkeit</h3>
+              <h3 data-i18n="card.speedtest">Internet Geschwindigkeit</h3>
             </div>
           </div>
           <div class="speedtest-container">
@@ -270,26 +270,93 @@
                 <!-- Speed value -->
                 <text id="speedValue" x="150" y="155" text-anchor="middle" font-size="40" font-weight="700" fill="var(--text)">0</text>
                 <text x="150" y="180" text-anchor="middle" font-size="14" fill="var(--text-muted)">Mbit/s</text>
-                <text id="speedLabel" x="150" y="195" text-anchor="middle" font-size="12" fill="var(--text-muted)">Bereit</text>
+                <text id="speedLabel" x="150" y="195" text-anchor="middle" font-size="12" fill="var(--text-muted)" data-i18n="speedtest.ready">Bereit</text>
               </svg>
             </div>
             <div class="speedtest-note" id="speedtestNotice" aria-live="polite"></div>
             <div class="speedtest-stats">
               <div class="speedtest-stat">
-                <span class="speedtest-stat-label">Download</span>
+                <span class="speedtest-stat-label" data-i18n="speedtest.download">Download</span>
                 <span class="speedtest-stat-value" id="downloadSpeed">-- Mbit/s</span>
               </div>
               <div class="speedtest-stat">
-                <span class="speedtest-stat-label">Upload</span>
+                <span class="speedtest-stat-label" data-i18n="speedtest.upload">Upload</span>
                 <span class="speedtest-stat-value" id="uploadSpeed">-- Mbit/s</span>
               </div>
               <div class="speedtest-stat">
-                <span class="speedtest-stat-label">Ping</span>
+                <span class="speedtest-stat-label" data-i18n="speedtest.ping">Ping</span>
                 <span class="speedtest-stat-value" id="pingSpeed">-- ms</span>
               </div>
             </div>
             <div class="speedtest-buttons">
-              <button class="btn" id="startLocalTest">Speed-Test starten</button>
+              <button class="btn" id="startLocalTest" data-i18n="speedtest.start">Speed-Test starten</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card windows-pc-card" style="margin-bottom: 16px">
+          <div class="section-title">
+            <div class="section-header">
+              <span class="icon-badge windows-icon" aria-hidden="true">
+                <svg viewBox="0 0 64 64">
+                  <rect x="8" y="8" width="22" height="22" rx="2" fill="#00a4ef"/>
+                  <rect x="34" y="8" width="22" height="22" rx="2" fill="#7fba00"/>
+                  <rect x="8" y="34" width="22" height="22" rx="2" fill="#f25022"/>
+                  <rect x="34" y="34" width="22" height="22" rx="2" fill="#ffb900"/>
+                </svg>
+              </span>
+              <h3 data-i18n="card.windowspc">Windows PC</h3>
+            </div>
+            <div class="pc-status" id="pcStatus">
+              <span class="status-dot" id="pcStatusDot"></span>
+              <span class="status-text" id="pcStatusText" data-i18n="pc.status.checking">Prüfe...</span>
+            </div>
+          </div>
+
+          <div class="pc-control-grid">
+            <div class="pc-buttons">
+              <button class="btn pc-wake-btn" id="pcWakeBtn" title="PC aufwecken">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="5"/>
+                  <line x1="12" y1="1" x2="12" y2="3"/>
+                  <line x1="12" y1="21" x2="12" y2="23"/>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                  <line x1="1" y1="12" x2="3" y2="12"/>
+                  <line x1="21" y1="12" x2="23" y2="12"/>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <span data-i18n="pc.wake">Wake</span>
+              </button>
+              <button class="btn pc-shutdown-btn" id="pcShutdownBtn" title="PC herunterfahren">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+                  <line x1="12" y1="2" x2="12" y2="12"/>
+                </svg>
+                <span data-i18n="pc.shutdown">Shutdown</span>
+              </button>
+            </div>
+
+            <div class="pc-info-grid">
+              <div class="pc-info-item">
+                <span class="pc-info-label" data-i18n="pc.ip">IP-Adresse</span>
+                <span class="pc-info-value" id="pcIpValue">--</span>
+              </div>
+              <div class="pc-info-item">
+                <span class="pc-info-label" data-i18n="pc.mac">MAC-Adresse</span>
+                <span class="pc-info-value" id="pcMacValue">--</span>
+              </div>
+              <div class="pc-info-item">
+                <span class="pc-info-label" data-i18n="pc.sshUser">SSH-User</span>
+                <span class="pc-info-value" id="pcSshUserValue">--</span>
+              </div>
+              <div class="pc-info-item">
+                <span class="pc-info-label" data-i18n="pc.sshPassword">SSH-Passwort</span>
+                <span class="pc-info-value pc-password" id="pcSshPassValue">
+                  <span class="password-masked">••••••••</span>
+                </span>
+              </div>
             </div>
           </div>
         </section>
@@ -305,7 +372,7 @@
     <div class="overlay" id="settingsOverlay">
       <div class="settings-modal">
         <div class="settings-header">
-          <h3>Einstellungen</h3>
+          <h3 data-i18n="settings.title">Einstellungen</h3>
           <button class="close-btn" id="closeSettings" aria-label="Schließen">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -319,7 +386,7 @@
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
               </svg>
-              <span>Design</span>
+              <span data-i18n="settings.design">Design</span>
             </button>
             <button class="settings-tab" data-tab="daten">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -327,21 +394,21 @@
                 <path d="M4 7c0-1 1-2 2-2h12c1 0 2 1 2 2" />
                 <path d="M12 11v6M9 14l3 3 3-3" />
               </svg>
-              <span>Daten</span>
+              <span data-i18n="settings.data">Daten</span>
             </button>
             <button class="settings-tab" data-tab="session">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <circle cx="12" cy="12" r="9" />
                 <path d="M12 6v6l4 2" />
               </svg>
-              <span>Session</span>
+              <span data-i18n="settings.session">Session</span>
             </button>
             <button class="settings-tab" data-tab="user">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <circle cx="12" cy="8" r="4" />
                 <path d="M4 20c0-4 4-6 8-6s8 2 8 6" />
               </svg>
-              <span>User</span>
+              <span data-i18n="settings.user">User</span>
             </button>
             <button class="settings-tab" data-tab="credits">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -349,24 +416,76 @@
                 <circle cx="12" cy="8" r="1" fill="currentColor" />
                 <path d="M12 11v5" stroke-width="2" />
               </svg>
-              <span>Credits</span>
+              <span data-i18n="settings.credits">Credits</span>
             </button>
           </nav>
           <div class="settings-content">
             <div class="settings-panel active" id="panel-design">
-              <h4>Design</h4>
+              <h4 data-i18n="settings.design">Design</h4>
               <div class="setting-row">
-                <label>Theme</label>
-                <div class="toggle-group" id="themeToggleGroup">
-                  <button class="toggle-option active" data-value="dark">Dark</button>
-                  <button class="toggle-option" data-value="light">Light</button>
+                <label data-i18n="settings.theme">Theme</label>
+                <div class="theme-switcher" id="themeSwitcher" data-position="0">
+                  <span class="theme-slider"></span>
+                  <button class="theme-option active" data-value="dark" aria-label="Dark Mode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>
+                    </svg>
+                  </button>
+                  <button class="theme-option" data-value="system" aria-label="System Mode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <rect x="2" y="3" width="20" height="14" rx="2"/>
+                      <path d="M8 21h8M12 17v4"/>
+                    </svg>
+                  </button>
+                  <button class="theme-option" data-value="light" aria-label="Light Mode">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <circle cx="12" cy="12" r="4"/>
+                      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
               <div class="setting-row">
-                <label>Button-Stil</label>
-                <div class="toggle-group" id="buttonStyleGroup">
-                  <button class="toggle-option active" data-value="default">Default</button>
-                  <button class="toggle-option" data-value="simple">Simpel</button>
+                <label data-i18n="settings.buttonStyle">Button-Stil</label>
+                <div class="toggle-group" id="buttonStyleGroup" data-position="0">
+                  <span class="toggle-slider"></span>
+                  <button class="toggle-option active" data-value="default" data-i18n="settings.default">Default</button>
+                  <button class="toggle-option" data-value="simple" data-i18n="settings.simple">Simpel</button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <label data-i18n="settings.glowStrength">Glow-Stärke</label>
+                <div class="glow-control">
+                  <span class="glow-icon" data-variant="low">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <circle cx="12" cy="12" r="4"/>
+                    </svg>
+                  </span>
+                  <input type="range" id="glowStrength" class="glow-slider" min="0" max="2" step="0.1" value="1" />
+                  <span class="glow-icon" data-variant="high">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <circle cx="12" cy="12" r="4"/>
+                      <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>
+                    </svg>
+                  </span>
+                </div>
+              </div>
+              <div class="setting-row">
+                <label data-i18n="settings.language">Sprache</label>
+                <div class="toggle-group" id="languageGroup" data-position="0">
+                  <span class="toggle-slider"></span>
+                  <button class="toggle-option active" data-value="de">Deutsch</button>
+                  <button class="toggle-option" data-value="en">English</button>
+                </div>
+              </div>
+              <div class="setting-row">
+                <label data-i18n="settings.accentColor">Akzentfarbe</label>
+                <div class="accent-picker" id="accentPicker">
+                  <button class="accent-option active" data-color="#00d4ff" style="--swatch: #00d4ff" aria-label="Cyan"></button>
+                  <button class="accent-option" data-color="#a855f7" style="--swatch: #a855f7" aria-label="Purple"></button>
+                  <button class="accent-option" data-color="#22c55e" style="--swatch: #22c55e" aria-label="Green"></button>
+                  <button class="accent-option" data-color="#f97316" style="--swatch: #f97316" aria-label="Orange"></button>
+                  <button class="accent-option" data-color="#ec4899" style="--swatch: #ec4899" aria-label="Pink"></button>
                 </div>
               </div>
             </div>
@@ -403,7 +522,8 @@
               <p class="setting-description">Automatisch ausloggen nach Inaktivitaet.</p>
               <div class="setting-row">
                 <label>Timeout aktivieren</label>
-                <div class="toggle-group" id="timeoutToggleGroup">
+                <div class="toggle-group" id="timeoutToggleGroup" data-position="1">
+                  <span class="toggle-slider"></span>
                   <button class="toggle-option" data-value="off">Aus</button>
                   <button class="toggle-option active" data-value="on">An</button>
                 </div>
