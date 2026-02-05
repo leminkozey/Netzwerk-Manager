@@ -1659,7 +1659,8 @@ label {
 }
 
 .toast-success {
-  background: #22c55e;
+  background: var(--accent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25), 0 0 calc(18px * var(--glow-strength)) var(--accent-glow);
 }
 
 .toast-error {
