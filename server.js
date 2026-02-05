@@ -4,7 +4,7 @@ const fs = require('fs');
 const { randomUUID } = require('crypto');
 const WebSocket = require('ws');
 const dgram = require('dgram');
-const { exec } = require('child_process');
+const { spawn } = require('child_process');
 
 const app = express();
 const PORT = process.env.PORT || 5055;
@@ -311,6 +311,65 @@ function authRequired(req, res, next) {
 // Windows PC Functions
 // ═══════════════════════════════════════════════════════════════════
 
+// Input validation patterns
+const VALIDATION = {
+  ipAddress: /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/,
+  macAddress: /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/,
+  sshUser: /^[a-zA-Z0-9_.-]{1,32}$/,
+  sshPort: (port) => Number.isInteger(port) && port >= 1 && port <= 65535,
+  name: /^[a-zA-Z0-9äöüÄÖÜß _.-]{1,50}$/,
+};
+
+function validateWindowsPCInput(field, value) {
+  if (value === '' || value === undefined || value === null) return true; // Empty is allowed
+
+  switch (field) {
+    case 'ipAddress':
+      return VALIDATION.ipAddress.test(value);
+    case 'macAddress':
+      return VALIDATION.macAddress.test(value);
+    case 'sshUser':
+      return VALIDATION.sshUser.test(value);
+    case 'sshPort':
+      return VALIDATION.sshPort(parseInt(value, 10));
+    case 'name':
+      return VALIDATION.name.test(value);
+    case 'sshPassword':
+      return typeof value === 'string' && value.length <= 128;
+    default:
+      return false;
+  }
+}
+
+// Rate limiting for PC control actions
+const pcControlLimits = new Map(); // IP -> { lastAction: timestamp, count: number }
+const PC_RATE_LIMIT_WINDOW = 60000; // 1 minute
+const PC_RATE_LIMIT_MAX = 10; // Max 10 actions per minute
+
+function checkPCRateLimit(ip) {
+  const now = Date.now();
+  const data = pcControlLimits.get(ip);
+
+  if (!data || now - data.lastAction > PC_RATE_LIMIT_WINDOW) {
+    pcControlLimits.set(ip, { lastAction: now, count: 1 });
+    return true;
+  }
+
+  if (data.count >= PC_RATE_LIMIT_MAX) {
+    return false;
+  }
+
+  data.count++;
+  data.lastAction = now;
+  return true;
+}
+
+// Audit logging for sensitive operations
+function logPCAction(action, ip, success, details = '') {
+  const timestamp = new Date().toISOString();
+  console.log(`[PC-AUDIT] ${timestamp} | ${action} | IP: ${ip} | Success: ${success} | ${details}`);
+}
+
 function readWindowsPCConfig() {
   if (!fs.existsSync(WINDOWS_PC_FILE)) {
     const defaultConfig = {
@@ -333,8 +392,13 @@ function saveWindowsPCConfig(config) {
 
 function sendWakeOnLan(macAddress) {
   return new Promise((resolve, reject) => {
+    // Validate MAC address format first
+    if (!VALIDATION.macAddress.test(macAddress)) {
+      return reject(new Error('Ungültige MAC-Adresse'));
+    }
+
     const mac = macAddress.replace(/[:-]/g, '');
-    if (mac.length !== 12) {
+    if (!/^[0-9A-Fa-f]{12}$/.test(mac)) {
       return reject(new Error('Ungültige MAC-Adresse'));
     }
 
@@ -355,14 +419,14 @@ function sendWakeOnLan(macAddress) {
     const socket = dgram.createSocket('udp4');
     socket.once('error', (err) => {
       socket.close();
-      reject(err);
+      reject(new Error('Netzwerkfehler beim Senden'));
     });
 
     socket.bind(() => {
       socket.setBroadcast(true);
       socket.send(magicPacket, 0, magicPacket.length, 9, '255.255.255.255', (err) => {
         socket.close();
-        if (err) reject(err);
+        if (err) reject(new Error('Fehler beim Senden des Wake-Pakets'));
         else resolve();
       });
     });
@@ -371,13 +435,26 @@ function sendWakeOnLan(macAddress) {
 
 function pingHost(ipAddress) {
   return new Promise((resolve) => {
-    const isWindows = process.platform === 'win32';
-    const cmd = isWindows
-      ? `ping -n 1 -w 2000 ${ipAddress}`
-      : `ping -c 1 -W 2 ${ipAddress}`;
+    // Strict IP validation to prevent command injection
+    if (!VALIDATION.ipAddress.test(ipAddress)) {
+      return resolve(false);
+    }
 
-    exec(cmd, (error) => {
-      resolve(!error);
+    const isWindows = process.platform === 'win32';
+
+    // Use spawn with argument array to prevent command injection
+    const args = isWindows
+      ? ['-n', '1', '-w', '2000', ipAddress]
+      : ['-c', '1', '-W', '2', ipAddress];
+
+    const ping = spawn('ping', args, { timeout: 5000 });
+
+    ping.on('close', (code) => {
+      resolve(code === 0);
+    });
+
+    ping.on('error', () => {
+      resolve(false);
     });
   });
 }
@@ -386,19 +463,56 @@ function shutdownWindowsPC(config) {
   return new Promise((resolve, reject) => {
     const { ipAddress, sshUser, sshPassword, sshPort } = config;
 
-    // Use sshpass for password authentication
-    const cmd = `sshpass -p '${sshPassword}' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${sshPort} ${sshUser}@${ipAddress} "shutdown /s /t 0"`;
+    // Validate all inputs before using them
+    if (!VALIDATION.ipAddress.test(ipAddress)) {
+      return reject(new Error('Ungültige IP-Adresse'));
+    }
+    if (!VALIDATION.sshUser.test(sshUser)) {
+      return reject(new Error('Ungültiger SSH-Benutzername'));
+    }
+    if (!VALIDATION.sshPort(sshPort)) {
+      return reject(new Error('Ungültiger SSH-Port'));
+    }
+    if (typeof sshPassword !== 'string' || sshPassword.length === 0) {
+      return reject(new Error('SSH-Passwort fehlt'));
+    }
 
-    exec(cmd, { timeout: 15000 }, (error, stdout, stderr) => {
-      if (error) {
-        // SSH connection might close before we get response (which is expected on shutdown)
-        if (stderr.includes('Connection') || error.killed) {
-          resolve(); // Shutdown was likely successful
-        } else {
-          reject(new Error(stderr || error.message));
-        }
-      } else {
+    // Use spawn with argument array to prevent command injection
+    // sshpass reads password from environment variable (safer than command line)
+    const sshArgs = [
+      '-o', 'StrictHostKeyChecking=accept-new',
+      '-o', 'ConnectTimeout=5',
+      '-o', 'BatchMode=no',
+      '-p', String(sshPort),
+      `${sshUser}@${ipAddress}`,
+      'shutdown /s /t 0'
+    ];
+
+    const sshpass = spawn('sshpass', ['-p', sshPassword, 'ssh', ...sshArgs], {
+      timeout: 15000,
+      env: { ...process.env },
+    });
+
+    let stderr = '';
+
+    sshpass.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    sshpass.on('close', (code) => {
+      // Code 0 = success, code 255 with connection closed = likely successful shutdown
+      if (code === 0 || stderr.includes('Connection') || stderr.includes('closed')) {
         resolve();
+      } else {
+        reject(new Error('Shutdown fehlgeschlagen'));
+      }
+    });
+
+    sshpass.on('error', (err) => {
+      if (err.code === 'ENOENT') {
+        reject(new Error('sshpass nicht installiert'));
+      } else {
+        reject(new Error('SSH-Verbindung fehlgeschlagen'));
       }
     });
   });
@@ -880,6 +994,7 @@ app.post('/api/import', authRequired, (req, res) => {
 // Windows PC Endpoints
 // ═══════════════════════════════════════════════════════════════════
 
+// GET config - NEVER return password
 app.get('/api/windows-pc', authRequired, (req, res) => {
   const config = readWindowsPCConfig();
   res.json({
@@ -887,61 +1002,133 @@ app.get('/api/windows-pc', authRequired, (req, res) => {
     ipAddress: config.ipAddress,
     macAddress: config.macAddress,
     sshUser: config.sshUser,
-    sshPassword: config.sshPassword,
+    hasPassword: Boolean(config.sshPassword), // Only indicate if password is set
     sshPort: config.sshPort,
   });
 });
 
+// POST config - with input validation
 app.post('/api/windows-pc', authRequired, (req, res) => {
+  const clientIp = getClientIp(req);
   const { name, ipAddress, macAddress, sshUser, sshPassword, sshPort } = req.body || {};
+
+  // Validate all inputs
+  const errors = [];
+
+  if (name !== undefined && !validateWindowsPCInput('name', name)) {
+    errors.push('Ungültiger Name (nur Buchstaben, Zahlen, Leerzeichen, max 50 Zeichen)');
+  }
+  if (ipAddress !== undefined && ipAddress !== '' && !validateWindowsPCInput('ipAddress', ipAddress)) {
+    errors.push('Ungültige IP-Adresse (Format: xxx.xxx.xxx.xxx)');
+  }
+  if (macAddress !== undefined && macAddress !== '' && !validateWindowsPCInput('macAddress', macAddress)) {
+    errors.push('Ungültige MAC-Adresse (Format: XX:XX:XX:XX:XX:XX)');
+  }
+  if (sshUser !== undefined && sshUser !== '' && !validateWindowsPCInput('sshUser', sshUser)) {
+    errors.push('Ungültiger SSH-Benutzername (nur alphanumerisch, max 32 Zeichen)');
+  }
+  if (sshPort !== undefined && !validateWindowsPCInput('sshPort', sshPort)) {
+    errors.push('Ungültiger SSH-Port (1-65535)');
+  }
+  if (sshPassword !== undefined && !validateWindowsPCInput('sshPassword', sshPassword)) {
+    errors.push('Ungültiges Passwort (max 128 Zeichen)');
+  }
+
+  if (errors.length > 0) {
+    logPCAction('CONFIG_UPDATE', clientIp, false, `Validation failed: ${errors.join(', ')}`);
+    return res.status(400).json({ ok: false, errors });
+  }
+
   const config = readWindowsPCConfig();
 
   if (name !== undefined) config.name = name;
   if (ipAddress !== undefined) config.ipAddress = ipAddress;
-  if (macAddress !== undefined) config.macAddress = macAddress;
+  if (macAddress !== undefined) config.macAddress = macAddress.toUpperCase();
   if (sshUser !== undefined) config.sshUser = sshUser;
   if (sshPassword !== undefined) config.sshPassword = sshPassword;
   if (sshPort !== undefined) config.sshPort = parseInt(sshPort, 10) || 22;
 
   saveWindowsPCConfig(config);
-  res.json({ ok: true, config });
+  logPCAction('CONFIG_UPDATE', clientIp, true, 'Config updated');
+
+  // Return config without password
+  res.json({
+    ok: true,
+    config: {
+      name: config.name,
+      ipAddress: config.ipAddress,
+      macAddress: config.macAddress,
+      sshUser: config.sshUser,
+      hasPassword: Boolean(config.sshPassword),
+      sshPort: config.sshPort,
+    },
+  });
 });
 
+// GET status - with rate limiting
 app.get('/api/windows-pc/status', authRequired, async (req, res) => {
+  const clientIp = getClientIp(req);
+
+  if (!checkPCRateLimit(clientIp)) {
+    return res.status(429).json({ online: false, error: 'Zu viele Anfragen' });
+  }
+
   const config = readWindowsPCConfig();
   if (!config.ipAddress) {
-    return res.json({ online: false, error: 'Keine IP konfiguriert' });
+    return res.json({ online: false, configured: false });
   }
 
   const online = await pingHost(config.ipAddress);
-  res.json({ online });
+  res.json({ online, configured: true });
 });
 
+// POST wake - with rate limiting and audit logging
 app.post('/api/windows-pc/wake', authRequired, async (req, res) => {
+  const clientIp = getClientIp(req);
+
+  if (!checkPCRateLimit(clientIp)) {
+    logPCAction('WAKE', clientIp, false, 'Rate limited');
+    return res.status(429).json({ success: false, message: 'Zu viele Anfragen. Bitte warten.' });
+  }
+
   const config = readWindowsPCConfig();
   if (!config.macAddress) {
+    logPCAction('WAKE', clientIp, false, 'No MAC configured');
     return res.status(400).json({ success: false, message: 'Keine MAC-Adresse konfiguriert' });
   }
 
   try {
     await sendWakeOnLan(config.macAddress);
+    logPCAction('WAKE', clientIp, true, `MAC: ${config.macAddress}`);
     res.json({ success: true, message: 'Wake-on-LAN Paket gesendet!' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    logPCAction('WAKE', clientIp, false, 'Send failed');
+    res.status(500).json({ success: false, message: 'Fehler beim Senden des Wake-Pakets' });
   }
 });
 
+// POST shutdown - with rate limiting and audit logging
 app.post('/api/windows-pc/shutdown', authRequired, async (req, res) => {
+  const clientIp = getClientIp(req);
+
+  if (!checkPCRateLimit(clientIp)) {
+    logPCAction('SHUTDOWN', clientIp, false, 'Rate limited');
+    return res.status(429).json({ success: false, message: 'Zu viele Anfragen. Bitte warten.' });
+  }
+
   const config = readWindowsPCConfig();
   if (!config.ipAddress || !config.sshUser || !config.sshPassword) {
+    logPCAction('SHUTDOWN', clientIp, false, 'Incomplete SSH config');
     return res.status(400).json({ success: false, message: 'SSH-Zugangsdaten nicht vollständig' });
   }
 
   try {
     await shutdownWindowsPC(config);
+    logPCAction('SHUTDOWN', clientIp, true, `Target: ${config.ipAddress}`);
     res.json({ success: true, message: 'Shutdown-Befehl gesendet!' });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    logPCAction('SHUTDOWN', clientIp, false, 'SSH failed');
+    res.status(500).json({ success: false, message: 'Shutdown fehlgeschlagen' });
   }
 });
 

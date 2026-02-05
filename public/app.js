@@ -1627,7 +1627,6 @@ speedTest.updateHostNotice();
 const windowsPC = {
   config: null,
   statusInterval: null,
-  passwordVisible: false,
 
   async init() {
     await this.loadConfig();
@@ -1661,12 +1660,11 @@ const windowsPC = {
     if (macEl) macEl.textContent = this.config.macAddress || '--';
     if (userEl) userEl.textContent = this.config.sshUser || '--';
 
+    // Password is never sent from server - only show if configured
     if (passEl) {
       const masked = passEl.querySelector('.password-masked');
       if (masked) {
-        masked.textContent = this.passwordVisible
-          ? (this.config.sshPassword || '--')
-          : '••••••••••••••';
+        masked.textContent = this.config.hasPassword ? '••••••••••••' : 'Nicht gesetzt';
       }
     }
   },
@@ -1674,7 +1672,6 @@ const windowsPC = {
   bindEvents() {
     const wakeBtn = document.getElementById('pcWakeBtn');
     const shutdownBtn = document.getElementById('pcShutdownBtn');
-    const passToggle = document.getElementById('pcPassToggle');
 
     if (wakeBtn) {
       wakeBtn.addEventListener('click', () => this.wake());
@@ -1682,25 +1679,6 @@ const windowsPC = {
 
     if (shutdownBtn) {
       shutdownBtn.addEventListener('click', () => this.shutdown());
-    }
-
-    if (passToggle) {
-      passToggle.addEventListener('click', () => this.togglePassword());
-    }
-  },
-
-  togglePassword() {
-    this.passwordVisible = !this.passwordVisible;
-    this.updateUI();
-
-    const toggle = document.getElementById('pcPassToggle');
-    if (toggle) {
-      const eyeIcon = toggle.querySelector('.eye-icon');
-      const eyeOffIcon = toggle.querySelector('.eye-off-icon');
-      if (eyeIcon && eyeOffIcon) {
-        eyeIcon.style.display = this.passwordVisible ? 'none' : 'block';
-        eyeOffIcon.style.display = this.passwordVisible ? 'block' : 'none';
-      }
     }
   },
 
