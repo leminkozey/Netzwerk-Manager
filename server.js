@@ -158,7 +158,7 @@ app.use((req, res, next) => {
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://www.google.com https://github.com",
+    "img-src 'self' data: https:",
     "connect-src 'self' ws: wss:",
   ].join('; '));
   // Prevent clickjacking

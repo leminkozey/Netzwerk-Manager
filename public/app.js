@@ -816,12 +816,15 @@ function renderHeaderLinks() {
     a.rel = 'noopener noreferrer';
     a.className = 'header-link';
 
-    // Favicon via Google Favicon Service
-    const domain = url.hostname;
+    // Favicon direkt von der Website holen
     const img = document.createElement('img');
-    img.src = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+    img.src = `${url.origin}/favicon.ico`;
     img.alt = '';
     img.loading = 'lazy';
+    // Fallback falls favicon.ico nicht existiert
+    img.onerror = () => {
+      img.style.display = 'none';
+    };
 
     const span = document.createElement('span');
     span.textContent = link.name;
