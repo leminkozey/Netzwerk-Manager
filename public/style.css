@@ -142,10 +142,9 @@ a:hover {
   position: sticky;
   top: 12px;
   z-index: 100;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: center;
   padding: 10px 16px;
   margin-bottom: 24px;
   background: var(--surface);
@@ -158,11 +157,17 @@ a:hover {
 }
 
 .top-bar .settings-btn {
-  justify-self: start;
+  position: absolute;
+  left: 16px;
+}
+
+.top-bar .header-links {
+  gap: 10px;
 }
 
 .top-bar .chip {
-  justify-self: end;
+  position: absolute;
+  right: 16px;
 }
 
 .top-bar:hover {
