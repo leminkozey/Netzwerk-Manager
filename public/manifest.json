@@ -1,0 +1,17 @@
+{
+  "name": "Lokales Netzwerk",
+  "short_name": "Netzwerk",
+  "description": "Netzwerk Manager für lokale Geräte",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#00d4ff",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
