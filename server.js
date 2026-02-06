@@ -461,21 +461,44 @@ function validateWindowsPCInput(field, value) {
   }
 }
 
-// Rate limiting for PC control actions
-const pcControlLimits = new Map(); // IP -> { lastAction: timestamp, count: number }
-const PC_RATE_LIMIT_WINDOW = 60000; // 1 minute
-const PC_RATE_LIMIT_MAX = 10; // Max 10 actions per minute
+// Rate limiting for PC control actions (wake/shutdown)
+const pcActionLimits = new Map();
+const PC_ACTION_LIMIT_WINDOW = 60000; // 1 minute
+const PC_ACTION_LIMIT_MAX = 10; // Max 10 actions per minute
 
-function checkPCRateLimit(ip) {
+function checkPCActionRateLimit(ip) {
   const now = Date.now();
-  const data = pcControlLimits.get(ip);
+  const data = pcActionLimits.get(ip);
 
-  if (!data || now - data.lastAction > PC_RATE_LIMIT_WINDOW) {
-    pcControlLimits.set(ip, { lastAction: now, count: 1 });
+  if (!data || now - data.lastAction > PC_ACTION_LIMIT_WINDOW) {
+    pcActionLimits.set(ip, { lastAction: now, count: 1 });
     return true;
   }
 
-  if (data.count >= PC_RATE_LIMIT_MAX) {
+  if (data.count >= PC_ACTION_LIMIT_MAX) {
+    return false;
+  }
+
+  data.count++;
+  data.lastAction = now;
+  return true;
+}
+
+// Separate rate limiting for status checks (more lenient)
+const pcStatusLimits = new Map();
+const PC_STATUS_LIMIT_WINDOW = 60000; // 1 minute
+const PC_STATUS_LIMIT_MAX = 60; // Max 60 status checks per minute (1 per second)
+
+function checkPCStatusRateLimit(ip) {
+  const now = Date.now();
+  const data = pcStatusLimits.get(ip);
+
+  if (!data || now - data.lastAction > PC_STATUS_LIMIT_WINDOW) {
+    pcStatusLimits.set(ip, { lastAction: now, count: 1 });
+    return true;
+  }
+
+  if (data.count >= PC_STATUS_LIMIT_MAX) {
     return false;
   }
 
@@ -1252,11 +1275,11 @@ app.post('/api/windows-pc', authRequired, (req, res) => {
   });
 });
 
-// GET status - with rate limiting
+// GET status - with lenient rate limiting
 app.get('/api/windows-pc/status', authRequired, async (req, res) => {
   const clientIp = getClientIp(req);
 
-  if (!checkPCRateLimit(clientIp)) {
+  if (!checkPCStatusRateLimit(clientIp)) {
     return res.status(429).json({ online: false, error: 'Zu viele Anfragen' });
   }
 
@@ -1273,7 +1296,7 @@ app.get('/api/windows-pc/status', authRequired, async (req, res) => {
 app.post('/api/windows-pc/wake', authRequired, async (req, res) => {
   const clientIp = getClientIp(req);
 
-  if (!checkPCRateLimit(clientIp)) {
+  if (!checkPCActionRateLimit(clientIp)) {
     logPCAction('WAKE', clientIp, false, 'Rate limited');
     return res.status(429).json({ success: false, message: 'Zu viele Anfragen. Bitte warten.' });
   }
@@ -1298,7 +1321,7 @@ app.post('/api/windows-pc/wake', authRequired, async (req, res) => {
 app.post('/api/windows-pc/shutdown', authRequired, async (req, res) => {
   const clientIp = getClientIp(req);
 
-  if (!checkPCRateLimit(clientIp)) {
+  if (!checkPCActionRateLimit(clientIp)) {
     logPCAction('SHUTDOWN', clientIp, false, 'Rate limited');
     return res.status(429).json({ success: false, message: 'Zu viele Anfragen. Bitte warten.' });
   }
