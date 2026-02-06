@@ -180,7 +180,7 @@
             <a class="btn link-btn" id="piHoleLink" href="#" target="_blank" rel="noopener">--</a>
             <a class="btn link-btn" id="piHoleRemoteLink" href="#" target="_blank" rel="noopener">--</a>
           </div>
-          <div class="status success" id="raspberryStatus" hidden>Gespeichert.</div>
+          <div class="status success" id="raspberryStatus" hidden data-i18n="msg.saved">Gespeichert.</div>
         </section>
 
         <section class="card" id="speedportCard" style="margin-bottom: 16px">
@@ -232,7 +232,7 @@
             <label for="modemId" data-i18n="speedport.modemId">Modem-ID</label>
             <input id="modemId" type="text" placeholder="Modem-ID" />
           </div>
-          <div class="status success" id="speedportStatus" hidden>Gespeichert.</div>
+          <div class="status success" id="speedportStatus" hidden data-i18n="msg.saved">Gespeichert.</div>
           <div class="link-row">
             <a class="btn link-btn" id="speedportLink" href="#" target="_blank" rel="noopener">--</a>
             <a class="btn link-btn" id="speedportRemoteLink" href="#" target="_blank" rel="noopener">--</a>
@@ -507,9 +507,9 @@
               </div>
             </div>
             <div class="settings-panel" id="panel-daten">
-              <h4>Versionen</h4>
+              <h4 data-i18n="settings.versions">Versionen</h4>
               <div class="version-section">
-                <label>Port-Belegungen</label>
+                <label data-i18n="settings.portAssignments">Port-Belegungen</label>
                 <select class="version-select" id="versionSelect"></select>
                 <span class="muted version-details" id="versionDetails"></span>
               </div>
@@ -524,50 +524,50 @@
                 <span class="muted version-details" id="raspberryVersionDetails"></span>
               </div>
               <hr class="settings-divider" />
-              <h4>Export / Import</h4>
-              <p class="setting-description">Exportiere oder importiere alle Daten (inkl. Credentials).</p>
+              <h4 data-i18n="settings.exportImport">Export / Import</h4>
+              <p class="setting-description" data-i18n="settings.exportDesc">Exportiere oder importiere alle Daten (inkl. Credentials).</p>
               <div class="export-import-buttons">
-                <button class="btn" id="exportBtn">Daten exportieren</button>
+                <button class="btn" id="exportBtn" data-i18n="settings.export">Daten exportieren</button>
                 <label class="btn secondary import-label">
-                  Daten importieren
+                  <span data-i18n="settings.import">Daten importieren</span>
                   <input type="file" id="importFile" accept=".json" hidden />
                 </label>
               </div>
             </div>
             <div class="settings-panel" id="panel-session">
-              <h4>Session Timeout</h4>
-              <p class="setting-description">Automatisch ausloggen nach Inaktivitaet.</p>
+              <h4 data-i18n="settings.sessionTimeout">Session Timeout</h4>
+              <p class="setting-description" data-i18n="settings.sessionDesc">Automatisch ausloggen nach Inaktivitaet.</p>
               <div class="setting-row">
-                <label>Timeout aktivieren</label>
+                <label data-i18n="settings.timeoutEnable">Timeout aktivieren</label>
                 <div class="toggle-group" id="timeoutToggleGroup" data-position="1">
                   <span class="toggle-slider"></span>
-                  <button class="toggle-option" data-value="off">Aus</button>
-                  <button class="toggle-option active" data-value="on">An</button>
+                  <button class="toggle-option" data-value="off" data-i18n="settings.off">Aus</button>
+                  <button class="toggle-option active" data-value="on" data-i18n="settings.on">An</button>
                 </div>
               </div>
               <div class="setting-row" id="timeoutMinutesRow">
-                <label>Minuten bis Timeout</label>
+                <label data-i18n="settings.timeoutMinutes">Minuten bis Timeout</label>
                 <input type="number" id="timeoutMinutes" class="timeout-input" value="5" min="1" max="60" />
               </div>
             </div>
             <div class="settings-panel" id="panel-user">
-              <h4>Benutzer & Passwort</h4>
+              <h4 data-i18n="settings.userPassword">Benutzer & Passwort</h4>
               <form id="credentialForm">
                 <div class="input-row">
-                  <label for="newUser">Neuer Benutzer</label>
+                  <label for="newUser" data-i18n="settings.newUser">Neuer Benutzer</label>
                   <input id="newUser" type="text" autocomplete="username" />
                 </div>
                 <div class="input-row">
-                  <label for="newPass">Neues Passwort</label>
+                  <label for="newPass" data-i18n="settings.newPassword">Neues Passwort</label>
                   <input id="newPass" type="password" autocomplete="new-password" />
                 </div>
                 <div class="actions">
-                  <button class="btn" type="submit">Speichern</button>
+                  <button class="btn" type="submit" data-i18n="settings.save">Speichern</button>
                   <span class="muted" id="credentialStatus"></span>
                 </div>
               </form>
               <hr class="settings-divider" />
-              <button class="btn logout-btn" id="logoutBtn">Ausloggen</button>
+              <button class="btn logout-btn" id="logoutBtn" data-i18n="settings.logout">Ausloggen</button>
             </div>
             <div class="settings-panel" id="panel-credits">
               <div class="credits-content">
@@ -575,7 +575,7 @@
                 <span class="credits-label">made by</span>
                 <a class="credits-name" href="https://github.com/leminkozey" target="_blank" rel="noopener">leminkozey</a>
                 <span class="credits-version">v2.0.0</span>
-                <a class="credits-repo" href="https://github.com/leminkozey/netzwerk-manager" target="_blank" rel="noopener">
+                <a class="credits-repo" href="https://github.com/leminkozey/netzwerk-manager" target="_blank" rel="noopener" data-i18n="credits.stayUpdated">
                   Bleibe immer aktuell
                 </a>
               </div>
@@ -587,19 +587,19 @@
 
     <div class="overlay" id="logoutOverlay">
       <div class="overlay-content">
-        <h3>Sitzung beendet</h3>
-        <p id="logoutReason">Ein anderes Gerät hat sich angemeldet.</p>
-        <button class="btn" id="reloginBtn">Erneut einloggen</button>
+        <h3 data-i18n="overlay.sessionEnded">Sitzung beendet</h3>
+        <p id="logoutReason" data-i18n="overlay.anotherDevice">Ein anderes Gerät hat sich angemeldet.</p>
+        <button class="btn" id="reloginBtn" data-i18n="overlay.relogin">Erneut einloggen</button>
       </div>
     </div>
 
     <div class="overlay" id="timeoutOverlay">
       <div class="overlay-content">
-        <h3>Session abgelaufen</h3>
-        <p class="timeout-hint">Du kannst die Zeit in den Einstellungen anpassen oder deaktivieren.</p>
+        <h3 data-i18n="overlay.sessionExpired">Session abgelaufen</h3>
+        <p class="timeout-hint" data-i18n="overlay.sessionHint">Du kannst die Zeit in den Einstellungen anpassen oder deaktivieren.</p>
         <div class="timeout-buttons">
-          <button class="btn secondary" id="timeoutSettingsBtn">Einstellungen</button>
-          <button class="btn" id="timeoutLoginBtn">Login</button>
+          <button class="btn secondary" id="timeoutSettingsBtn" data-i18n="app.settings">Einstellungen</button>
+          <button class="btn" id="timeoutLoginBtn" data-i18n="login.title">Login</button>
         </div>
       </div>
     </div>

@@ -124,6 +124,36 @@ const i18n = {
       'msg.saved': 'Gespeichert.',
       'msg.error': 'Fehler',
       'msg.success': 'Erfolg',
+      'msg.fillCredentials': 'Bitte Benutzer und Passwort ausfüllen.',
+      'msg.fillLogin': 'Bitte Nutzer & Passwort eingeben.',
+      'msg.loginFailed': 'Login fehlgeschlagen',
+      'msg.serverUnreachable': 'Server nicht erreichbar.',
+      'msg.lockLifted': 'Sperre aufgehoben. Erneut versuchen.',
+      'msg.locked': 'Gesperrt. Noch {time} Min',
+      'msg.colorSaveFailed': 'Farbe konnte nicht gespeichert werden',
+      'msg.credentialSaveFailed': 'Zugangsdaten konnten nicht gespeichert werden',
+      'msg.speedportSaveFailed': 'Speedport konnte nicht gespeichert werden',
+      'msg.piholeSaveFailed': 'PiHole konnte nicht gespeichert werden',
+      'msg.portSaveFailed': 'Port konnte nicht gespeichert werden',
+      'msg.exportFailed': 'Export fehlgeschlagen',
+      'msg.exported': 'Daten exportiert',
+      'msg.importFailed': 'Import fehlgeschlagen',
+      'msg.imported': 'Daten importiert - Seite wird neu geladen',
+      'msg.invalidJson': 'Ungueltige JSON-Datei',
+      'msg.confirmOverwrite': 'Alle Daten werden ueberschrieben. Fortfahren?',
+
+      // Dynamic
+      'table.notAssigned': 'Nicht belegt',
+      'version.change': 'Änderung',
+      'version.noData': '(keine Daten verfügbar)',
+      'version.none': 'Keine Versionen vorhanden',
+      'speedtest.localhostNotice': 'Bitte über die LAN-IP öffnen (nicht localhost).',
+      'overlay.deviceLoggedAt': '{device} hat sich um {time} eingeloggt.',
+      'overlay.unknownDevice': 'anderes Gerät',
+      'overlay.unknownDeviceName': 'Unbekanntes Gerät',
+      'link.website': 'Zur Website',
+      'link.websiteVpn': 'Zur Website (VPN)',
+      'credits.stayUpdated': 'Bleibe immer aktuell',
     },
 
     en: {
@@ -244,6 +274,36 @@ const i18n = {
       'msg.saved': 'Saved.',
       'msg.error': 'Error',
       'msg.success': 'Success',
+      'msg.fillCredentials': 'Please fill in username and password.',
+      'msg.fillLogin': 'Please enter username & password.',
+      'msg.loginFailed': 'Login failed',
+      'msg.serverUnreachable': 'Server not reachable.',
+      'msg.lockLifted': 'Lock lifted. Try again.',
+      'msg.locked': 'Locked. {time} min remaining',
+      'msg.colorSaveFailed': 'Could not save color',
+      'msg.credentialSaveFailed': 'Could not save credentials',
+      'msg.speedportSaveFailed': 'Could not save Speedport',
+      'msg.piholeSaveFailed': 'Could not save PiHole',
+      'msg.portSaveFailed': 'Could not save port',
+      'msg.exportFailed': 'Export failed',
+      'msg.exported': 'Data exported',
+      'msg.importFailed': 'Import failed',
+      'msg.imported': 'Data imported - page will reload',
+      'msg.invalidJson': 'Invalid JSON file',
+      'msg.confirmOverwrite': 'All data will be overwritten. Continue?',
+
+      // Dynamic
+      'table.notAssigned': 'Not assigned',
+      'version.change': 'Change',
+      'version.noData': '(no data available)',
+      'version.none': 'No versions available',
+      'speedtest.localhostNotice': 'Please open via LAN IP (not localhost).',
+      'overlay.deviceLoggedAt': '{device} logged in at {time}.',
+      'overlay.unknownDevice': 'another device',
+      'overlay.unknownDeviceName': 'Unknown device',
+      'link.website': 'Go to website',
+      'link.websiteVpn': 'Go to website (VPN)',
+      'credits.stayUpdated': 'Stay up to date',
     },
   },
 
@@ -287,7 +347,7 @@ const i18n = {
   updateDynamicContent() {
     // Update speedtest labels
     const speedLabel = document.getElementById('speedLabel');
-    if (speedLabel && speedLabel.textContent === 'Bereit') {
+    if (speedLabel && (speedLabel.textContent === 'Bereit' || speedLabel.textContent === 'Ready')) {
       speedLabel.textContent = this.t('speedtest.ready');
     }
 
@@ -295,11 +355,9 @@ const i18n = {
     const pcStatusText = document.getElementById('pcStatusText');
     if (pcStatusText) {
       const text = pcStatusText.textContent;
-      if (text === 'Online' || text === 'Offline' || text === 'Prüfe...' || text === 'Checking...') {
-        if (text === 'Online') pcStatusText.textContent = this.t('pc.status.online');
-        else if (text === 'Offline') pcStatusText.textContent = this.t('pc.status.offline');
-        else pcStatusText.textContent = this.t('pc.status.checking');
-      }
+      if (text === 'Online') pcStatusText.textContent = this.t('pc.status.online');
+      else if (text === 'Offline') pcStatusText.textContent = this.t('pc.status.offline');
+      else if (text === 'Prüfe...' || text === 'Checking...') pcStatusText.textContent = this.t('pc.status.checking');
     }
   },
 
@@ -893,7 +951,7 @@ async function handleLogin() {
   }
   const deviceToken = tokenInput || getStoredDeviceToken();
   if (!deviceToken && (!username || !password)) {
-    showLoginStatus('Bitte Nutzer & Passwort eingeben.', true);
+    showLoginStatus(i18n.t('msg.fillLogin'), true);
     return;
   }
   try {
@@ -912,7 +970,7 @@ async function handleLogin() {
       if (body.locked && body.remainingMs) {
         startLockoutTimer(body.remainingMs);
       } else {
-        showLoginStatus(body.message || 'Login fehlgeschlagen', true);
+        showLoginStatus(body.message || i18n.t('msg.loginFailed'), true);
       }
       return;
     }
@@ -931,7 +989,7 @@ async function handleLogin() {
     }
   } catch (e) {
     console.error(e);
-    showLoginStatus('Server nicht erreichbar.', true);
+    showLoginStatus(i18n.t('msg.serverUnreachable'), true);
   }
 }
 
@@ -945,12 +1003,12 @@ function startLockoutTimer(remainingMs) {
     if (left <= 0) {
       clearInterval(startLockoutTimer._interval);
       els.loginBtn.disabled = false;
-      showLoginStatus('Sperre aufgehoben. Erneut versuchen.', false);
+      showLoginStatus(i18n.t('msg.lockLifted'), false);
       return;
     }
     const min = Math.floor(left / 60000);
     const sec = Math.floor((left % 60000) / 1000);
-    showLoginStatus(`Gesperrt. Noch ${min}:${sec.toString().padStart(2, '0')} Min`, true);
+    showLoginStatus(i18n.t('msg.locked').replace('{time}', `${min}:${sec.toString().padStart(2, '0')}`), true);
   }
 
   const lockoutEnd = Date.now() + remainingMs;
@@ -1012,7 +1070,7 @@ function handleForceLogout(deviceName, timeMs) {
   stopSessionTimer();
   if (state.socket) state.socket.close();
   const at = timeMs ? new Date(timeMs) : new Date();
-  els.logoutReason.textContent = `ein: ${deviceName || 'anderes Gerät'} hat sich um ${at.toLocaleTimeString()} eingeloggt.`;
+  els.logoutReason.textContent = i18n.t('overlay.deviceLoggedAt').replace('{device}', deviceName || i18n.t('overlay.unknownDevice')).replace('{time}', at.toLocaleTimeString());
   els.logoutOverlay.classList.add('active');
 }
 
@@ -1091,7 +1149,7 @@ function createPortRow(port, group) {
   statusInput.className = 'inline-input status-input';
   statusInput.type = 'text';
   statusInput.value = port.status; // Safe - setting value property
-  statusInput.placeholder = 'Nicht belegt';
+  statusInput.placeholder = i18n.t('table.notAssigned');
   statusInput.dataset.group = group;
   statusInput.dataset.id = port.id;
   statusInput.dataset.last = port.status;
@@ -1138,7 +1196,7 @@ function renderTables() {
           headers: authHeaders(),
           body: JSON.stringify({ group, id, color }),
         });
-        if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+        if (res.status === 401) return handleForceLogout(null, Date.now());
         const body = await res.json();
         if (body.switchPorts) {
           setLiveState(body);
@@ -1151,7 +1209,7 @@ function renderTables() {
         }
       } catch (err) {
         console.error('Fehler beim Ändern der Farbe:', err);
-        showToast('Farbe konnte nicht gespeichert werden', true);
+        showToast(i18n.t('msg.colorSaveFailed'), true);
       }
     });
   });
@@ -1201,22 +1259,22 @@ function normalizeUrl(value) {
 }
 
 function updateSpeedportLinks() {
-  updateLinkButton(els.speedportLink, speedportInputs.configuration?.value, 'Zur Website');
-  updateLinkButton(els.speedportRemoteLink, speedportInputs.remoteUrl?.value, 'Zur Website (VPN)');
+  updateLinkButton(els.speedportLink, speedportInputs.configuration?.value, i18n.t('link.website'));
+  updateLinkButton(els.speedportRemoteLink, speedportInputs.remoteUrl?.value, i18n.t('link.websiteVpn'));
 }
 
 function updatePiholeLinks() {
-  updateLinkButton(els.piHoleLink, raspberryInputs.piholeUrl?.value, 'Zur Website');
-  updateLinkButton(els.piHoleRemoteLink, raspberryInputs.piholeRemoteUrl?.value, 'Zur Website (VPN)');
+  updateLinkButton(els.piHoleLink, raspberryInputs.piholeUrl?.value, i18n.t('link.website'));
+  updateLinkButton(els.piHoleRemoteLink, raspberryInputs.piholeRemoteUrl?.value, i18n.t('link.websiteVpn'));
 }
 
 function updateVersions(versions) {
   state.versions = versions || [];
   els.versionSelect.innerHTML = '';
   if (!state.versions.length) {
-    els.versionSelect.innerHTML = '<option>Keine Versionen vorhanden</option>';
+    els.versionSelect.innerHTML = `<option>${i18n.t('version.none')}</option>`;
     els.versionDetails.textContent = '';
-    els.versionChip.textContent = 'Letzte Version: --';
+    els.versionChip.textContent = `${i18n.t('app.lastVersion')}: --`;
     return;
   }
   state.versions.forEach((v, idx) => {
@@ -1234,7 +1292,7 @@ function updateVersions(versions) {
   state.followLatest = targetId === newest.id;
   state.activeVersionId = targetId;
   els.versionSelect.value = targetId;
-  els.versionChip.textContent = `Letzte Version: ${newest.label}`;
+  els.versionChip.textContent = `${i18n.t('app.lastVersion')}: ${newest.label}`;
   applyVersionSnapshot(targetId);
 }
 
@@ -1243,7 +1301,7 @@ function updateRaspberryVersions(versions) {
   state.raspberryVersions = versions || [];
   els.raspberryVersionSelect.innerHTML = '';
   if (!state.raspberryVersions.length) {
-    els.raspberryVersionSelect.innerHTML = '<option>Keine Versionen vorhanden</option>';
+    els.raspberryVersionSelect.innerHTML = `<option>${i18n.t('version.none')}</option>`;
     if (els.raspberryVersionDetails) {
       els.raspberryVersionDetails.textContent = '';
     }
@@ -1274,7 +1332,7 @@ function updateSpeedportVersions(versions) {
   state.speedportVersions = versions || [];
   els.speedportVersionSelect.innerHTML = '';
   if (!state.speedportVersions.length) {
-    els.speedportVersionSelect.innerHTML = '<option>Keine Versionen vorhanden</option>';
+    els.speedportVersionSelect.innerHTML = `<option>${i18n.t('version.none')}</option>`;
     if (els.speedportVersionDetails) {
       els.speedportVersionDetails.textContent = '';
     }
@@ -1307,8 +1365,8 @@ function renderVersionDetails(id) {
     return;
   }
   const date = new Date(version.timestamp || Date.now());
-  const suffix = version.snapshot ? '' : ' (keine Daten verfügbar)';
-  els.versionDetails.textContent = `${version.summary || 'Änderung'} · ${date.toLocaleString()}${suffix}`;
+  const suffix = version.snapshot ? '' : ` ${i18n.t('version.noData')}`;
+  els.versionDetails.textContent = `${version.summary || i18n.t('version.change')} · ${date.toLocaleString()}${suffix}`;
 }
 
 function renderRaspberryVersionDetails(id) {
@@ -1319,8 +1377,8 @@ function renderRaspberryVersionDetails(id) {
     return;
   }
   const date = new Date(version.timestamp || Date.now());
-  const suffix = version.snapshot ? '' : ' (keine Daten verfügbar)';
-  els.raspberryVersionDetails.textContent = `${version.summary || 'Änderung'} · ${date.toLocaleString()}${suffix}`;
+  const suffix = version.snapshot ? '' : ` ${i18n.t('version.noData')}`;
+  els.raspberryVersionDetails.textContent = `${version.summary || i18n.t('version.change')} · ${date.toLocaleString()}${suffix}`;
 }
 
 function renderSpeedportVersionDetails(id) {
@@ -1331,8 +1389,8 @@ function renderSpeedportVersionDetails(id) {
     return;
   }
   const date = new Date(version.timestamp || Date.now());
-  const suffix = version.snapshot ? '' : ' (keine Daten verfügbar)';
-  els.speedportVersionDetails.textContent = `${version.summary || 'Änderung'} · ${date.toLocaleString()}${suffix}`;
+  const suffix = version.snapshot ? '' : ` ${i18n.t('version.noData')}`;
+  els.speedportVersionDetails.textContent = `${version.summary || i18n.t('version.change')} · ${date.toLocaleString()}${suffix}`;
 }
 
 async function saveCredentials(e) {
@@ -1340,7 +1398,7 @@ async function saveCredentials(e) {
   const username = els.newUser.value.trim();
   const password = els.newPass.value.trim();
   if (!username || !password) {
-    els.credentialStatus.textContent = 'Bitte Benutzer und Passwort ausfüllen.';
+    els.credentialStatus.textContent = i18n.t('msg.fillCredentials');
     return;
   }
   try {
@@ -1349,13 +1407,13 @@ async function saveCredentials(e) {
       headers: authHeaders(),
       body: JSON.stringify({ username, password }),
     });
-    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    if (res.status === 401) return handleForceLogout(null, Date.now());
     els.newUser.value = '';
     els.newPass.value = '';
-    els.credentialStatus.textContent = 'Gespeichert.';
+    els.credentialStatus.textContent = i18n.t('msg.saved');
   } catch (err) {
     console.error('Fehler beim Speichern:', err);
-    showToast('Zugangsdaten konnten nicht gespeichert werden', true);
+    showToast(i18n.t('msg.credentialSaveFailed'), true);
   }
 }
 
@@ -1371,7 +1429,7 @@ const debouncedSpeedportSave = debounce(async () => {
       headers: authHeaders(),
       body: JSON.stringify(payload),
     });
-    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    if (res.status === 401) return handleForceLogout(null, Date.now());
     const body = await res.json();
     setLiveState({ speedportInfo: body.speedportInfo });
     state.speedportInfo = { ...state.live.speedportInfo };
@@ -1381,7 +1439,7 @@ const debouncedSpeedportSave = debounce(async () => {
     showSpeedportStatus();
   } catch (err) {
     console.error('Fehler beim Speichern:', err);
-    showToast('Speedport konnte nicht gespeichert werden', true);
+    showToast(i18n.t('msg.speedportSaveFailed'), true);
   }
 }, 350);
 
@@ -1397,7 +1455,7 @@ const debouncedRaspberrySave = debounce(async () => {
       headers: authHeaders(),
       body: JSON.stringify(payload),
     });
-    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    if (res.status === 401) return handleForceLogout(null, Date.now());
     const body = await res.json();
     setLiveState({ raspberryInfo: body.raspberryInfo });
     state.raspberryInfo = { ...state.live.raspberryInfo };
@@ -1407,13 +1465,13 @@ const debouncedRaspberrySave = debounce(async () => {
     showRaspberryStatus();
   } catch (err) {
     console.error('Fehler beim Speichern:', err);
-    showToast('PiHole konnte nicht gespeichert werden', true);
+    showToast(i18n.t('msg.piholeSaveFailed'), true);
   }
 }, 350);
 
 function showSpeedportStatus() {
   els.speedportStatus.hidden = false;
-  els.speedportStatus.textContent = 'Gespeichert.';
+  els.speedportStatus.textContent = i18n.t('msg.saved');
   clearTimeout(showSpeedportStatus._timeout);
   showSpeedportStatus._timeout = setTimeout(() => {
     els.speedportStatus.hidden = true;
@@ -1423,7 +1481,7 @@ function showSpeedportStatus() {
 function showRaspberryStatus() {
   if (!els.raspberryStatus) return;
   els.raspberryStatus.hidden = false;
-  els.raspberryStatus.textContent = 'Gespeichert.';
+  els.raspberryStatus.textContent = i18n.t('msg.saved');
   clearTimeout(showRaspberryStatus._timeout);
   showRaspberryStatus._timeout = setTimeout(() => {
     els.raspberryStatus.hidden = true;
@@ -1544,9 +1602,9 @@ function updateTimeoutUI() {
 async function handleExport() {
   try {
     const res = await fetch('/api/export', { headers: authHeaders() });
-    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    if (res.status === 401) return handleForceLogout(null, Date.now());
     if (!res.ok) {
-      showToast('Export fehlgeschlagen', true);
+      showToast(i18n.t('msg.exportFailed'), true);
       return;
     }
     const blob = await res.blob();
@@ -1558,10 +1616,10 @@ async function handleExport() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showToast('Daten exportiert');
+    showToast(i18n.t('msg.exported'));
   } catch (e) {
     console.error('Export error:', e);
-    showToast('Export fehlgeschlagen', true);
+    showToast(i18n.t('msg.exportFailed'), true);
   }
 }
 
@@ -1572,7 +1630,7 @@ async function handleImport(file) {
     const json = JSON.parse(text);
     const data = json.data || json;
 
-    if (!confirm('Alle Daten werden ueberschrieben. Fortfahren?')) {
+    if (!confirm(i18n.t('msg.confirmOverwrite'))) {
       return;
     }
 
@@ -1581,17 +1639,17 @@ async function handleImport(file) {
       headers: authHeaders(),
       body: JSON.stringify({ data }),
     });
-    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    if (res.status === 401) return handleForceLogout(null, Date.now());
     const body = await res.json();
     if (!res.ok) {
-      showToast(body.error || 'Import fehlgeschlagen', true);
+      showToast(body.error || i18n.t('msg.importFailed'), true);
       return;
     }
-    showToast('Daten importiert - Seite wird neu geladen');
+    showToast(i18n.t('msg.imported'));
     setTimeout(() => location.reload(), 1500);
   } catch (e) {
     console.error('Import error:', e);
-    showToast('Ungueltige JSON-Datei', true);
+    showToast(i18n.t('msg.invalidJson'), true);
   }
 }
 
@@ -1877,7 +1935,7 @@ async function submitStatusChange(input) {
       headers: authHeaders(),
       body: JSON.stringify({ group, id, status: value }),
     });
-    if (res.status === 401) return handleForceLogout('Unbekannt', Date.now());
+    if (res.status === 401) return handleForceLogout(null, Date.now());
     const body = await res.json();
     if (body.switchPorts) {
       setLiveState(body);
@@ -1890,7 +1948,7 @@ async function submitStatusChange(input) {
     }
   } catch (err) {
     console.error('Fehler beim Speichern:', err);
-    showToast('Port konnte nicht gespeichert werden', true);
+    showToast(i18n.t('msg.portSaveFailed'), true);
   }
 }
 
@@ -1899,7 +1957,7 @@ function deriveDeviceName() {
     if (navigator.userAgentData && navigator.userAgentData.platform) {
       const brands = navigator.userAgentData.brands || [];
       const brand = brands.length ? brands[0].brand : '';
-      return `${brand || 'Gerät'} ${navigator.userAgentData.platform}`.trim();
+      return `${brand || i18n.t('overlay.unknownDeviceName')} ${navigator.userAgentData.platform}`.trim();
     }
     const ua = navigator.userAgent || '';
     const match = ua.match(/\(([^)]+)\)/);
@@ -1910,9 +1968,9 @@ function deriveDeviceName() {
         .filter(Boolean);
       if (parts.length) return parts[0];
     }
-    return ua.split(' ')[0] || 'Unbekanntes Gerät';
+    return ua.split(' ')[0] || i18n.t('overlay.unknownDeviceName');
   } catch (e) {
-    return 'Unbekanntes Gerät';
+    return i18n.t('overlay.unknownDeviceName');
   }
 }
 
@@ -1953,7 +2011,7 @@ const speedTest = {
 
   ensureNonLocalHost() {
     if (!this.isLocalhostHost()) return true;
-    const msg = 'Bitte über die LAN-IP öffnen (nicht localhost).';
+    const msg = i18n.t('speedtest.localhostNotice');
     const notice = document.getElementById('speedtestNotice');
     if (notice) notice.textContent = msg;
     return false;
@@ -1963,7 +2021,7 @@ const speedTest = {
     const notice = document.getElementById('speedtestNotice');
     if (!notice) return;
     if (this.isLocalhostHost()) {
-      notice.textContent = 'Bitte über die LAN-IP öffnen (nicht localhost).';
+      notice.textContent = i18n.t('speedtest.localhostNotice');
       this.disableButton(true);
       return;
     }
