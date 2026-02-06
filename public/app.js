@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const i18n = {
-  currentLang: localStorage.getItem('lang') || (typeof siteConfig !== 'undefined' ? siteConfig.defaults?.language : null) || 'de',
+  currentLang: localStorage.getItem('lang') || (typeof siteConfig !== 'undefined' && siteConfig != null ? siteConfig.defaults?.language : null) || 'de',
 
   translations: {
     de: {
@@ -340,6 +340,13 @@ const i18n = {
     // Update title
     document.title = this.t('app.title');
 
+    // Recalculate toggle sliders after text changes (only visible ones)
+    document.querySelectorAll('.toggle-group').forEach((group) => {
+      if (typeof updateToggleSlider === 'function' && group.offsetParent !== null) {
+        updateToggleSlider(group);
+      }
+    });
+
     // Update dynamic content
     this.updateDynamicContent();
   },
@@ -486,7 +493,7 @@ const STORAGE_KEYS = {
 };
 
 // Config-basierte Defaults mit Fallback und Validierung
-const configDefaults = typeof siteConfig !== 'undefined' ? siteConfig.defaults : null;
+const configDefaults = typeof siteConfig !== 'undefined' && siteConfig != null ? siteConfig.defaults : null;
 
 function validateTheme(theme) {
   const validThemes = ['dark', 'light', 'system'];
@@ -731,7 +738,7 @@ function loadLocalSettings() {
 }
 
 function applyConfigVisibility() {
-  if (typeof siteConfig === 'undefined') return;
+  if (typeof siteConfig === 'undefined' || siteConfig == null) return;
 
   // Settings-Button nur ausblenden wenn EXPLIZIT auf false gesetzt
   if (siteConfig.settings?.showSettingsButton === false) {
@@ -784,7 +791,7 @@ function applyConfigVisibility() {
 }
 
 function applyCardsVisibility() {
-  if (typeof siteConfig === 'undefined') return;
+  if (typeof siteConfig === 'undefined' || siteConfig == null) return;
 
   const cards = siteConfig.cards || {};
   const cardMap = {
@@ -815,7 +822,7 @@ function applyCardsVisibility() {
 }
 
 function applyAnimationConfig() {
-  if (typeof siteConfig === 'undefined') return;
+  if (typeof siteConfig === 'undefined' || siteConfig == null) return;
 
   const animations = siteConfig.animations || {};
 
@@ -844,7 +851,7 @@ function applyAnimationConfig() {
 }
 
 function renderHeaderLinks() {
-  if (typeof siteConfig === 'undefined') return;
+  if (typeof siteConfig === 'undefined' || siteConfig == null) return;
 
   const links = siteConfig.headerLinks || [];
   const container = document.getElementById('headerLinks');
@@ -919,6 +926,15 @@ function switchSettingsTab(tabName) {
   els.settingsPanels.forEach((panel) => {
     panel.classList.toggle('active', panel.id === `panel-${tabName}`);
   });
+  // Recalculate toggle sliders in the newly visible panel
+  const activePanel = document.getElementById(`panel-${tabName}`);
+  if (activePanel) {
+    requestAnimationFrame(() => {
+      activePanel.querySelectorAll('.toggle-group').forEach((group) => {
+        updateToggleSlider(group);
+      });
+    });
+  }
 }
 
 async function bootstrap() {
@@ -1153,7 +1169,7 @@ function createPortRow(port, group) {
   statusInput.dataset.group = group;
   statusInput.dataset.id = port.id;
   statusInput.dataset.last = port.status;
-  statusInput.setAttribute('aria-label', `${port.label} Belegung`);
+  statusInput.setAttribute('aria-label', `${port.label} ${i18n.t('table.assignment')}`);
   statusTd.appendChild(statusInput);
   tr.appendChild(statusTd);
 
