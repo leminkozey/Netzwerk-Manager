@@ -10,6 +10,8 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Speed-Test** – Download, Upload und Ping im lokalen Netzwerk messen
 - **Uptime Monitoring** – Geräte per Ping überwachen mit Live-Status
 - **Control Center** – Geräte per Wake-on-LAN, SSH-Shutdown und SSH-Restart steuern
+- **Pi-hole DNS Analytics** – Statistiken, Top-Domains und Query-Verlauf direkt im Dashboard
+- **Pi-hole Blocking Toggle** – DNS-Blocking per Knopfdruck pausieren und fortsetzen
 - **Versionshistorie** – Alle Änderungen automatisch versioniert und nachvollziehbar
 - **Daten-Export/Import** – Vollständiges Backup als JSON
 - **Multi-Language** – Deutsch und Englisch
@@ -251,6 +253,65 @@ controlDevices: [
 ],
 ```
 
+### Pi-hole (`pihole`)
+
+Verbindet sich mit deinem Pi-hole v6 und zeigt DNS-Statistiken im Analysen Center. Zusätzlich kann das DNS-Blocking direkt im Control Center pausiert und fortgesetzt werden.
+
+Der Server liest `url` und `password` aus der Config und kommuniziert serverseitig mit der Pi-hole API. Die Zugangsdaten sind im Frontend nicht sichtbar (`config.js` wird serverseitig mit 403 blockiert).
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `url` | `string` | — | Pi-hole Admin URL (z.B. `'http://192.168.1.100'`). |
+| `password` | `string` | — | Pi-hole API Passwort. |
+| `blockingToggle` | `boolean` | `true` | Blocking-Toggle im Control Center anzeigen. |
+| `piholeInterval` | `number` | `60` | Aktualisierungs-Intervall in Sekunden (Minimum 30). Wird auf Root-Ebene gesetzt. |
+
+#### Blocking Toggle
+
+Wenn `blockingToggle: true` (oder nicht gesetzt), erscheint im Control Center eine Pi-hole Tile:
+
+- **Status-Badge** zeigt den aktuellen Blocking-Status (Aktiv / Inaktiv / Offline)
+- **Pause-Button** (gelb) deaktiviert das DNS-Blocking
+- **Resume-Button** (grün) aktiviert das DNS-Blocking wieder
+- Der Status wird alle 15 Sekunden automatisch aktualisiert
+- Bei `blockingToggle: false` wird die Tile komplett ausgeblendet
+- Wenn Pi-hole nicht erreichbar ist, wird die Tile mit "Offline"-Status angezeigt (ohne Button)
+- Schnelles Umschalten wird serverseitig auf max. 1x pro 5 Sekunden limitiert
+
+#### Dashboard-Cards (`pihole.cards`)
+
+Einzelne Cards im Analysen Center ein- oder ausblenden. Deaktivierte Cards werden nicht gerendert und die zugehörigen API-Calls werden nicht ausgeführt.
+
+| Card | Default | Beschreibung |
+|------|---------|--------------|
+| `summary` | `true` | 4 Summary-Stat-Cards (Queries, Blocked, %, Blocklist). |
+| `queriesOverTime` | `true` | Stacked Bar Chart mit Queries über Zeit. |
+| `queryTypes` | `true` | Donut-Diagramm der Anfragetypen (A, AAAA, HTTPS, etc.). |
+| `upstreams` | `true` | Donut-Diagramm der Upstream-Server. |
+| `topDomains` | `true` | Top aufgerufene Domains. |
+| `topBlocked` | `true` | Top blockierte Domains. |
+| `topClients` | `true` | Top aktive Clients. |
+
+```js
+pihole: {
+  url: 'http://192.168.1.100',
+  password: 'dein-pihole-passwort',
+  blockingToggle: true,
+  cards: {
+    summary: true,
+    queriesOverTime: true,
+    queryTypes: true,
+    upstreams: true,
+    topDomains: true,
+    topBlocked: true,
+    topClients: true,
+  },
+},
+
+// Auf Root-Ebene:
+piholeInterval: 60,
+```
+
 ### Header Links (`headerLinks`)
 
 Links die oben rechts in der Topbar erscheinen. Jeder Link zeigt automatisch das Favicon der Ziel-Website.
@@ -306,6 +367,8 @@ node -e "console.log(require('crypto').randomUUID())"
 - **SSH-Allowlist** – Nur vordefinierte Befehle können per SSH ausgeführt werden
 - **Session-Timeout** – Automatisches Ausloggen nach Inaktivität (konfigurierbar)
 - **Config-Sandbox** – `config.js` wird serverseitig in einer isolierten VM geparst
+- **Pi-hole Proxy** – API-Calls laufen serverseitig, Passwort ist im Frontend nie sichtbar
+- **Blocking Rate-Limit** – DNS-Blocking kann max. 1x pro 5 Sekunden umgeschaltet werden
 
 ---
 
