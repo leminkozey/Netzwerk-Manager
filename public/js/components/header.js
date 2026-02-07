@@ -9,22 +9,36 @@ import { el } from '../ui.js';
 import { icon } from '../icons.js';
 
 let headerEl = null;
+let pageContextEl = null;
+
+// Route → { titleKey, iconName }
+const PAGE_META = {
+  '/info':     { titleKey: 'page.info',     iconName: 'info' },
+  '/start':    { titleKey: 'page.start',    iconName: 'start' },
+  '/analysen': { titleKey: 'page.analysen', iconName: 'analysen' },
+};
 
 export function renderHeader(container) {
   const cfg = getConfig();
   const links = cfg?.headerLinks || [];
 
+  // Page context: back button + page title (hidden on landing/login)
+  pageContextEl = el('div', { className: 'page-context', id: 'pageContext' });
+
   headerEl = el('div', { className: 'top-bar', id: 'topBar' }, [
-    // Settings button (left)
-    el('button', {
-      className: 'settings-btn',
-      'aria-label': t('app.settings'),
-      onClick: () => {
-        window.dispatchEvent(new CustomEvent('open-settings'));
-      },
-    }, [
-      el('span', { className: 'settings-icon', innerHTML: icon('settings', 18) }),
-      el('span', { className: 'settings-text', textContent: t('app.settings'), 'data-i18n': 'app.settings' }),
+    // Left group: settings + page context
+    el('div', { className: 'top-bar-left' }, [
+      el('button', {
+        className: 'settings-btn',
+        'aria-label': t('app.settings'),
+        onClick: () => {
+          window.dispatchEvent(new CustomEvent('open-settings'));
+        },
+      }, [
+        el('span', { className: 'settings-icon', innerHTML: icon('settings', 18) }),
+        el('span', { className: 'settings-text', textContent: t('app.settings'), 'data-i18n': 'app.settings' }),
+      ]),
+      pageContextEl,
     ]),
 
     // Center: nav links
@@ -35,47 +49,51 @@ export function renderHeader(container) {
       createNavBtn('/analysen', icon('analysen', 16), t('landing.analysen')),
     ]),
 
-    // Quick links
-    el('div', { className: 'header-links', id: 'headerLinks' },
-      links.filter(l => l.name && l.url).map(link => {
-        let url;
-        try {
-          url = new URL(link.url);
-          if (!['http:', 'https:'].includes(url.protocol)) return null;
-        } catch { return null; }
+    // Right group: quick links + version chip
+    el('div', { className: 'top-bar-right' }, [
+      el('div', { className: 'header-links', id: 'headerLinks' },
+        links.filter(l => l.name && l.url).map(link => {
+          let url;
+          try {
+            url = new URL(link.url);
+            if (!['http:', 'https:'].includes(url.protocol)) return null;
+          } catch { return null; }
 
-        const a = el('a', {
-          href: url.href,
-          target: '_blank',
-          rel: 'noopener noreferrer',
-          className: 'header-link',
-        }, [
-          el('img', {
-            src: `${url.origin}/favicon.ico`,
-            alt: '',
-            loading: 'lazy',
-            style: { width: '14px', height: '14px', borderRadius: '2px' },
-            onError: (e) => { e.target.style.display = 'none'; },
-          }),
-          el('span', { textContent: link.name }),
-        ]);
-        return a;
-      }).filter(Boolean)
-    ),
-
-    // Version chip (right)
-    el('div', {
-      className: 'chip',
-      id: 'versionChip',
-      textContent: `${t('app.lastVersion')}: --`,
-    }),
+          const a = el('a', {
+            href: url.href,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            className: 'header-link',
+          }, [
+            el('img', {
+              src: `${url.origin}/favicon.ico`,
+              alt: '',
+              loading: 'lazy',
+              style: { width: '14px', height: '14px', borderRadius: '2px' },
+              onError: (e) => { e.target.style.display = 'none'; },
+            }),
+            el('span', { textContent: link.name }),
+          ]);
+          return a;
+        }).filter(Boolean)
+      ),
+      el('div', {
+        className: 'chip',
+        id: 'versionChip',
+        textContent: `${t('app.lastVersion')}: --`,
+      }),
+    ]),
   ]);
 
   container.prepend(headerEl);
   updateActiveNav();
+  updatePageContext();
 
   // Listen for route changes
-  window.addEventListener('hashchange', updateActiveNav);
+  window.addEventListener('hashchange', () => {
+    updateActiveNav();
+    updatePageContext();
+  });
 
   return headerEl;
 }
@@ -98,6 +116,30 @@ function updateActiveNav() {
   document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.route === current);
   });
+}
+
+function updatePageContext() {
+  if (!pageContextEl) return;
+  const route = getCurrentRoute() || '/';
+  const meta = PAGE_META[route];
+
+  pageContextEl.innerHTML = '';
+
+  if (meta) {
+    pageContextEl.appendChild(el('button', {
+      className: 'page-context-back',
+      innerHTML: icon('back', 18),
+      'aria-label': 'Back',
+      onClick: () => navigate('/'),
+    }));
+    pageContextEl.appendChild(el('span', {
+      className: 'page-context-title',
+      textContent: t(meta.titleKey),
+    }));
+    pageContextEl.style.display = '';
+  } else {
+    pageContextEl.style.display = 'none';
+  }
 }
 
 export function updateVersionChip(versions) {

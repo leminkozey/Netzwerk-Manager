@@ -131,7 +131,7 @@ a:hover {
   z-index: 1;
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px 20px 100px;
+  padding: 14px 20px 100px;
 }
 
 .page-wide {
@@ -139,7 +139,7 @@ a:hover {
   z-index: 1;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 24px 28px 100px;
+  padding: 14px 28px 100px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -990,17 +990,30 @@ label {
   display: none;
 }
 
-/* ── Floating Settings Button (top-left) ── */
-.settings-float-btn {
+/* ── Floating Bar (top-left): Settings + Back + Title ── */
+.float-bar {
   position: fixed;
   top: 16px;
   left: 16px;
   z-index: 900;
   display: flex;
   align-items: center;
+  gap: 6px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(12px) saturate(1.4);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow: var(--shadow-ambient);
+}
+
+.settings-float-btn {
+  display: flex;
+  align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1008,8 +1021,7 @@ label {
   color: var(--text);
   cursor: pointer;
   transition: all 0.2s ease;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  flex-shrink: 0;
 }
 
 .settings-float-btn:hover {
@@ -1025,6 +1037,68 @@ label {
 
 .settings-float-btn:hover svg {
   transform: rotate(45deg);
+}
+
+.float-bar-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.float-bar-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+}
+
+.float-bar-back:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface-elevated);
+}
+
+.float-bar-back:hover svg {
+  animation: arrowBounce 0.5s ease;
+}
+
+.float-bar-back svg {
+  width: 18px;
+  height: 18px;
+}
+
+@keyframes arrowBounce {
+  0% { transform: translateX(0); }
+  30% { transform: translateX(-4px); }
+  60% { transform: translateX(2px); }
+  100% { transform: translateX(0); }
+}
+
+/* Page hero title – centered below float bar, gradient animated */
+.page-hero-title {
+  margin: -8px 0 8px;
+  padding: 0;
+  font-size: clamp(2rem, 5vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  background: linear-gradient(135deg, var(--text) 0%, var(--accent) 50%, var(--accent-warm) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradientShift 8s ease infinite;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1932,7 +2006,7 @@ label {
 
 @media (max-width: 640px) {
   .page {
-    padding: 16px 14px 80px;
+    padding: 12px 14px 80px;
   }
 
   .top-bar {
@@ -2843,7 +2917,7 @@ label {
   }
 
   .page-wide {
-    padding: 16px 14px 80px;
+    padding: 12px 14px 80px;
   }
 }
 
@@ -2899,6 +2973,7 @@ label {
 .nav-btn-label {
   white-space: nowrap;
 }
+
 
 @media (max-width: 640px) {
   .nav-btn-label {

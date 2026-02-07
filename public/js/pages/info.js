@@ -4,7 +4,6 @@
 
 import { t } from '../i18n.js';
 import { state, on } from '../state.js';
-import { navigate } from '../router.js';
 import { el, showToast, debounce, pickTextColor, copyToClipboard } from '../ui.js';
 import { icon } from '../icons.js';
 import * as api from '../api.js';
@@ -330,18 +329,6 @@ function buildWindowsPCCard() {
   ]);
 }
 
-// ── Page header ─────────────────────────────────────────────────
-
-function buildPageHeader() {
-  return el('div', { className: 'info-page-header' }, [
-    el('button', {
-      className: 'back-btn',
-      innerHTML: icon('back', 20),
-      onClick: () => navigate('/'),
-    }),
-    el('h1', { className: 'info-page-title', textContent: t('page.info') }),
-  ]);
-}
 
 // ═══════════════════════════════════════════════════════════════════
 // Main render
@@ -349,8 +336,6 @@ function buildPageHeader() {
 
 export function renderInfo(container) {
   const page = el('div', { className: 'page-wide' });
-
-  page.appendChild(buildPageHeader());
 
   // Netzwerkgeräte
   page.appendChild(sectionHeading(t('section.devices')));

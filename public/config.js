@@ -76,9 +76,9 @@ const siteConfig = {
   // name: Anzeigename
   // ip: IP-Adresse des Geräts
   uptimeDevices: [
-    { id: 'router',    name: 'Router',     ip: 'xxx.xxx.xxx.xxx' },
-    { id: 'pihole',    name: 'PiHole',     ip: 'xxx.xxx.xxx.xxx' },
-    { id: 'windowspc', name: 'Windows PC', ip: 'xxx.xxx.xx.xx' },
+    { id: 'router',    name: 'Router',     ip: '192.168.2.1' },
+    { id: 'pihole',    name: 'PiHole',     ip: '192.168.2.135' },
+    { id: 'windowspc', name: 'Windows PC', ip: '192.168.2.137' },
   ],
 
   // ══════════════════════════════════════════════

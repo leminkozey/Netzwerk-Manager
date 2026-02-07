@@ -3,7 +3,6 @@
 // =================================================================
 
 import { t } from '../i18n.js';
-import { navigate } from '../router.js';
 import { el, showToast } from '../ui.js';
 import { icon, iconEl } from '../icons.js';
 import * as api from '../api.js';
@@ -60,18 +59,6 @@ function mockBadge() {
       lineHeight: '1.4',
     },
   });
-}
-
-function buildPageHeader() {
-  return el('div', { className: 'info-page-header' }, [
-    el('button', {
-      className: 'back-btn',
-      innerHTML: icon('back', 20),
-      onClick: () => navigate('/'),
-    }),
-    el('span', { className: 'icon-badge icon-cyan page-icon', innerHTML: icon('analysen', 24) }),
-    el('h1', { className: 'info-page-title', textContent: t('page.analysen') }),
-  ]);
 }
 
 const iconColors = {
@@ -560,8 +547,6 @@ export function renderAnalysen(container) {
   if (parentPage) parentPage.style.maxWidth = 'none';
 
   const page = el('div', { className: 'page-wide', style: { maxWidth: 'none' } });
-
-  page.appendChild(buildPageHeader());
 
   // Two-column top: speedtest left, uptime grid right (responsive via CSS)
   const topRow = el('div', { className: 'analysen-top' });

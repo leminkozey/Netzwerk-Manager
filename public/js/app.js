@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { state, on } from './state.js';
-import { initRouter, registerRoute, setContentElement, setBeforeNavigate, navigate, startRouter } from './router.js';
+import { initRouter, registerRoute, setContentElement, setBeforeNavigate, navigate, getCurrentRoute, startRouter } from './router.js';
 import { t, initI18n } from './i18n.js';
 import { loadLocalSettings, el, applyTheme } from './ui.js';
 import { isLoggedIn, handleLogin, tryAutoLogin } from './auth.js';
@@ -140,9 +140,54 @@ function onLoginSuccess() {
 let chromeRendered = false;
 
 function hideAppChrome() {
-  document.getElementById('settingsFloatBtn')?.remove();
+  document.getElementById('floatBar')?.remove();
   document.getElementById('settingsOverlay')?.remove();
+  window.removeEventListener('hashchange', updateFloatBar);
   chromeRendered = false;
+}
+
+// Route → page title key
+const PAGE_TITLES = {
+  '/info': 'page.info',
+  '/start': 'page.start',
+  '/analysen': 'page.analysen',
+};
+
+let floatBarContext = null;
+
+function updateFloatBar() {
+  if (!floatBarContext) return;
+  const route = getCurrentRoute() || '/';
+  const titleKey = PAGE_TITLES[route];
+
+  floatBarContext.innerHTML = '';
+  if (titleKey) {
+    floatBarContext.appendChild(el('button', {
+      className: 'float-bar-back',
+      innerHTML: icon('back', 18),
+      'aria-label': 'Back',
+      onClick: () => navigate('/'),
+    }));
+    floatBarContext.style.display = '';
+  } else {
+    floatBarContext.style.display = 'none';
+  }
+
+  // Page title below the bar, centered
+  const oldTitle = document.getElementById('pageTitle');
+  if (oldTitle) oldTitle.remove();
+
+  if (titleKey) {
+    const title = el('h1', {
+      className: 'page-hero-title',
+      id: 'pageTitle',
+      textContent: t(titleKey),
+    });
+    const appContent = document.getElementById('appContent');
+    if (appContent && appContent.firstChild) {
+      appContent.firstChild.prepend(title);
+    }
+  }
 }
 
 function showAppChrome() {
@@ -151,15 +196,23 @@ function showAppChrome() {
 
   initSettings();
 
-  // Floating settings button (top-left)
-  const btn = el('button', {
-    className: 'settings-float-btn',
-    id: 'settingsFloatBtn',
-    'aria-label': t('app.settings'),
-    innerHTML: icon('settings', 20),
-    onClick: () => window.dispatchEvent(new CustomEvent('open-settings')),
-  });
-  document.body.appendChild(btn);
+  // Floating bar (top-left): [Settings] [← Back] [Page name]
+  floatBarContext = el('div', { className: 'float-bar-context' });
+
+  const bar = el('div', { className: 'float-bar', id: 'floatBar' }, [
+    el('button', {
+      className: 'settings-float-btn',
+      'aria-label': t('app.settings'),
+      innerHTML: icon('settings', 20),
+      onClick: () => window.dispatchEvent(new CustomEvent('open-settings')),
+    }),
+    floatBarContext,
+  ]);
+
+  document.body.appendChild(bar);
+  window.addEventListener('hashchange', updateFloatBar);
+  // Initial update after a tick (route may not be set yet)
+  requestAnimationFrame(updateFloatBar);
 }
 
 // ── Overlays ──
@@ -262,6 +315,7 @@ async function init() {
   if (autoLoggedIn) {
     showAppChrome();
     startRouter();
+    updateFloatBar();
   } else {
     navigate('/login');
     startRouter();

@@ -3,7 +3,6 @@
 // =================================================================
 
 import { t } from '../i18n.js';
-import { navigate } from '../router.js';
 import { el, showToast, showConfirm } from '../ui.js';
 import { icon, iconEl } from '../icons.js';
 import * as api from '../api.js';
@@ -28,19 +27,6 @@ function statusIcon(status) {
   return icon('unknown', 14);
 }
 
-// ── Page Header ──
-
-function buildPageHeader() {
-  return el('div', { className: 'info-page-header' }, [
-    el('button', {
-      className: 'back-btn',
-      innerHTML: icon('back', 20),
-      onClick: () => navigate('/'),
-    }),
-    el('span', { className: 'icon-badge icon-orange page-icon', innerHTML: icon('start', 24) }),
-    el('h1', { className: 'info-page-title', textContent: t('page.start') }),
-  ]);
-}
 
 // ── Section Title ──
 
@@ -205,9 +191,6 @@ export function renderStart(container) {
   let destroyed = false;
 
   const page = el('div', { className: 'page-wide' });
-
-  // Page header
-  page.appendChild(buildPageHeader());
 
   // Section: Gerätesteuerung
   page.appendChild(buildSectionTitle(t('section.control')));
