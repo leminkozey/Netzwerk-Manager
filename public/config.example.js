@@ -93,6 +93,7 @@ const siteConfig = {
   pihole: {
     url: 'http://192.168.1.100',           // Pi-hole Admin URL
     password: 'your-pihole-password',       // Pi-hole API Passwort
+    blockingToggle: true,                    // Blocking-Toggle im Control Center anzeigen
 
     // Einzelne Dashboard-Cards ein-/ausblenden.
     // Deaktivierte Cards werden nicht gerendert und die zugehörigen

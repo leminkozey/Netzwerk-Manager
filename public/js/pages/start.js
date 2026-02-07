@@ -179,8 +179,9 @@ export function renderStart(container) {
   // Shared refs for Pi-hole tile (set once tile is built, used by poll)
   let piholeRefs = null;
   let piholePollInterval = null;
+  const showBlockingToggle = cfg?.pihole?.blockingToggle !== false;
 
-  api.getPiholeStatus().then(status => {
+  showBlockingToggle && api.getPiholeStatus().then(status => {
     if (destroyed || !status.configured) return;
 
     const isReachable = status.reachable;
