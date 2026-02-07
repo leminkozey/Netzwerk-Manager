@@ -87,14 +87,29 @@ const siteConfig = {
   // ══════════════════════════════════════════════
   // PI-HOLE v6 DNS ANALYTICS
   // ══════════════════════════════════════════════
-  // Konfiguration liegt in Data/pihole.json (nicht öffentlich).
-  // Erstelle die Datei mit:
-  // {
-  //   "url": "http://192.168.1.100",
-  //   "password": "your-pihole-password"
-  // }
-  //
-  // Aktualisierungs-Intervall (Sekunden, Minimum 30, Standard 60):
+  // URL und Passwort deines Pi-hole v6.
+  // HINWEIS: config.js wird vom Server blockiert (403) und ist nicht
+  // öffentlich abrufbar. Der Server liest die Datei nur intern.
+  pihole: {
+    url: 'http://192.168.1.100',           // Pi-hole Admin URL
+    password: 'your-pihole-password',       // Pi-hole API Passwort
+
+    // Einzelne Dashboard-Cards ein-/ausblenden.
+    // Deaktivierte Cards werden nicht gerendert und die zugehörigen
+    // API-Calls werden nicht ausgeführt (spart Bandbreite).
+    // Standard: alle true (wenn cards-Objekt fehlt)
+    cards: {
+      summary: true,          // 4 Summary-Stat-Cards (Queries, Blocked, %, Blocklist)
+      queriesOverTime: true,  // Stacked Bar Chart (Queries über Zeit)
+      queryTypes: true,       // Donut: Anfragetypen (A, AAAA, HTTPS, etc.)
+      upstreams: true,        // Donut: Upstream-Server
+      topDomains: true,       // Top Domains Liste
+      topBlocked: true,       // Top Blockierte Domains Liste
+      topClients: true,       // Top Clients Liste
+    },
+  },
+
+  // Aktualisierungs-Intervall für Pi-hole (Sekunden, Minimum 30, Standard 60):
   piholeInterval: 60,
 
   uptimeInterval: 10,

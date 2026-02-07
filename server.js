@@ -237,6 +237,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve a sanitized config.js (strips pihole credentials)
+app.get('/config.js', (req, res) => {
+  const cfg = readSiteConfig();
+  if (!cfg) return res.status(404).end();
+  // Deep clone and strip sensitive fields
+  const safe = JSON.parse(JSON.stringify(cfg));
+  if (safe.pihole) {
+    delete safe.pihole.url;
+    delete safe.pihole.password;
+  }
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.send(`const siteConfig = ${JSON.stringify(safe, null, 2)};\n`);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 const defaultState = {
@@ -1840,16 +1855,28 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
 
 const piholeSession = { sid: null, expiresAt: 0 };
 let _piholeAuthPromise = null;
-const PIHOLE_CONFIG_FILE = path.join(DATA_DIR, 'pihole.json');
 const PIHOLE_MAX_BODY = 10 * 1024 * 1024; // 10 MB
 
 function readPiholeConfig() {
+  // Primary: read from public/config.js (pihole.url + pihole.password)
+  const cfg = readSiteConfig();
+  const pihole = cfg?.pihole;
+  if (pihole && pihole.url && pihole.password) {
+    const url = pihole.url.replace(/\/+$/, '');
+    try {
+      const parsed = new URL(url);
+      if (!isAllowedProxyTarget(parsed.hostname)) return null;
+    } catch { return null; }
+    return { url, password: pihole.password };
+  }
+
+  // Fallback: legacy Data/pihole.json (backwards compatibility)
+  const legacyFile = path.join(DATA_DIR, 'pihole.json');
   try {
-    if (!fs.existsSync(PIHOLE_CONFIG_FILE)) return null;
-    const raw = JSON.parse(fs.readFileSync(PIHOLE_CONFIG_FILE, 'utf-8'));
+    if (!fs.existsSync(legacyFile)) return null;
+    const raw = JSON.parse(fs.readFileSync(legacyFile, 'utf-8'));
     if (!raw || !raw.url || !raw.password) return null;
     const url = raw.url.replace(/\/+$/, '');
-    // SSRF protection — validate hostname
     try {
       const parsed = new URL(url);
       if (!isAllowedProxyTarget(parsed.hostname)) return null;

@@ -908,17 +908,27 @@ export function renderAnalysen(container) {
         return;
       }
 
-      // Fetch all data in parallel
-      Promise.all([
-        api.getPiholeSummary(),
-        api.getPiholeHistory(),
-        api.getPiholeQueryTypes(),
-        api.getPiholeTopDomains(10),
-        api.getPiholeTopBlocked(10),
-        api.getPiholeTopClients(10),
-        api.getPiholeUpstreams(),
-      ]).then(([summary, history, queryTypes, topDomains, topBlocked, topClients, upstreams]) => {
+      // Card toggles — default: all visible
+      const cards = cfg?.pihole?.cards || {};
+      const show = (key) => cards[key] !== false;
+
+      // Only fetch APIs for enabled sections
+      const fetches = [api.getPiholeSummary()]; // always needed for status
+      const fetchKeys = ['summary'];
+
+      if (show('queriesOverTime')) { fetches.push(api.getPiholeHistory()); fetchKeys.push('queriesOverTime'); }
+      if (show('queryTypes'))      { fetches.push(api.getPiholeQueryTypes()); fetchKeys.push('queryTypes'); }
+      if (show('topDomains'))      { fetches.push(api.getPiholeTopDomains(10)); fetchKeys.push('topDomains'); }
+      if (show('topBlocked'))      { fetches.push(api.getPiholeTopBlocked(10)); fetchKeys.push('topBlocked'); }
+      if (show('topClients'))      { fetches.push(api.getPiholeTopClients(10)); fetchKeys.push('topClients'); }
+      if (show('upstreams'))       { fetches.push(api.getPiholeUpstreams()); fetchKeys.push('upstreams'); }
+
+      Promise.all(fetches).then((results) => {
         if (destroyed) return;
+
+        // Map results by key
+        const r = {};
+        for (let i = 0; i < fetchKeys.length; i++) r[fetchKeys[i]] = results[i];
 
         piholeContainer.replaceChildren();
 
@@ -931,25 +941,35 @@ export function renderAnalysen(container) {
         ]));
 
         // Summary cards
-        piholeContainer.appendChild(buildPiholeSummaryCards(summary));
+        if (show('summary')) {
+          piholeContainer.appendChild(buildPiholeSummaryCards(r.summary));
+        }
 
         // Queries over time (full width)
-        piholeContainer.appendChild(buildQueriesOverTimeChart(history));
+        if (show('queriesOverTime')) {
+          piholeContainer.appendChild(buildQueriesOverTimeChart(r.queriesOverTime));
+        }
 
         // Donuts row: query types + upstream servers (2 columns)
-        const donutsRow = el('div', { className: 'pihole-donuts-row' }, [
-          buildQueryTypesDonut(queryTypes),
-          buildUpstreamsDonut(upstreams),
-        ]);
-        piholeContainer.appendChild(donutsRow);
+        const donuts = [];
+        if (show('queryTypes')) donuts.push(buildQueryTypesDonut(r.queryTypes));
+        if (show('upstreams')) donuts.push(buildUpstreamsDonut(r.upstreams));
+        if (donuts.length > 0) {
+          piholeContainer.appendChild(el('div', { className: 'pihole-donuts-row' }, donuts));
+        }
 
-        // Top lists: 3 columns
-        const topListsRow = el('div', { className: 'grid three equal-height' }, [
-          buildTopList(t('pihole.topDomains'), 'traffic', extractTopList(topDomains, 'domains'), 'var(--accent)'),
-          buildTopList(t('pihole.topBlocked'), 'outage', extractTopList(topBlocked, 'domains'), '#ef4444'),
-          buildTopList(t('pihole.topClients'), 'power', extractTopList(topClients, 'clients'), '#8b5cf6'),
-        ]);
-        piholeContainer.appendChild(topListsRow);
+        // Top lists: up to 3 columns
+        const topCols = [];
+        if (show('topDomains')) topCols.push(buildTopList(t('pihole.topDomains'), 'traffic', extractTopList(r.topDomains, 'domains'), 'var(--accent)'));
+        if (show('topBlocked')) topCols.push(buildTopList(t('pihole.topBlocked'), 'outage', extractTopList(r.topBlocked, 'domains'), '#ef4444'));
+        if (show('topClients')) topCols.push(buildTopList(t('pihole.topClients'), 'power', extractTopList(r.topClients, 'clients'), '#8b5cf6'));
+        if (topCols.length > 0) {
+          const cls = topCols.length === 3 ? 'grid three equal-height'
+                    : topCols.length === 2 ? 'pihole-donuts-row'
+                    : '';
+          const wrapper = el('div', { className: cls }, topCols);
+          piholeContainer.appendChild(wrapper);
+        }
       }).catch(() => {
         if (destroyed) return;
         piholeContainer.replaceChildren();
