@@ -132,6 +132,19 @@ function createDesignPanel() {
 
     // Accent Color
     createSettingRow(t('settings.accentColor'), createAccentPicker()),
+
+    // Reset
+    el('hr', { className: 'settings-divider' }),
+    el('button', {
+      className: 'btn secondary',
+      textContent: t('settings.resetDefaults'),
+      'data-i18n': 'settings.resetDefaults',
+      onClick: () => {
+        Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+        showToast(t('settings.resetDone'));
+        setTimeout(() => location.reload(), 600);
+      },
+    }),
   ]);
   return panel;
 }
