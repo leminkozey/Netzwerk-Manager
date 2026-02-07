@@ -263,6 +263,7 @@ export const icons = {
   </svg>`,
 };
 
+/** @deprecated Use iconEl() instead — this returns HTML strings requiring innerHTML. */
 export function icon(name, size = 20) {
   const svg = icons[name] || '';
   return `<span class="icon" style="width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center" aria-hidden="true">${svg}</span>`;

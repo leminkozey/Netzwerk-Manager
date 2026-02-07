@@ -526,8 +526,8 @@ function getPiSpeedtestTarget(state) {
 
 function sendPiUnavailable(res, host, port, reason) {
   res.status(503).json({
-    error: 'Raspberry Pi nicht erreichbar',
-    message: `${host}:${port} ist nicht erreichbar. Laeuft der Pi-Speedtest-Server?`,
+    error: 'Raspberry Pi unreachable',
+    message: `${host}:${port} is unreachable. Is the Pi speedtest server running?`,
     piIp: host,
     reason,
   });
@@ -625,6 +625,28 @@ function checkPCStatusRateLimit(ip) {
   return true;
 }
 
+// Strict rate limiting for password reveal (5 per minute)
+const pcPasswordLimits = new Map();
+const PC_PASSWORD_LIMIT_WINDOW = 60000;
+const PC_PASSWORD_LIMIT_MAX = 5;
+
+function checkPasswordRateLimit(ip) {
+  const now = Date.now();
+  const data = pcPasswordLimits.get(ip);
+
+  if (!data || now - data.windowStart > PC_PASSWORD_LIMIT_WINDOW) {
+    pcPasswordLimits.set(ip, { windowStart: now, count: 1 });
+    return true;
+  }
+
+  if (data.count >= PC_PASSWORD_LIMIT_MAX) {
+    return false;
+  }
+
+  data.count++;
+  return true;
+}
+
 // Audit logging for sensitive operations
 function logPCAction(action, ip, success, details = '') {
   const timestamp = new Date().toISOString();
@@ -660,14 +682,14 @@ function sendWakeOnLan(macAddress) {
     const socket = dgram.createSocket('udp4');
     socket.once('error', (err) => {
       socket.close();
-      reject(new Error('Netzwerkfehler beim Senden'));
+      reject(new Error('Network error while sending'));
     });
 
     socket.bind(() => {
       socket.setBroadcast(true);
       socket.send(magicPacket, 0, magicPacket.length, 9, '255.255.255.255', (err) => {
         socket.close();
-        if (err) reject(new Error('Fehler beim Senden des Wake-Pakets'));
+        if (err) reject(new Error('Failed to send Wake-on-LAN packet'));
         else resolve();
       });
     });
@@ -759,22 +781,11 @@ function readSiteConfig() {
     if (!fs.existsSync(CONFIG_FILE)) return null;
     const src = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const vm = require('vm');
-    // Restricted sandbox: block access to process, require, global, etc.
-    const sandbox = Object.create(null);
-    sandbox.Object = Object;
-    sandbox.Array = Array;
-    sandbox.String = String;
-    sandbox.Number = Number;
-    sandbox.Boolean = Boolean;
-    sandbox.Math = Math;
-    sandbox.JSON = JSON;
-    sandbox.Date = Date;
-    sandbox.encodeURIComponent = encodeURIComponent;
-    vm.createContext(sandbox);
     // const → var so siteConfig lands on the sandbox global object
     const modified = src.replace(/\bconst siteConfig\b/, 'var siteConfig');
-    vm.runInContext(modified, sandbox, { timeout: 1000 });
-    return sandbox.siteConfig || null;
+    // runInNewContext creates fresh built-in copies, preventing prototype pollution
+    const sandbox = vm.runInNewContext(modified + '; siteConfig;', Object.create(null), { timeout: 1000 });
+    return sandbox || null;
   } catch {
     return null;
   }
@@ -910,6 +921,11 @@ function buildUptimeResponse() {
 
 function sshCommand(config, command) {
   return new Promise((resolve, reject) => {
+    // Validate command against allowlist
+    if (!ALLOWED_SSH_COMMANDS.has(command)) {
+      return reject(new Error('Command not allowed'));
+    }
+
     const { ipAddress, sshUser, sshPort } = config;
     const sshPassword = config._sshPasswordDecrypted || decryptValue(config.sshPassword);
 
@@ -985,6 +1001,11 @@ const DEVICE_COMMANDS = {
     restart: 'sudo reboot',
   },
 };
+
+// Allowed SSH commands whitelist (built from DEVICE_COMMANDS)
+const ALLOWED_SSH_COMMANDS = new Set(
+  Object.values(DEVICE_COMMANDS).flatMap(cmds => Object.values(cmds))
+);
 
 function getDeviceCommand(type, action) {
   return DEVICE_COMMANDS[type]?.[action] || null;
@@ -1251,10 +1272,10 @@ app.post('/api/ports/update', authRequired, async (req, res) => {
 app.post('/api/settings/credentials', authRequired, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
-    return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich' });
+    return res.status(400).json({ error: 'Username and password are required' });
   }
   if (password.length < 4) {
-    return res.status(400).json({ error: 'Passwort muss mindestens 4 Zeichen lang sein' });
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
 
   await withStateLock(() => {
@@ -1280,7 +1301,7 @@ app.post('/api/speedport', authRequired, async (req, res) => {
   const fields = { wifiName, wifiPassword, serialNumber, configuration, remoteUrl, devicePassword, modemId };
   for (const [key, val] of Object.entries(fields)) {
     if (typeof val === 'string' && val.length > MAX_FIELD_LEN) {
-      return res.status(400).json({ error: `Feld ${key} zu lang (max ${MAX_FIELD_LEN} Zeichen)` });
+      return res.status(400).json({ error: `Field ${key} too long (max ${MAX_FIELD_LEN} chars)` });
     }
   }
   await withStateLock(() => {
@@ -1318,7 +1339,7 @@ app.post('/api/raspberry', authRequired, async (req, res) => {
   const fields = { model, hostname, ipAddress, vpnIp, macAddress, sshUser, piholeUrl, piholeRemoteUrl };
   for (const [key, val] of Object.entries(fields)) {
     if (typeof val === 'string' && val.length > MAX_FIELD_LEN) {
-      return res.status(400).json({ error: `Feld ${key} zu lang (max ${MAX_FIELD_LEN} Zeichen)` });
+      return res.status(400).json({ error: `Field ${key} too long (max ${MAX_FIELD_LEN} chars)` });
     }
   }
   await withStateLock(() => {
@@ -1594,12 +1615,12 @@ app.get('/api/export', authRequired, (req, res) => {
 app.post('/api/import', authRequired, async (req, res) => {
   const { data } = req.body || {};
   if (!data || typeof data !== 'object') {
-    return res.status(400).json({ error: 'Ungueltige Daten' });
+    return res.status(400).json({ error: 'Invalid data' });
   }
 
   // Validiere wichtige Felder
   if (!data.switchPorts && !data.routerPorts && !data.speedportInfo && !data.raspberryInfo) {
-    return res.status(400).json({ error: 'Keine gueltigen Netzwerk-Manager Daten' });
+    return res.status(400).json({ error: 'No valid Netzwerk Manager data found' });
   }
 
   // Sanitize imported string data to prevent XSS
@@ -1738,7 +1759,7 @@ app.get('/api/control/:deviceId/password', authRequired, (req, res) => {
   const deviceId = req.params.deviceId;
   const clientIp = getClientIp(req);
 
-  if (!checkPCStatusRateLimit(clientIp)) {
+  if (!checkPasswordRateLimit(clientIp)) {
     return res.status(429).json({ error: 'Too many requests' });
   }
 

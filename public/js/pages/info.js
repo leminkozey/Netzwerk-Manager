@@ -85,7 +85,7 @@ function buildPortCard(title, colorIconName, ports, group) {
   const tbody = el('tbody');
 
   function renderRows() {
-    tbody.innerHTML = '';
+    tbody.replaceChildren();
     const list = group === 'switch' ? state.switchPorts : state.routerPorts;
     for (const port of list) {
       const statusInput = el('input', {
@@ -189,7 +189,7 @@ function buildPiholeCard() {
   const fieldContainer = el('div', { className: 'service-fields' });
 
   function renderFields() {
-    fieldContainer.innerHTML = '';
+    fieldContainer.replaceChildren();
     for (const f of fields) {
       const value = state.raspberryInfo[f.key] || '';
       const { row } = buildServiceField(f.label, value, (val) => {
@@ -241,7 +241,7 @@ function buildSpeedportCard() {
   const fieldContainer = el('div', { className: 'service-fields' });
 
   function renderFields() {
-    fieldContainer.innerHTML = '';
+    fieldContainer.replaceChildren();
     for (const f of fields) {
       const value = state.speedportInfo[f.key] || '';
       const { row } = buildServiceField(f.label, value, (val) => {
@@ -272,7 +272,6 @@ function buildSpeedportCard() {
 
 function buildWindowsPCCard() {
   const fieldContainer = el('div', { className: 'service-fields' });
-  let loaded = false;
 
   const debouncedSave = debounce(async () => {
     try {
@@ -284,7 +283,7 @@ function buildWindowsPCCard() {
   }, 800);
 
   function renderInfo(data) {
-    fieldContainer.innerHTML = '';
+    fieldContainer.replaceChildren();
     if (!state.windowsPCInfo) state.windowsPCInfo = {};
     Object.assign(state.windowsPCInfo, data);
 
@@ -309,7 +308,6 @@ function buildWindowsPCCard() {
   (async () => {
     try {
       const data = await api.getControlDevice('windowspc');
-      loaded = true;
       renderInfo(data);
     } catch {
       renderInfo({});

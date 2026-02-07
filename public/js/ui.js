@@ -102,7 +102,6 @@ export function el(tag, attrs = {}, children = []) {
   for (const [key, value] of Object.entries(attrs)) {
     if (key === 'className') elem.className = value;
     else if (key === 'textContent') elem.textContent = value;
-    else if (key === 'innerHTML') elem.innerHTML = value;
     else if (key === 'style' && typeof value === 'object') {
       for (const [p, v] of Object.entries(value)) {
         if (p.startsWith('--')) elem.style.setProperty(p, v);

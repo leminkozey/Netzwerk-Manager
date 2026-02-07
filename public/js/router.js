@@ -44,7 +44,7 @@ function handleRoute() {
     const fallback = routes.get('/');
     if (fallback && contentEl) {
       currentRoute = '/';
-      contentEl.innerHTML = '';
+      contentEl.replaceChildren();
       fallback(contentEl);
     }
     return;

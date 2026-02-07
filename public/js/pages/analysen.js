@@ -3,6 +3,7 @@
 // =================================================================
 
 import { t } from '../i18n.js';
+import { getConfig } from '../state.js';
 import { el, showToast } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
@@ -267,8 +268,8 @@ function buildSpeedtestSection() {
       try { await api.saveSpeedtest({ download: dl, upload: ul, ping }); } catch {}
       noteEl.textContent = t('speedtest.complete');
     } catch {
-      noteEl.textContent = t('pc.connectionError');
-      showToast(t('pc.connectionError'), true);
+      noteEl.textContent = t('speedtest.error');
+      showToast(t('speedtest.error'), true);
     } finally {
       running = false;
       startBtn.disabled = false;
@@ -544,7 +545,7 @@ export function renderAnalysen(container) {
   const timerRefs = []; // { el, ts } — updated every second
 
   // Read poll interval from config (default 60s, min 10s)
-  const cfg = typeof siteConfig !== 'undefined' && siteConfig != null ? siteConfig : null;
+  const cfg = getConfig();
   const pollSec = (cfg?.uptimeInterval && cfg.uptimeInterval >= 10) ? cfg.uptimeInterval : 60;
   const pollMs = pollSec * 1000;
 
@@ -614,12 +615,12 @@ export function renderAnalysen(container) {
       if (destroyed) return;
 
       if (data && data.devices && data.devices.length > 0) {
-        uptimeGrid.innerHTML = '';
+        uptimeGrid.replaceChildren();
         for (const d of data.devices) {
           uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
         }
       } else {
-        uptimeGrid.innerHTML = '';
+        uptimeGrid.replaceChildren();
         uptimeGrid.appendChild(el('div', {
           className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
         }, [el('span', { textContent: t('analysen.noData') })]));
@@ -640,7 +641,7 @@ export function renderAnalysen(container) {
         }, 1000);
       }
     }).catch(() => {
-      uptimeGrid.innerHTML = '';
+      uptimeGrid.replaceChildren();
       uptimeGrid.appendChild(el('div', {
         className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
       }, [el('span', { textContent: t('analysen.noData') })]));

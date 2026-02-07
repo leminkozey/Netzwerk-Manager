@@ -10,6 +10,7 @@ import { iconEl } from '../icons.js';
 
 let headerEl = null;
 let pageContextEl = null;
+let hashChangeHandler = null;
 
 // Route → { titleKey, iconName }
 const PAGE_META = {
@@ -89,11 +90,13 @@ export function renderHeader(container) {
   updateActiveNav();
   updatePageContext();
 
-  // Listen for route changes
-  window.addEventListener('hashchange', () => {
+  // Listen for route changes (remove previous listener to prevent leaks)
+  if (hashChangeHandler) window.removeEventListener('hashchange', hashChangeHandler);
+  hashChangeHandler = () => {
     updateActiveNav();
     updatePageContext();
-  });
+  };
+  window.addEventListener('hashchange', hashChangeHandler);
 
   return headerEl;
 }
@@ -123,7 +126,7 @@ function updatePageContext() {
   const route = getCurrentRoute() || '/';
   const meta = PAGE_META[route];
 
-  pageContextEl.innerHTML = '';
+  pageContextEl.replaceChildren();
 
   if (meta) {
     pageContextEl.appendChild(el('button', {

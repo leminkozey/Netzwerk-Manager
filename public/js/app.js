@@ -2,7 +2,7 @@
 // Netzwerk Manager v3.0.0 – Main Entry Point
 // ═══════════════════════════════════════════════════════════════════
 
-import { state, on } from './state.js';
+import { state, on, getConfig } from './state.js';
 import { initRouter, registerRoute, setContentElement, setBeforeNavigate, navigate, getCurrentRoute, startRouter } from './router.js';
 import { t, initI18n } from './i18n.js';
 import { loadLocalSettings, el, applyTheme } from './ui.js';
@@ -160,7 +160,7 @@ function updateFloatBar() {
   const route = getCurrentRoute() || '/';
   const titleKey = PAGE_TITLES[route];
 
-  floatBarContext.innerHTML = '';
+  floatBarContext.replaceChildren();
   if (titleKey) {
     floatBarContext.appendChild(el('button', {
       className: 'float-bar-back',
@@ -321,7 +321,7 @@ async function init() {
 }
 
 function applyConfigSettings() {
-  const cfg = typeof siteConfig !== 'undefined' && siteConfig != null ? siteConfig : null;
+  const cfg = getConfig();
   if (!cfg) return;
 
   // Freeze config to prevent runtime tampering

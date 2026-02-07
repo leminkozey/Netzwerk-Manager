@@ -140,7 +140,7 @@ export async function speedtestDownload(sizeMB) {
 }
 
 export async function speedtestUpload(data) {
-  const res = await fetch('/api/speedtest/local-upload-proxy', {
+  const res = await request('/api/speedtest/local-upload-proxy', {
     method: 'POST',
     headers: { ...authHeadersRaw(), 'Content-Type': 'application/octet-stream' },
     body: data,

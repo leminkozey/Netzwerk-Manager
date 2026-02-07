@@ -57,6 +57,7 @@ const translations = {
     'speedtest.measuringDownload': 'Messe Download...',
     'speedtest.measuringUpload': 'Messe Upload...',
     'speedtest.complete': 'Test abgeschlossen',
+    'speedtest.error': 'Speed-Test fehlgeschlagen',
     'speedtest.localhostNotice': 'Bitte über die LAN-IP öffnen (nicht localhost).',
 
     'pc.status.online': 'Online',
@@ -279,6 +280,7 @@ const translations = {
     'speedtest.measuringDownload': 'Measuring download...',
     'speedtest.measuringUpload': 'Measuring upload...',
     'speedtest.complete': 'Test complete',
+    'speedtest.error': 'Speed test failed',
     'speedtest.localhostNotice': 'Please open via LAN IP (not localhost).',
 
     'pc.status.online': 'Online',

@@ -3,6 +3,7 @@
 // =================================================================
 
 import { t } from '../i18n.js';
+import { getConfig } from '../state.js';
 import { el, showToast } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
@@ -150,8 +151,9 @@ export function renderStart(container) {
   page.appendChild(buildSectionTitle(t('section.control')));
 
   // Build tiles from config
-  const devices = (typeof siteConfig !== 'undefined' && Array.isArray(siteConfig.controlDevices))
-    ? siteConfig.controlDevices
+  const cfg = getConfig();
+  const devices = cfg?.controlDevices && Array.isArray(cfg.controlDevices)
+    ? cfg.controlDevices
     : [];
 
   const tiles = [];

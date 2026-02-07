@@ -68,9 +68,9 @@ function closeSettings() {
 
 function createSidebar() {
   const cfg = getConfig();
-  const hasControlDevices = typeof siteConfig !== 'undefined'
-    && Array.isArray(siteConfig.controlDevices)
-    && siteConfig.controlDevices.length > 0;
+  const hasControlDevices = cfg?.controlDevices
+    && Array.isArray(cfg.controlDevices)
+    && cfg.controlDevices.length > 0;
 
   const tabs = [
     { id: 'design', icon: 'sun', label: t('settings.design') },
@@ -329,8 +329,9 @@ async function loadUptimeResetButtons(container) {
 
 // ── Control Panel ──
 function createControlPanel() {
-  const devices = (typeof siteConfig !== 'undefined' && Array.isArray(siteConfig.controlDevices))
-    ? siteConfig.controlDevices
+  const cfg = getConfig();
+  const devices = cfg?.controlDevices && Array.isArray(cfg.controlDevices)
+    ? cfg.controlDevices
     : [];
 
   const sections = devices.map(device => createControlDeviceSection(device));
@@ -650,7 +651,7 @@ function fillVersionSelect(selectId, detailsId, versions) {
   const details = document.getElementById(detailsId);
   if (!select) return;
 
-  select.innerHTML = '';
+  select.replaceChildren();
   if (!versions?.length) {
     select.appendChild(el('option', { textContent: t('version.none') }));
     if (details) details.textContent = '';
