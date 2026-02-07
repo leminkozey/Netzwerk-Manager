@@ -43,6 +43,7 @@ function openSettings() {
         // Content
         el('div', { className: 'settings-content', id: 'settingsContent' }, [
           createDesignPanel(),
+          createAnalysenPanel(),
           createDataPanel(),
           createSessionPanel(),
           createUserPanel(),
@@ -69,6 +70,7 @@ function createSidebar() {
   const cfg = getConfig();
   const tabs = [
     { id: 'design', icon: 'sun', label: t('settings.design') },
+    { id: 'analysen', icon: 'analysen', label: t('settings.analysen') },
     { id: 'daten', icon: 'copy', label: t('settings.data') },
     { id: 'session', icon: 'uptime', label: t('settings.session') },
     { id: 'user', icon: 'settings', label: t('settings.user') },
@@ -261,6 +263,64 @@ function createAccentPicker() {
     )
   );
   return picker;
+}
+
+// ── Analysen Panel ──
+function createAnalysenPanel() {
+  const uptimeContainer = el('div', { id: 'uptimeResetContainer' });
+  loadUptimeResetButtons(uptimeContainer);
+
+  return el('div', { className: 'settings-panel', id: 'panel-analysen' }, [
+    el('h4', { textContent: t('settings.uptimeReset') }),
+    el('p', { className: 'setting-description', textContent: t('settings.uptimeResetDesc') }),
+    uptimeContainer,
+  ]);
+}
+
+async function loadUptimeResetButtons(container) {
+  try {
+    const data = await api.getUptime();
+    const devices = data?.devices || [];
+
+    const btns = [];
+
+    // Reset all button
+    btns.push(el('button', {
+      className: 'btn danger',
+      textContent: t('settings.uptimeResetAll'),
+      onClick: async () => {
+        try {
+          await api.resetAllUptime();
+          showToast(t('settings.uptimeResetDone'));
+          window.dispatchEvent(new CustomEvent('uptime-reset'));
+        } catch { showToast(t('msg.error'), true); }
+      },
+    }));
+
+    // Individual device buttons
+    for (const d of devices) {
+      btns.push(el('button', {
+        className: 'btn secondary',
+        textContent: d.name,
+        onClick: async () => {
+          try {
+            await api.resetDeviceUptime(d.id);
+            showToast(t('settings.uptimeResetDone'));
+            window.dispatchEvent(new CustomEvent('uptime-reset'));
+          } catch { showToast(t('msg.error'), true); }
+        },
+      }));
+    }
+
+    container.appendChild(el('div', {
+      style: { display: 'flex', flexWrap: 'wrap', gap: '8px' },
+    }, btns));
+  } catch {
+    container.appendChild(el('span', {
+      className: 'muted',
+      textContent: t('settings.uptimeNoDevices'),
+    }));
+  }
 }
 
 // ── Data Panel ──

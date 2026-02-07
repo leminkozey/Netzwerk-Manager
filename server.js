@@ -783,10 +783,10 @@ function formatTimestamp(ts) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Read uptimeDevices from public/config.js
-function readUptimeDevicesFromConfig() {
+// Parse public/config.js and return the siteConfig object
+function readSiteConfig() {
   try {
-    if (!fs.existsSync(CONFIG_FILE)) return [];
+    if (!fs.existsSync(CONFIG_FILE)) return null;
     const src = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const vm = require('vm');
     const sandbox = {};
@@ -794,17 +794,30 @@ function readUptimeDevicesFromConfig() {
     // const → var so siteConfig lands on the sandbox global object
     const modified = src.replace(/\bconst siteConfig\b/, 'var siteConfig');
     vm.runInContext(modified, sandbox, { timeout: 1000 });
-    const devices = sandbox.siteConfig?.uptimeDevices;
-    if (!Array.isArray(devices)) return [];
-    // Validate each entry
-    return devices.filter(d =>
-      d && typeof d.id === 'string' && d.id.length > 0
-        && typeof d.name === 'string' && d.name.length > 0
-        && typeof d.ip === 'string' && VALIDATION.ipAddress.test(d.ip)
-    );
+    return sandbox.siteConfig || null;
   } catch {
-    return [];
+    return null;
   }
+}
+
+// Read uptimeDevices from public/config.js
+function readUptimeDevicesFromConfig() {
+  const cfg = readSiteConfig();
+  const devices = cfg?.uptimeDevices;
+  if (!Array.isArray(devices)) return [];
+  return devices.filter(d =>
+    d && typeof d.id === 'string' && d.id.length > 0
+      && typeof d.name === 'string' && d.name.length > 0
+      && typeof d.ip === 'string' && VALIDATION.ipAddress.test(d.ip)
+  );
+}
+
+// Read uptimeInterval (seconds) from config, minimum 10s, default 60s
+function readUptimeIntervalMs() {
+  const cfg = readSiteConfig();
+  const val = cfg?.uptimeInterval;
+  if (typeof val === 'number' && val >= 10) return val * 1000;
+  return 60000;
 }
 
 async function runUptimePingCycle() {
@@ -1713,6 +1726,26 @@ app.get('/api/uptime', authRequired, (req, res) => {
   res.json(buildUptimeResponse());
 });
 
+// Reset all uptime data
+app.post('/api/uptime/reset', authRequired, async (req, res) => {
+  saveUptimeData({ devices: {}, outages: [] });
+  await runUptimePingCycle().catch(() => {});
+  res.json({ ok: true });
+});
+
+// Reset single device uptime data
+app.post('/api/uptime/reset/:deviceId', authRequired, async (req, res) => {
+  const id = req.params.deviceId;
+  const data = readUptimeData();
+  if (data.devices[id]) {
+    delete data.devices[id];
+    data.outages = data.outages.filter(o => o.device !== id && o.deviceId !== id);
+    saveUptimeData(data);
+  }
+  await runUptimePingCycle().catch(() => {});
+  res.json({ ok: true });
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -1818,12 +1851,14 @@ function startServer() {
     }
   }, 3600000); // Every hour
 
-  // Uptime monitoring: first ping after 5s, then every 60s
+  // Uptime monitoring: first ping after 5s, then at configured interval
+  const uptimeMs = readUptimeIntervalMs();
+  console.log(`Uptime monitoring interval: ${uptimeMs / 1000}s`);
   setTimeout(() => {
     runUptimePingCycle().catch(() => {});
     setInterval(() => {
       runUptimePingCycle().catch(() => {});
-    }, 60000);
+    }, uptimeMs);
   }, 5000);
 }
 

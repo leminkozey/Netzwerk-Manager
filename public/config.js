@@ -48,6 +48,7 @@ const siteConfig = {
     // Einzelne Tabs
     tabs: {
       design: true,             // Design-Tab anzeigen
+      analysen: true,           // Analysen-Tab (Uptime Reset) anzeigen
       daten: true,              // Daten-Tab (Export/Import) anzeigen
       session: true,            // Session-Tab anzeigen
       user: true,               // User-Tab anzeigen
@@ -71,6 +72,10 @@ const siteConfig = {
   // ══════════════════════════════════════════════
   // UPTIME MONITORING
   // ══════════════════════════════════════════════
+  // Ping-Intervall in Sekunden (Server pingt + Frontend aktualisiert)
+  // Minimum: 10 Sekunden
+  uptimeInterval: 10,
+
   // Geräte die per Ping überwacht werden sollen
   // id: eindeutiger Schlüssel (lowercase, keine Leerzeichen)
   // name: Anzeigename

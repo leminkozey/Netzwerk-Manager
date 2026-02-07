@@ -540,7 +540,13 @@ function buildPowerCard() {
 export function renderAnalysen(container) {
   let destroyed = false;
   let timerInterval = null;
+  let pollInterval = null;
   const timerRefs = []; // { el, ts } — updated every second
+
+  // Read poll interval from config (default 60s, min 10s)
+  const cfg = typeof siteConfig !== 'undefined' && siteConfig != null ? siteConfig : null;
+  const pollSec = (cfg?.uptimeInterval && cfg.uptimeInterval >= 10) ? cfg.uptimeInterval : 60;
+  const pollMs = pollSec * 1000;
 
   // Unlock the parent .page max-width so analysen uses the full viewport
   const parentPage = container.closest('.page');
@@ -593,44 +599,69 @@ export function renderAnalysen(container) {
 
   container.appendChild(page);
 
-  // Fetch uptime data
-  api.getUptime().then(data => {
+  // Outages element ref (may be replaced)
+  let currentOutages = outagesPlaceholder;
+
+  function refreshUptime() {
     if (destroyed) return;
 
-    if (data && data.devices && data.devices.length > 0) {
-      uptimeGrid.innerHTML = '';
-      for (const d of data.devices) {
-        uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
+    // Clear old timer
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+    timerRefs.length = 0;
+
+    api.getUptime().then(data => {
+      if (destroyed) return;
+
+      if (data && data.devices && data.devices.length > 0) {
+        uptimeGrid.innerHTML = '';
+        for (const d of data.devices) {
+          uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
+        }
+      } else {
+        uptimeGrid.innerHTML = '';
+        uptimeGrid.appendChild(el('div', {
+          className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
+        }, [el('span', { textContent: t('analysen.noData') })]));
       }
-    } else {
+
+      if (data && data.outages !== undefined) {
+        const newOutages = buildOutagesCardFromData(data.outages);
+        currentOutages.replaceWith(newOutages);
+        currentOutages = newOutages;
+      }
+
+      // Start live timer
+      if (timerRefs.length > 0) {
+        timerInterval = setInterval(() => {
+          for (const ref of timerRefs) {
+            ref.el.textContent = formatLiveTimer(ref.ts);
+          }
+        }, 1000);
+      }
+    }).catch(() => {
       uptimeGrid.innerHTML = '';
       uptimeGrid.appendChild(el('div', {
         className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
       }, [el('span', { textContent: t('analysen.noData') })]));
-    }
+    });
+  }
 
-    if (data && data.outages !== undefined) {
-      outagesPlaceholder.replaceWith(buildOutagesCardFromData(data.outages));
-    }
+  // Initial fetch
+  refreshUptime();
 
-    // Start live timer
-    if (timerRefs.length > 0) {
-      timerInterval = setInterval(() => {
-        for (const ref of timerRefs) {
-          ref.el.textContent = formatLiveTimer(ref.ts);
-        }
-      }, 1000);
-    }
-  }).catch(() => {
-    uptimeGrid.innerHTML = '';
-    uptimeGrid.appendChild(el('div', {
-      className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
-    }, [el('span', { textContent: t('analysen.noData') })]));
-  });
+  // Auto-poll at configured interval for live status updates
+  pollInterval = setInterval(() => refreshUptime(), pollMs);
+
+  // Live-update when uptime is reset from settings
+  const onReset = () => refreshUptime();
+  window.addEventListener('uptime-reset', onReset);
 
   return function cleanup() {
     destroyed = true;
     if (timerInterval) clearInterval(timerInterval);
+    if (pollInterval) clearInterval(pollInterval);
+    window.removeEventListener('uptime-reset', onReset);
     // Restore parent .page max-width for other pages
     if (parentPage) parentPage.style.maxWidth = '';
   };

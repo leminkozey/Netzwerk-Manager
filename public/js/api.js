@@ -208,3 +208,15 @@ export async function getUptime() {
   return res.json();
 }
 
+export async function resetAllUptime() {
+  const res = await request('/api/uptime/reset', { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to reset uptime');
+  return res.json();
+}
+
+export async function resetDeviceUptime(deviceId) {
+  const res = await request(`/api/uptime/reset/${encodeURIComponent(deviceId)}`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to reset device uptime');
+  return res.json();
+}
+
