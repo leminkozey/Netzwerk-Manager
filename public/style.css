@@ -517,30 +517,53 @@ a:hover {
 
 /* Preserve PC control button styling in simple mode */
 [data-button-style="simple"] .pc-wake-btn,
-[data-button-style="simple"] .pc-shutdown-btn {
+[data-button-style="simple"] .pc-restart-btn,
+[data-button-style="simple"] .pc-shutdown-btn,
+[data-button-style="simple"] .wake-btn,
+[data-button-style="simple"] .restart-btn,
+[data-button-style="simple"] .shutdown-btn {
   border-width: 2px;
 }
 
-[data-button-style="simple"] .pc-wake-btn {
+[data-button-style="simple"] .pc-wake-btn,
+[data-button-style="simple"] .wake-btn {
   background: rgba(34, 197, 94, 0.1);
   border-color: rgba(34, 197, 94, 0.3);
   color: #22c55e;
 }
 
-[data-button-style="simple"] .pc-wake-btn:hover {
+[data-button-style="simple"] .pc-wake-btn:hover,
+[data-button-style="simple"] .wake-btn:hover {
   background: rgba(34, 197, 94, 0.2);
   border-color: #22c55e;
   color: #22c55e;
   box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(34, 197, 94, 0.3);
 }
 
-[data-button-style="simple"] .pc-shutdown-btn {
+[data-button-style="simple"] .pc-restart-btn,
+[data-button-style="simple"] .restart-btn {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #3b82f6;
+}
+
+[data-button-style="simple"] .pc-restart-btn:hover,
+[data-button-style="simple"] .restart-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: #3b82f6;
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(59, 130, 246, 0.3);
+}
+
+[data-button-style="simple"] .pc-shutdown-btn,
+[data-button-style="simple"] .shutdown-btn {
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
   color: #ef4444;
 }
 
-[data-button-style="simple"] .pc-shutdown-btn:hover {
+[data-button-style="simple"] .pc-shutdown-btn:hover,
+[data-button-style="simple"] .shutdown-btn:hover {
   background: rgba(239, 68, 68, 0.2);
   border-color: #ef4444;
   color: #ef4444;
@@ -2173,7 +2196,8 @@ label {
 
 /* Windows PC card uses .icon-windows class now */
 
-.pc-status {
+.pc-status,
+.device-status {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2187,40 +2211,48 @@ label {
   transition: all 0.3s ease;
 }
 
-.pc-status .status-icon-wrap {
+.pc-status .status-icon-wrap,
+.device-status .status-icon-wrap {
   display: flex;
   align-items: center;
 }
 
-.pc-status .status-icon-wrap svg {
+.pc-status .status-icon-wrap svg,
+.device-status .status-icon-wrap svg {
   width: 14px;
   height: 14px;
 }
 
-.pc-status.online {
+.pc-status.online,
+.device-status.online {
   border-color: rgba(34, 197, 94, 0.4);
   background: rgba(34, 197, 94, 0.1);
   color: #22c55e;
 }
 
-.pc-status.online .status-icon-wrap {
+.pc-status.online .status-icon-wrap,
+.device-status.online .status-icon-wrap {
   color: #22c55e;
 }
 
-.pc-status.online .status-text {
+.pc-status.online .status-text,
+.device-status.online .status-text {
   color: #22c55e;
 }
 
-.pc-status.offline {
+.pc-status.offline,
+.device-status.offline {
   border-color: var(--border);
   background: var(--surface-2);
 }
 
-.pc-status.offline .status-icon-wrap {
+.pc-status.offline .status-icon-wrap,
+.device-status.offline .status-icon-wrap {
   color: var(--text-muted);
 }
 
-.pc-status.offline .status-text {
+.pc-status.offline .status-text,
+.device-status.offline .status-text {
   color: var(--text-muted);
 }
 
@@ -2238,6 +2270,7 @@ label {
 }
 
 .pc-wake-btn,
+.pc-restart-btn,
 .pc-shutdown-btn {
   display: flex;
   flex-direction: column;
@@ -2255,44 +2288,72 @@ label {
 }
 
 .pc-wake-btn svg,
+.pc-restart-btn svg,
 .pc-shutdown-btn svg {
   width: 32px;
   height: 32px;
 }
 
-.pc-wake-btn {
+.pc-wake-btn,
+.wake-btn {
   background: rgba(34, 197, 94, 0.1);
   border: 2px solid rgba(34, 197, 94, 0.3);
   color: #22c55e;
   box-shadow: none;
 }
 
-.pc-wake-btn:hover {
+.pc-wake-btn:hover,
+.wake-btn:hover {
   background: rgba(34, 197, 94, 0.2);
   border-color: #22c55e;
   transform: scale(1.08);
   box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(34, 197, 94, 0.3);
 }
 
-.pc-wake-btn:active {
+.pc-wake-btn:active,
+.wake-btn:active {
   transform: scale(0.95);
 }
 
-.pc-shutdown-btn {
+.pc-restart-btn,
+.restart-btn {
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  color: #3b82f6;
+  box-shadow: none;
+}
+
+.pc-restart-btn:hover,
+.restart-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  transform: scale(1.08);
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(59, 130, 246, 0.3);
+}
+
+.pc-restart-btn:active,
+.restart-btn:active {
+  transform: scale(0.95);
+}
+
+.pc-shutdown-btn,
+.shutdown-btn {
   background: rgba(239, 68, 68, 0.1);
   border: 2px solid rgba(239, 68, 68, 0.3);
   color: #ef4444;
   box-shadow: none;
 }
 
-.pc-shutdown-btn:hover {
+.pc-shutdown-btn:hover,
+.shutdown-btn:hover {
   background: rgba(239, 68, 68, 0.2);
   border-color: #ef4444;
   transform: scale(1.08);
   box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(239, 68, 68, 0.3);
 }
 
-.pc-shutdown-btn:active {
+.pc-shutdown-btn:active,
+.shutdown-btn:active {
   transform: scale(0.95);
 }
 
@@ -2385,10 +2446,81 @@ label {
   }
 
   .pc-wake-btn,
-  .pc-shutdown-btn {
+  .pc-restart-btn,
+  .pc-shutdown-btn,
+  .wake-btn,
+  .restart-btn,
+  .shutdown-btn {
     width: 100px;
     height: 100px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Control Device Settings
+   ═══════════════════════════════════════════════════════════════════ */
+
+.control-device-section {
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.control-device-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.control-device-header:hover {
+  background: var(--surface-elevated);
+}
+
+.control-device-header .icon-badge {
+  flex-shrink: 0;
+}
+
+.control-device-header h4 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  flex: 1;
+}
+
+.control-device-header .chevron {
+  transition: transform 0.2s ease;
+  color: var(--text-muted);
+}
+
+.control-device-header.expanded .chevron {
+  transform: rotate(90deg);
+}
+
+.control-device-body {
+  padding: 18px;
+  display: none;
+}
+
+.control-device-body.expanded {
+  display: block;
+}
+
+.control-device-body .input-row {
+  margin-bottom: 14px;
+}
+
+.control-device-body .input-row label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

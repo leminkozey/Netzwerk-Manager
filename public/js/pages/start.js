@@ -3,7 +3,7 @@
 // =================================================================
 
 import { t } from '../i18n.js';
-import { el, showToast, showConfirm } from '../ui.js';
+import { el, showToast } from '../ui.js';
 import { icon, iconEl } from '../icons.js';
 import * as api from '../api.js';
 
@@ -27,6 +27,13 @@ function statusIcon(status) {
   return icon('unknown', 14);
 }
 
+// ── Success message mapping ──
+
+const ACTION_SUCCESS_KEYS = {
+  wake: 'control.wakeSuccess',
+  shutdown: 'control.shutdownSuccess',
+  restart: 'control.restartSuccess',
+};
 
 // ── Section Title ──
 
@@ -36,75 +43,34 @@ function buildSectionTitle(text) {
   ]);
 }
 
-// ── Windows PC Tile ──
+// ── Generic Device Tile ──
 
-function buildWindowsPCTile() {
-  let pcStatus = 'unknown';
-  let pcConfig = { name: '...', ip: '...', mac: '...' };
-
+function buildDeviceTile(device) {
   // Status indicator
   const statusText = el('span', { className: 'status-text', textContent: statusLabel('unknown') });
   const statusIconSpan = el('span', { className: 'status-icon-wrap', innerHTML: statusIcon('unknown') });
 
   const statusContainer = el('div', {
-    className: 'device-tile-status pc-status',
+    className: 'device-tile-status device-status',
   }, [statusIconSpan, statusText]);
 
-  // Device info fields
-  const nameValue = el('span', { className: 'pc-info-value', textContent: '...' });
-  const ipValue = el('span', { className: 'pc-info-value', textContent: '...' });
-  const macValue = el('span', { className: 'pc-info-value', textContent: '...' });
-
-  const infoGrid = el('div', { className: 'pc-info-grid' }, [
-    el('div', { className: 'pc-info-item' }, [
-      el('span', { className: 'pc-info-label', textContent: t('pc.name') }),
-      nameValue,
-    ]),
-    el('div', { className: 'pc-info-item' }, [
-      el('span', { className: 'pc-info-label', textContent: t('pc.ip') }),
-      ipValue,
-    ]),
-    el('div', { className: 'pc-info-item', style: { gridColumn: '1 / -1' } }, [
-      el('span', { className: 'pc-info-label', textContent: t('pc.mac') }),
-      macValue,
-    ]),
-  ]);
-
   // Action buttons
-  const wakeBtn = el('button', {
-    className: 'action-circle wake-btn pc-wake-btn',
-    onClick: async () => {
-      try {
-        await api.wakeWindowsPC();
-        showToast(t('pc.wakeSuccess'));
-      } catch {
-        showToast(t('pc.connectionError'), true);
-      }
-    },
-  }, [iconEl('wake', 32), el('span', { textContent: t('pc.wake') })]);
-
-  const shutdownBtn = el('button', {
-    className: 'action-circle shutdown-btn pc-shutdown-btn',
-    onClick: () => {
-      showConfirm(
-        t('pc.shutdown'),
-        t('msg.confirmShutdown'),
-        async () => {
-          try {
-            await api.shutdownWindowsPC();
-            showToast(t('pc.shutdownSuccess'));
-          } catch {
-            showToast(t('pc.connectionError'), true);
-          }
+  const actionButtons = (device.actions || []).map(action => {
+    const btnClass = `action-circle ${action}-btn`;
+    return el('button', {
+      className: btnClass,
+      onClick: async () => {
+        try {
+          await api.controlDeviceAction(device.id, action);
+          showToast(t(ACTION_SUCCESS_KEYS[action] || 'msg.success'));
+        } catch {
+          showToast(t('control.connectionError'), true);
         }
-      );
-    },
-  }, [iconEl('shutdown', 32), el('span', { textContent: t('pc.shutdown') })]);
+      },
+    }, [iconEl(action, 32), el('span', { textContent: t(`control.${action}`) })]);
+  });
 
-  const actionsRow = el('div', { className: 'device-tile-actions pc-buttons' }, [
-    wakeBtn,
-    shutdownBtn,
-  ]);
+  const actionsRow = el('div', { className: 'device-tile-actions' }, actionButtons);
 
   // Header with icon and status
   const tileHeader = el('div', {
@@ -112,39 +78,27 @@ function buildWindowsPCTile() {
     style: { flexWrap: 'wrap', gap: '12px' },
   }, [
     el('div', { className: 'section-header' }, [
-      el('span', { className: 'icon-badge', innerHTML: icon('windowsColor', 22) }),
-      el('h3', { textContent: t('card.windowspc') }),
+      el('span', { className: 'icon-badge', innerHTML: icon(device.icon || 'windowsColor', 22) }),
+      el('h3', { textContent: device.name }),
     ]),
     statusContainer,
   ]);
 
   // Full tile card
-  const tile = el('div', { className: 'device-tile card windows-pc-card' }, [
+  const tile = el('div', { className: 'device-tile card' }, [
     tileHeader,
-    el('div', { className: 'pc-control-grid' }, [
-      actionsRow,
-      infoGrid,
-    ]),
+    actionsRow,
   ]);
 
   // Update status UI
   function updateStatus(status) {
-    pcStatus = status;
     const cls = statusClass(status);
-    statusContainer.className = `device-tile-status pc-status ${cls}`;
+    statusContainer.className = `device-tile-status device-status ${cls}`;
     statusText.textContent = statusLabel(status);
     statusIconSpan.innerHTML = statusIcon(status);
   }
 
-  // Update config UI
-  function updateConfig(config) {
-    pcConfig = config;
-    nameValue.textContent = config.name || config.hostname || 'Windows PC';
-    ipValue.textContent = config.ip || '-';
-    macValue.textContent = config.mac || '-';
-  }
-
-  return { tile, updateStatus, updateConfig };
+  return { tile, updateStatus, deviceId: device.id };
 }
 
 // ── Placeholder Section ──
@@ -195,9 +149,26 @@ export function renderStart(container) {
   // Section: Gerätesteuerung
   page.appendChild(buildSectionTitle(t('section.control')));
 
-  // Windows PC tile
-  const { tile, updateStatus, updateConfig } = buildWindowsPCTile();
-  page.appendChild(tile);
+  // Build tiles from config
+  const devices = (typeof siteConfig !== 'undefined' && Array.isArray(siteConfig.controlDevices))
+    ? siteConfig.controlDevices
+    : [];
+
+  const tiles = [];
+
+  if (devices.length === 0) {
+    page.appendChild(el('p', {
+      className: 'muted',
+      textContent: t('control.noDevices'),
+      style: { textAlign: 'center', padding: '20px 0' },
+    }));
+  } else {
+    for (const device of devices) {
+      const { tile, updateStatus, deviceId } = buildDeviceTile(device);
+      tiles.push({ updateStatus, deviceId });
+      page.appendChild(tile);
+    }
+  }
 
   // Placeholder section
   page.appendChild(el('div', { style: { marginTop: '32px' } }));
@@ -206,27 +177,21 @@ export function renderStart(container) {
 
   container.appendChild(page);
 
-  // ── Load config ──
-  (async () => {
-    try {
-      const config = await api.getWindowsPC();
-      if (!destroyed) updateConfig(config);
-    } catch {
-      // Config not available yet
-    }
-  })();
-
   // ── Status polling ──
   async function pollStatus() {
-    if (destroyed) return;
-    try {
-      const result = await api.getWindowsPCStatus();
-      if (!destroyed) {
-        updateStatus(result.online ? 'online' : 'offline');
-      }
-    } catch {
-      if (!destroyed) {
-        updateStatus('unknown');
+    if (destroyed || tiles.length === 0) return;
+
+    const results = await Promise.allSettled(
+      tiles.map(tile => api.getControlDeviceStatus(tile.deviceId))
+    );
+
+    for (let i = 0; i < tiles.length; i++) {
+      if (destroyed) return;
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        tiles[i].updateStatus(result.value.online ? 'online' : 'offline');
+      } else {
+        tiles[i].updateStatus('unknown');
       }
     }
   }

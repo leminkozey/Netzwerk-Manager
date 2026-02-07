@@ -87,6 +87,27 @@ const siteConfig = {
   ],
 
   // ══════════════════════════════════════════════
+  // GERÄTESTEUERUNG (Control Center)
+  // ══════════════════════════════════════════════
+  // Geräte die über das Control Center gesteuert werden können
+  // id: eindeutiger Schlüssel (lowercase, keine Leerzeichen)
+  // name: Anzeigename
+  // icon: Icon-Name aus icons.js (z.B. 'windowsColor', 'server')
+  // type: 'ssh-windows' | 'ssh-linux'
+  // ip: IP-Adresse des Geräts
+  // actions: Array von Aktionen ('wake', 'restart', 'shutdown')
+  controlDevices: [
+    {
+      id: 'windowspc',
+      name: 'Windows PC',
+      icon: 'windowsColor',
+      type: 'ssh-windows',
+      ip: '192.168.2.137',
+      actions: ['wake', 'restart', 'shutdown'],
+    },
+  ],
+
+  // ══════════════════════════════════════════════
   // HEADER LINKS
   // ══════════════════════════════════════════════
   // Links erscheinen in der Topbar mit Favicon

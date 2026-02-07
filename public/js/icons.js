@@ -124,6 +124,23 @@ export const icons = {
     <rect x="13" y="13" width="8" height="8" rx="1"/>
   </svg>`,
 
+  // ── Server (for future NAS/server devices) ──
+  server: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="2" width="20" height="8" rx="2"/>
+    <rect x="2" y="14" width="20" height="8" rx="2"/>
+    <line x1="6" y1="6" x2="6.01" y2="6"/>
+    <line x1="6" y1="18" x2="6.01" y2="18"/>
+  </svg>`,
+
+  serverColor: `<svg viewBox="0 0 24 24" fill="none">
+    <rect x="2" y="2" width="20" height="8" rx="2" fill="#6366f1" stroke="#818cf8" stroke-width="0.5"/>
+    <rect x="2" y="14" width="20" height="8" rx="2" fill="#6366f1" stroke="#818cf8" stroke-width="0.5"/>
+    <circle cx="6" cy="6" r="1" fill="#22c55e"/>
+    <circle cx="6" cy="18" r="1" fill="#22c55e"/>
+    <rect x="10" y="5" width="8" height="2" rx="0.5" fill="#fff" opacity="0.2"/>
+    <rect x="10" y="17" width="8" height="2" rx="0.5" fill="#fff" opacity="0.2"/>
+  </svg>`,
+
   // ── Actions ──
   wake: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="5"/>
@@ -140,6 +157,13 @@ export const icons = {
   shutdown: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
     <line x1="12" y1="2" x2="12" y2="12"/>
+  </svg>`,
+
+  restart: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 2v6h-6"/>
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+    <path d="M3 22v-6h6"/>
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
   </svg>`,
 
   // ── Settings ──

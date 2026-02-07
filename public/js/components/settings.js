@@ -44,6 +44,7 @@ function openSettings() {
         el('div', { className: 'settings-content', id: 'settingsContent' }, [
           createDesignPanel(),
           createAnalysenPanel(),
+          createControlPanel(),
           createDataPanel(),
           createSessionPanel(),
           createUserPanel(),
@@ -68,9 +69,14 @@ function closeSettings() {
 
 function createSidebar() {
   const cfg = getConfig();
+  const hasControlDevices = typeof siteConfig !== 'undefined'
+    && Array.isArray(siteConfig.controlDevices)
+    && siteConfig.controlDevices.length > 0;
+
   const tabs = [
     { id: 'design', icon: 'sun', label: t('settings.design') },
     { id: 'analysen', icon: 'analysen', label: t('settings.analysen') },
+    ...(hasControlDevices ? [{ id: 'control', icon: 'start', label: t('settings.controlDevices') }] : []),
     { id: 'daten', icon: 'copy', label: t('settings.data') },
     { id: 'session', icon: 'uptime', label: t('settings.session') },
     { id: 'user', icon: 'settings', label: t('settings.user') },
@@ -320,6 +326,106 @@ async function loadUptimeResetButtons(container) {
       className: 'muted',
       textContent: t('settings.uptimeNoDevices'),
     }));
+  }
+}
+
+// ── Control Panel ──
+function createControlPanel() {
+  const devices = (typeof siteConfig !== 'undefined' && Array.isArray(siteConfig.controlDevices))
+    ? siteConfig.controlDevices
+    : [];
+
+  const sections = devices.map(device => createControlDeviceSection(device));
+
+  return el('div', { className: 'settings-panel', id: 'panel-control' }, [
+    el('h4', { textContent: t('settings.controlDevices') }),
+    el('p', { className: 'setting-description', textContent: t('settings.controlDevicesDesc') }),
+    ...sections,
+  ]);
+}
+
+function createControlDeviceSection(device) {
+  const header = el('div', { className: 'control-device-header' }, [
+    el('span', { className: 'icon-badge', innerHTML: icon(device.icon || 'windowsColor', 18) }),
+    el('h4', { textContent: device.name }),
+    el('span', { className: 'chevron', innerHTML: icon('back', 14), style: { transform: 'rotate(0deg)' } }),
+  ]);
+
+  const body = el('div', { className: 'control-device-body' });
+  let loaded = false;
+
+  header.addEventListener('click', () => {
+    const isExpanded = body.classList.contains('expanded');
+    if (isExpanded) {
+      body.classList.remove('expanded');
+      header.classList.remove('expanded');
+    } else {
+      body.classList.add('expanded');
+      header.classList.add('expanded');
+      if (!loaded) {
+        loaded = true;
+        loadControlDeviceForm(device, body);
+      }
+    }
+  });
+
+  return el('div', { className: 'control-device-section' }, [header, body]);
+}
+
+async function loadControlDeviceForm(device, container) {
+  try {
+    const data = await api.getControlDevice(device.id);
+
+    const macInput = el('input', { type: 'text', value: data.macAddress || '', placeholder: 'AA:BB:CC:DD:EE:FF' });
+    const userInput = el('input', { type: 'text', value: data.sshUser || '', placeholder: 'admin' });
+    const passInput = el('input', { type: 'password', value: '', placeholder: data.hasPassword ? '••••••••' : '' });
+    const portInput = el('input', { type: 'number', value: String(data.sshPort || 22), min: '1', max: '65535' });
+
+    const form = el('form', {}, [
+      el('div', { className: 'input-row' }, [
+        el('label', { textContent: t('control.macAddress') }),
+        macInput,
+      ]),
+      el('div', { className: 'input-row' }, [
+        el('label', { textContent: t('control.sshUser') }),
+        userInput,
+      ]),
+      el('div', { className: 'input-row' }, [
+        el('label', { textContent: t('control.sshPassword') }),
+        passInput,
+      ]),
+      el('div', { className: 'input-row' }, [
+        el('label', { textContent: t('control.sshPort') }),
+        portInput,
+      ]),
+      el('div', { className: 'actions', style: { marginTop: '12px' } }, [
+        el('button', { className: 'btn', type: 'submit', textContent: t('settings.save') }),
+      ]),
+    ]);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        macAddress: macInput.value.trim(),
+        sshUser: userInput.value.trim(),
+        sshPort: parseInt(portInput.value, 10) || 22,
+      };
+      if (passInput.value) {
+        payload.sshPassword = passInput.value;
+      }
+      try {
+        await api.saveControlDevice(device.id, payload);
+        showToast(t('msg.saved'));
+        passInput.value = '';
+        passInput.placeholder = '••••••••';
+      } catch {
+        showToast(t('msg.error'), true);
+      }
+    });
+
+    container.appendChild(form);
+  } catch {
+    container.appendChild(el('span', { className: 'muted', textContent: t('msg.error') }));
   }
 }
 

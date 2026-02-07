@@ -113,6 +113,7 @@ const DATA_FILE = path.join(DATA_DIR, 'state.json');
 const USER_FILE = path.join(DATA_DIR, 'Nutzer');
 const LOGIN_TOKEN_FILE = path.join(DATA_DIR, 'LoginToken.txt');
 const WINDOWS_PC_FILE = path.join(DATA_DIR, 'WindowsPC.json');
+const CONTROL_DEVICES_FILE = path.join(DATA_DIR, 'ControlDevices.json');
 const UPTIME_FILE = path.join(DATA_DIR, 'uptime.json');
 const CONFIG_FILE = path.join(__dirname, 'public', 'config.js');
 const MAX_VERSIONS = 100;
@@ -928,7 +929,7 @@ function buildUptimeResponse() {
   return { devices, outages };
 }
 
-function shutdownWindowsPC(config) {
+function sshCommand(config, command) {
   return new Promise((resolve, reject) => {
     const { ipAddress, sshUser, sshPort } = config;
     const sshPassword = config._sshPasswordDecrypted || decryptValue(config.sshPassword);
@@ -955,7 +956,7 @@ function shutdownWindowsPC(config) {
       '-o', 'BatchMode=no',
       '-p', String(sshPort),
       `${sshUser}@${ipAddress}`,
-      'shutdown /s /t 0'
+      command
     ];
 
     // -e flag reads password from SSHPASS environment variable
@@ -988,6 +989,107 @@ function shutdownWindowsPC(config) {
       }
     });
   });
+}
+
+function shutdownWindowsPC(config) {
+  return sshCommand(config, 'shutdown /s /t 0');
+}
+
+function restartWindowsPC(config) {
+  return sshCommand(config, 'shutdown /r /t 0');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Generic Control Devices
+// ═══════════════════════════════════════════════════════════════════
+
+// Command mapping per device type
+const DEVICE_COMMANDS = {
+  'ssh-windows': {
+    shutdown: 'shutdown /s /t 0',
+    restart: 'shutdown /r /t 0',
+  },
+  'ssh-linux': {
+    shutdown: 'sudo shutdown -h now',
+    restart: 'sudo reboot',
+  },
+};
+
+function getDeviceCommand(type, action) {
+  return DEVICE_COMMANDS[type]?.[action] || null;
+}
+
+function readControlDevicesData() {
+  try {
+    if (fs.existsSync(CONTROL_DEVICES_FILE)) {
+      return JSON.parse(fs.readFileSync(CONTROL_DEVICES_FILE, 'utf-8'));
+    }
+  } catch { /* ignore */ }
+  return {};
+}
+
+function saveControlDevicesData(data) {
+  fs.writeFileSync(CONTROL_DEVICES_FILE, JSON.stringify(data, null, 2));
+}
+
+function readControlDeviceCredentials(deviceId) {
+  const data = readControlDevicesData();
+  const creds = data[deviceId] || { macAddress: '', sshUser: '', sshPassword: '', sshPort: 22 };
+  if (creds.sshPassword) {
+    creds._sshPasswordDecrypted = decryptValue(creds.sshPassword);
+  }
+  return creds;
+}
+
+function saveControlDeviceCredentials(deviceId, creds) {
+  const data = readControlDevicesData();
+  const toSave = { ...creds };
+  if (toSave.sshPassword && !toSave.sshPassword.startsWith('enc:')) {
+    toSave.sshPassword = encryptValue(toSave.sshPassword);
+  }
+  delete toSave._sshPasswordDecrypted;
+  data[deviceId] = toSave;
+  saveControlDevicesData(data);
+}
+
+function readControlDevicesFromConfig() {
+  const cfg = readSiteConfig();
+  const devices = cfg?.controlDevices;
+  if (!Array.isArray(devices)) return [];
+  return devices.filter(d =>
+    d && typeof d.id === 'string' && d.id.length > 0
+      && typeof d.name === 'string' && d.name.length > 0
+      && typeof d.type === 'string'
+      && typeof d.ip === 'string' && VALIDATION.ipAddress.test(d.ip)
+      && Array.isArray(d.actions)
+  );
+}
+
+function logControlAction(deviceId, action, ip, success, details = '') {
+  const timestamp = new Date().toISOString();
+  console.log(`[CONTROL-AUDIT] ${timestamp} | ${deviceId} | ${action} | IP: ${ip} | Success: ${success} | ${details}`);
+}
+
+function migrateWindowsPCToControlDevices() {
+  // Only migrate if ControlDevices.json does not exist yet
+  if (fs.existsSync(CONTROL_DEVICES_FILE)) return;
+
+  const data = {};
+  if (fs.existsSync(WINDOWS_PC_FILE)) {
+    try {
+      const old = JSON.parse(fs.readFileSync(WINDOWS_PC_FILE, 'utf-8'));
+      if (old.macAddress || old.sshUser || old.sshPassword) {
+        data.windowspc = {
+          macAddress: old.macAddress || '',
+          sshUser: old.sshUser || '',
+          sshPassword: old.sshPassword || '',
+          sshPort: old.sshPort || 22,
+        };
+        console.log('[MIGRATION] Migrated WindowsPC.json → ControlDevices.json');
+      }
+    } catch { /* ignore */ }
+  }
+  saveControlDevicesData(data);
 }
 
 app.get('/api/bootstrap', (req, res) => {
@@ -1571,44 +1673,41 @@ app.post('/api/import', authRequired, async (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-// Windows PC Endpoints
+// Generic Control Device Endpoints
 // ═══════════════════════════════════════════════════════════════════
 
-// GET config - NEVER return password
-app.get('/api/windows-pc', authRequired, (req, res) => {
-  const config = readWindowsPCConfig();
+// GET device config + credentials (no password)
+app.get('/api/control/:deviceId', authRequired, (req, res) => {
+  const deviceId = req.params.deviceId;
+  const configDevices = readControlDevicesFromConfig();
+  const device = configDevices.find(d => d.id === deviceId);
+  if (!device) return res.status(404).json({ error: 'Device not found' });
+
+  const creds = readControlDeviceCredentials(deviceId);
   res.json({
-    name: config.name,
-    ipAddress: config.ipAddress,
-    macAddress: config.macAddress,
-    sshUser: config.sshUser,
-    hasPassword: Boolean(config.sshPassword), // Only indicate if password is set
-    sshPort: config.sshPort,
+    id: device.id,
+    name: device.name,
+    type: device.type,
+    ip: device.ip,
+    actions: device.actions,
+    macAddress: creds.macAddress || '',
+    sshUser: creds.sshUser || '',
+    hasPassword: Boolean(creds.sshPassword),
+    sshPort: creds.sshPort || 22,
   });
 });
 
-// GET password - reveal SSH password (authenticated, decrypted)
-app.get('/api/windows-pc/password', authRequired, (req, res) => {
-  const config = readWindowsPCConfig();
-  res.json({
-    password: config._sshPasswordDecrypted || '',
-  });
-});
-
-// POST config - with input validation
-app.post('/api/windows-pc', authRequired, (req, res) => {
+// POST save credentials
+app.post('/api/control/:deviceId', authRequired, (req, res) => {
+  const deviceId = req.params.deviceId;
   const clientIp = getClientIp(req);
-  const { name, ipAddress, macAddress, sshUser, sshPassword, sshPort } = req.body || {};
+  const configDevices = readControlDevicesFromConfig();
+  const device = configDevices.find(d => d.id === deviceId);
+  if (!device) return res.status(404).json({ error: 'Device not found' });
 
-  // Validate all inputs
+  const { macAddress, sshUser, sshPassword, sshPort } = req.body || {};
   const errors = [];
 
-  if (name !== undefined && !validateWindowsPCInput('name', name)) {
-    errors.push('Ungültiger Name (nur Buchstaben, Zahlen, Leerzeichen, max 50 Zeichen)');
-  }
-  if (ipAddress !== undefined && ipAddress !== '' && !validateWindowsPCInput('ipAddress', ipAddress)) {
-    errors.push('Ungültige IP-Adresse (Format: xxx.xxx.xxx.xxx)');
-  }
   if (macAddress !== undefined && macAddress !== '' && !validateWindowsPCInput('macAddress', macAddress)) {
     errors.push('Ungültige MAC-Adresse (Format: XX:XX:XX:XX:XX:XX)');
   }
@@ -1623,100 +1722,113 @@ app.post('/api/windows-pc', authRequired, (req, res) => {
   }
 
   if (errors.length > 0) {
-    logPCAction('CONFIG_UPDATE', clientIp, false, `Validation failed: ${errors.join(', ')}`);
+    logControlAction(deviceId, 'CONFIG_UPDATE', clientIp, false, `Validation failed: ${errors.join(', ')}`);
     return res.status(400).json({ ok: false, errors });
   }
 
-  const config = readWindowsPCConfig();
+  const creds = readControlDeviceCredentials(deviceId);
+  if (macAddress !== undefined) creds.macAddress = macAddress.toUpperCase();
+  if (sshUser !== undefined) creds.sshUser = sshUser;
+  if (sshPassword !== undefined) creds.sshPassword = sshPassword;
+  if (sshPort !== undefined) creds.sshPort = parseInt(sshPort, 10) || 22;
+  delete creds._sshPasswordDecrypted;
 
-  if (name !== undefined) config.name = name;
-  if (ipAddress !== undefined) config.ipAddress = ipAddress;
-  if (macAddress !== undefined) config.macAddress = macAddress.toUpperCase();
-  if (sshUser !== undefined) config.sshUser = sshUser;
-  if (sshPassword !== undefined) config.sshPassword = sshPassword;
-  if (sshPort !== undefined) config.sshPort = parseInt(sshPort, 10) || 22;
+  saveControlDeviceCredentials(deviceId, creds);
+  logControlAction(deviceId, 'CONFIG_UPDATE', clientIp, true, 'Credentials updated');
 
-  saveWindowsPCConfig(config);
-  logPCAction('CONFIG_UPDATE', clientIp, true, 'Config updated');
-
-  // Return config without password
   res.json({
     ok: true,
-    config: {
-      name: config.name,
-      ipAddress: config.ipAddress,
-      macAddress: config.macAddress,
-      sshUser: config.sshUser,
-      hasPassword: Boolean(config.sshPassword),
-      sshPort: config.sshPort,
-    },
+    macAddress: creds.macAddress || '',
+    sshUser: creds.sshUser || '',
+    hasPassword: Boolean(creds.sshPassword),
+    sshPort: creds.sshPort || 22,
   });
 });
 
-// GET status - with lenient rate limiting
-app.get('/api/windows-pc/status', authRequired, async (req, res) => {
+// GET status - ping check
+app.get('/api/control/:deviceId/status', authRequired, async (req, res) => {
+  const deviceId = req.params.deviceId;
   const clientIp = getClientIp(req);
 
   if (!checkPCStatusRateLimit(clientIp)) {
     return res.status(429).json({ online: false, error: 'Zu viele Anfragen' });
   }
 
-  const config = readWindowsPCConfig();
-  if (!config.ipAddress) {
-    return res.json({ online: false, configured: false });
-  }
+  const configDevices = readControlDevicesFromConfig();
+  const device = configDevices.find(d => d.id === deviceId);
+  if (!device) return res.status(404).json({ online: false, error: 'Device not found' });
 
-  const online = await pingHost(config.ipAddress);
+  const online = await pingHost(device.ip);
   res.json({ online, configured: true });
 });
 
-// POST wake - with rate limiting and audit logging
-app.post('/api/windows-pc/wake', authRequired, async (req, res) => {
-  const clientIp = getClientIp(req);
-
-  if (!checkPCActionRateLimit(clientIp)) {
-    logPCAction('WAKE', clientIp, false, 'Rate limited');
-    return res.status(429).json({ success: false, message: 'Zu viele Anfragen. Bitte warten.' });
-  }
-
-  const config = readWindowsPCConfig();
-  if (!config.macAddress) {
-    logPCAction('WAKE', clientIp, false, 'No MAC configured');
-    return res.status(400).json({ success: false, message: 'Keine MAC-Adresse konfiguriert' });
-  }
-
-  try {
-    await sendWakeOnLan(config.macAddress);
-    logPCAction('WAKE', clientIp, true, `MAC: ${config.macAddress}`);
-    res.json({ success: true, message: 'Wake-on-LAN Paket gesendet!' });
-  } catch (err) {
-    logPCAction('WAKE', clientIp, false, 'Send failed');
-    res.status(500).json({ success: false, message: 'Fehler beim Senden des Wake-Pakets' });
-  }
+// GET password - reveal decrypted SSH password
+app.get('/api/control/:deviceId/password', authRequired, (req, res) => {
+  const deviceId = req.params.deviceId;
+  const creds = readControlDeviceCredentials(deviceId);
+  res.json({ password: creds._sshPasswordDecrypted || '' });
 });
 
-// POST shutdown - with rate limiting and audit logging
-app.post('/api/windows-pc/shutdown', authRequired, async (req, res) => {
+// POST action - execute wake/restart/shutdown
+app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
+  const { deviceId, action } = req.params;
   const clientIp = getClientIp(req);
 
   if (!checkPCActionRateLimit(clientIp)) {
-    logPCAction('SHUTDOWN', clientIp, false, 'Rate limited');
+    logControlAction(deviceId, action.toUpperCase(), clientIp, false, 'Rate limited');
     return res.status(429).json({ success: false, message: 'Zu viele Anfragen. Bitte warten.' });
   }
 
-  const config = readWindowsPCConfig();
-  if (!config.ipAddress || !config.sshUser || !config.sshPassword) {
-    logPCAction('SHUTDOWN', clientIp, false, 'Incomplete SSH config');
+  const configDevices = readControlDevicesFromConfig();
+  const device = configDevices.find(d => d.id === deviceId);
+  if (!device) return res.status(404).json({ success: false, message: 'Device not found' });
+  if (!device.actions.includes(action)) {
+    return res.status(400).json({ success: false, message: 'Action not supported' });
+  }
+
+  const creds = readControlDeviceCredentials(deviceId);
+
+  // Wake action
+  if (action === 'wake') {
+    if (!creds.macAddress) {
+      logControlAction(deviceId, 'WAKE', clientIp, false, 'No MAC configured');
+      return res.status(400).json({ success: false, message: 'Keine MAC-Adresse konfiguriert' });
+    }
+    try {
+      await sendWakeOnLan(creds.macAddress);
+      logControlAction(deviceId, 'WAKE', clientIp, true, `MAC: ${creds.macAddress}`);
+      return res.json({ success: true, message: 'Wake-on-LAN Paket gesendet!' });
+    } catch {
+      logControlAction(deviceId, 'WAKE', clientIp, false, 'Send failed');
+      return res.status(500).json({ success: false, message: 'Fehler beim Senden des Wake-Pakets' });
+    }
+  }
+
+  // SSH actions (shutdown, restart)
+  const command = getDeviceCommand(device.type, action);
+  if (!command) {
+    return res.status(400).json({ success: false, message: 'Unknown command for device type' });
+  }
+
+  if (!device.ip || !creds.sshUser || !creds.sshPassword) {
+    logControlAction(deviceId, action.toUpperCase(), clientIp, false, 'Incomplete SSH config');
     return res.status(400).json({ success: false, message: 'SSH-Zugangsdaten nicht vollständig' });
   }
 
+  const sshConfig = {
+    ipAddress: device.ip,
+    sshUser: creds.sshUser,
+    sshPassword: creds.sshPassword,
+    sshPort: creds.sshPort || 22,
+  };
+
   try {
-    await shutdownWindowsPC(config);
-    logPCAction('SHUTDOWN', clientIp, true, `Target: ${config.ipAddress}`);
-    res.json({ success: true, message: 'Shutdown-Befehl gesendet!' });
-  } catch (err) {
-    logPCAction('SHUTDOWN', clientIp, false, 'SSH failed');
-    res.status(500).json({ success: false, message: 'Shutdown fehlgeschlagen' });
+    await sshCommand(sshConfig, command);
+    logControlAction(deviceId, action.toUpperCase(), clientIp, true, `Target: ${device.ip}`);
+    res.json({ success: true, message: `${action}-Befehl gesendet!` });
+  } catch {
+    logControlAction(deviceId, action.toUpperCase(), clientIp, false, 'SSH failed');
+    res.status(500).json({ success: false, message: `${action} fehlgeschlagen` });
   }
 });
 
@@ -1864,4 +1976,5 @@ function startServer() {
 
 // Server starten
 ensureDataFile();
+migrateWindowsPCToControlDevices();
 startServer();

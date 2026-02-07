@@ -162,41 +162,38 @@ export async function getSpeedtestHistory() {
   return res.json();
 }
 
-// ── Windows PC ──
+// ── Control Devices ──
 
-export async function getWindowsPC() {
-  const res = await request('/api/windows-pc');
-  if (!res.ok) throw new Error('Failed to get PC config');
+export async function getControlDevice(deviceId) {
+  const res = await request(`/api/control/${encodeURIComponent(deviceId)}`);
+  if (!res.ok) throw new Error('Failed to get device config');
   return res.json();
 }
 
-export async function getWindowsPCPassword() {
-  const res = await request('/api/windows-pc/password');
+export async function getControlDevicePassword(deviceId) {
+  const res = await request(`/api/control/${encodeURIComponent(deviceId)}/password`);
   if (!res.ok) throw new Error('Failed to get password');
   return res.json();
 }
 
-export async function saveWindowsPC(config) {
-  const res = await request('/api/windows-pc', {
+export async function saveControlDevice(deviceId, config) {
+  const res = await request(`/api/control/${encodeURIComponent(deviceId)}`, {
     method: 'POST',
     body: JSON.stringify(config),
   });
   return res.json();
 }
 
-export async function getWindowsPCStatus() {
-  const res = await request('/api/windows-pc/status');
+export async function getControlDeviceStatus(deviceId) {
+  const res = await request(`/api/control/${encodeURIComponent(deviceId)}/status`);
   if (!res.ok) return { online: false };
   return res.json();
 }
 
-export async function wakeWindowsPC() {
-  const res = await request('/api/windows-pc/wake', { method: 'POST' });
-  return res.json();
-}
-
-export async function shutdownWindowsPC() {
-  const res = await request('/api/windows-pc/shutdown', { method: 'POST' });
+export async function controlDeviceAction(deviceId, action) {
+  const res = await request(`/api/control/${encodeURIComponent(deviceId)}/${encodeURIComponent(action)}`, {
+    method: 'POST',
+  });
   return res.json();
 }
 
