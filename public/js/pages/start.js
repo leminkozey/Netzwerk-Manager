@@ -4,7 +4,7 @@
 
 import { t } from '../i18n.js';
 import { el, showToast } from '../ui.js';
-import { icon, iconEl } from '../icons.js';
+import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 
 // ── Helpers ──
@@ -21,10 +21,10 @@ function statusLabel(status) {
   return t('pc.status.checking');
 }
 
-function statusIcon(status) {
-  if (status === 'online') return icon('online', 14);
-  if (status === 'offline') return icon('offline', 14);
-  return icon('unknown', 14);
+function statusIconNode(status) {
+  if (status === 'online') return iconEl('online', 14);
+  if (status === 'offline') return iconEl('offline', 14);
+  return iconEl('unknown', 14);
 }
 
 // ── Success message mapping ──
@@ -48,7 +48,7 @@ function buildSectionTitle(text) {
 function buildDeviceTile(device) {
   // Status indicator
   const statusText = el('span', { className: 'status-text', textContent: statusLabel('unknown') });
-  const statusIconSpan = el('span', { className: 'status-icon-wrap', innerHTML: statusIcon('unknown') });
+  const statusIconSpan = el('span', { className: 'status-icon-wrap' }, [statusIconNode('unknown')]);
 
   const statusContainer = el('div', {
     className: 'device-tile-status device-status',
@@ -78,7 +78,7 @@ function buildDeviceTile(device) {
     style: { flexWrap: 'wrap', gap: '12px' },
   }, [
     el('div', { className: 'section-header' }, [
-      el('span', { className: 'icon-badge', innerHTML: icon(device.icon || 'windowsColor', 22) }),
+      el('span', { className: 'icon-badge' }, [iconEl(device.icon || 'windowsColor', 22)]),
       el('h3', { textContent: device.name }),
     ]),
     statusContainer,
@@ -95,7 +95,7 @@ function buildDeviceTile(device) {
     const cls = statusClass(status);
     statusContainer.className = `device-tile-status device-status ${cls}`;
     statusText.textContent = statusLabel(status);
-    statusIconSpan.innerHTML = statusIcon(status);
+    statusIconSpan.replaceChildren(statusIconNode(status));
   }
 
   return { tile, updateStatus, deviceId: device.id };

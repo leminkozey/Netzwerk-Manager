@@ -7,7 +7,7 @@ import { initRouter, registerRoute, setContentElement, setBeforeNavigate, naviga
 import { t, initI18n } from './i18n.js';
 import { loadLocalSettings, el, applyTheme } from './ui.js';
 import { isLoggedIn, handleLogin, tryAutoLogin } from './auth.js';
-import { icon } from './icons.js';
+import { iconEl } from './icons.js';
 import { initSettings } from './components/settings.js';
 import { renderLanding } from './pages/landing.js';
 import { renderInfo } from './pages/info.js';
@@ -164,10 +164,9 @@ function updateFloatBar() {
   if (titleKey) {
     floatBarContext.appendChild(el('button', {
       className: 'float-bar-back',
-      innerHTML: icon('back', 18),
       'aria-label': 'Back',
       onClick: () => navigate('/'),
-    }));
+    }, [iconEl('back', 18)]));
     floatBarContext.style.display = '';
   } else {
     floatBarContext.style.display = 'none';
@@ -203,9 +202,8 @@ function showAppChrome() {
     el('button', {
       className: 'settings-float-btn',
       'aria-label': t('app.settings'),
-      innerHTML: icon('settings', 20),
       onClick: () => window.dispatchEvent(new CustomEvent('open-settings')),
-    }),
+    }, [iconEl('settings', 20)]),
     floatBarContext,
   ]);
 

@@ -4,7 +4,7 @@
 
 import { t } from '../i18n.js';
 import { el, showToast } from '../ui.js';
-import { icon, iconEl } from '../icons.js';
+import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 
 // =================================================================
@@ -75,7 +75,7 @@ function sectionTitle(titleText, iconName, badge) {
   const colorClass = iconName in iconColors ? iconColors[iconName] : 'icon-cyan';
   const children = [
     el('div', { className: 'section-header' }, [
-      el('span', { className: `icon-badge ${colorClass}`, innerHTML: icon(iconName, 22) }),
+      el('span', { className: `icon-badge ${colorClass}` }, [iconEl(iconName, 22)]),
       el('h3', { textContent: titleText }),
     ]),
   ];
@@ -485,7 +485,7 @@ function buildOutagesCardFromData(outages) {
   const rows = outages.map(d => {
     const isOngoing = d.ongoing;
     return el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border)' } }, [
-      el('div', { innerHTML: icon('outage', 18), style: { color: isOngoing ? '#ef4444' : 'var(--accent-warm)', flexShrink: '0', display: 'flex', alignItems: 'center' } }),
+      el('div', { style: { color: isOngoing ? '#ef4444' : 'var(--accent-warm)', flexShrink: '0', display: 'flex', alignItems: 'center' } }, [iconEl('outage', 18)]),
       el('div', { style: { flex: '1', minWidth: '0' } }, [
         el('div', { textContent: d.device, style: { fontSize: '0.9rem', fontWeight: '600', color: 'var(--text)' } }),
         el('div', { textContent: d.timestamp, style: { fontSize: '0.78rem', color: 'var(--text-muted)' } }),
@@ -565,7 +565,7 @@ export function renderAnalysen(container) {
 
   rightSide.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
     el('div', { className: 'section-header' }, [
-      el('span', { className: 'icon-badge icon-green', innerHTML: icon('uptime', 22) }),
+      el('span', { className: 'icon-badge icon-green' }, [iconEl('uptime', 22)]),
       el('h3', { textContent: t('analysen.uptime') }),
     ]),
   ]));

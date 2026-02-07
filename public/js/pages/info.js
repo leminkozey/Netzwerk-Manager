@@ -5,7 +5,7 @@
 import { t } from '../i18n.js';
 import { state, on } from '../state.js';
 import { el, showToast, debounce, pickTextColor, copyToClipboard } from '../ui.js';
-import { icon } from '../icons.js';
+import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -13,7 +13,6 @@ import * as api from '../api.js';
 function copyBtn(textFn) {
   return el('button', {
     className: 'copy-btn',
-    innerHTML: icon('copy', 14),
     title: t('ui.copy'),
     onClick: (e) => {
       e.preventDefault();
@@ -21,24 +20,23 @@ function copyBtn(textFn) {
       const val = typeof textFn === 'function' ? textFn() : textFn;
       if (val) copyToClipboard(val);
     },
-  });
+  }, [iconEl('copy', 14)]);
 }
 
 function eyeToggle(input) {
   let visible = false;
   const btn = el('button', {
     className: 'eye-btn',
-    innerHTML: icon('eye', 16),
     title: t('ui.show'),
     onClick: (e) => {
       e.preventDefault();
       e.stopPropagation();
       visible = !visible;
       input.type = visible ? 'text' : 'password';
-      btn.innerHTML = icon(visible ? 'eyeOff' : 'eye', 16);
+      btn.replaceChildren(iconEl(visible ? 'eyeOff' : 'eye', 16));
       btn.title = visible ? t('ui.hide') : t('ui.show');
     },
-  });
+  }, [iconEl('eye', 16)]);
   return btn;
 }
 
@@ -146,7 +144,7 @@ function buildPortCard(title, colorIconName, ports, group) {
   const card = el('section', { className: 'card' }, [
     el('div', { className: 'section-title' }, [
       el('div', { className: 'section-header' }, [
-        el('span', { className: 'icon-badge', innerHTML: icon(colorIconName, 24) }),
+        el('span', { className: 'icon-badge' }, [iconEl(colorIconName, 24)]),
         el('h3', { textContent: title }),
       ]),
     ]),
@@ -210,7 +208,7 @@ function buildPiholeCard() {
   return el('section', { className: 'card service-card' }, [
     el('div', { className: 'section-title' }, [
       el('div', { className: 'section-header' }, [
-        el('span', { className: 'icon-badge', innerHTML: icon('raspberryColor', 26) }),
+        el('span', { className: 'icon-badge' }, [iconEl('raspberryColor', 26)]),
         el('h3', { textContent: t('card.pihole') }),
       ]),
     ]),
@@ -262,7 +260,7 @@ function buildSpeedportCard() {
   return el('section', { className: 'card service-card' }, [
     el('div', { className: 'section-title' }, [
       el('div', { className: 'section-header' }, [
-        el('span', { className: 'icon-badge', innerHTML: icon('speedportColor', 26) }),
+        el('span', { className: 'icon-badge' }, [iconEl('speedportColor', 26)]),
         el('h3', { textContent: t('card.speedport') }),
       ]),
     ]),
@@ -278,7 +276,7 @@ function buildWindowsPCCard() {
 
   const debouncedSave = debounce(async () => {
     try {
-      await api.saveWindowsPC(state.windowsPCInfo || {});
+      await api.saveControlDevice('windowspc', state.windowsPCInfo || {});
       showToast(t('msg.saved'));
     } catch {
       showToast(t('msg.error'), true);
@@ -310,7 +308,7 @@ function buildWindowsPCCard() {
 
   (async () => {
     try {
-      const data = await api.getWindowsPC();
+      const data = await api.getControlDevice('windowspc');
       loaded = true;
       renderInfo(data);
     } catch {
@@ -321,7 +319,7 @@ function buildWindowsPCCard() {
   return el('section', { className: 'card service-card' }, [
     el('div', { className: 'section-title' }, [
       el('div', { className: 'section-header' }, [
-        el('span', { className: 'icon-badge', innerHTML: icon('windowsColor', 26) }),
+        el('span', { className: 'icon-badge' }, [iconEl('windowsColor', 26)]),
         el('h3', { textContent: t('card.windowspc') }),
       ]),
     ]),

@@ -5,7 +5,7 @@
 import { t, setLanguage, getCurrentLang, updateDOM } from '../i18n.js';
 import { state, defaults, STORAGE_KEYS, getConfig } from '../state.js';
 import { el, applyTheme, applyGlowStrength, applyAccentColor, applyButtonStyle, showToast, hexToRgb } from '../ui.js';
-import { icon } from '../icons.js';
+import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 import { handleLogout } from '../auth.js';
 
@@ -32,9 +32,8 @@ function openSettings() {
         el('button', {
           className: 'close-btn',
           'aria-label': 'Close',
-          innerHTML: icon('close', 18),
           onClick: () => closeSettings(),
-        }),
+        }, [iconEl('close', 18)]),
       ]),
       // Body
       el('div', { className: 'settings-body' }, [
@@ -93,7 +92,7 @@ function createSidebar() {
         'data-tab': tab.id,
         onClick: () => switchTab(tab.id),
       }, [
-        el('span', { innerHTML: icon(tab.icon, 18), style: { display: 'flex' } }),
+        el('span', { style: { display: 'flex' } }, [iconEl(tab.icon, 18)]),
         el('span', { textContent: tab.label }),
       ])
     )
@@ -177,7 +176,6 @@ function createThemeSwitcher() {
         className: `theme-option ${value === currentTheme ? 'active' : ''}`,
         'data-value': value,
         'aria-label': `${value} mode`,
-        innerHTML: icon(iconName, 20),
         onClick: () => {
           applyTheme(value, true);
           switcher.setAttribute('data-position', String(i));
@@ -185,7 +183,7 @@ function createThemeSwitcher() {
             b.classList.toggle('active', b.dataset.value === value);
           });
         },
-      });
+      }, [iconEl(iconName, 20)]);
     }),
   ]);
   return switcher;
@@ -241,9 +239,9 @@ function createGlowSlider() {
   });
 
   return el('div', { className: 'glow-control' }, [
-    el('span', { className: 'glow-icon', innerHTML: icon('moon', 18) }),
+    el('span', { className: 'glow-icon' }, [iconEl('moon', 18)]),
     slider,
-    el('span', { className: 'glow-icon', innerHTML: icon('sun', 18), style: { color: 'var(--accent)' } }),
+    el('span', { className: 'glow-icon', style: { color: 'var(--accent)' } }, [iconEl('sun', 18)]),
   ]);
 }
 
@@ -346,9 +344,9 @@ function createControlPanel() {
 
 function createControlDeviceSection(device) {
   const header = el('div', { className: 'control-device-header' }, [
-    el('span', { className: 'icon-badge', innerHTML: icon(device.icon || 'windowsColor', 18) }),
+    el('span', { className: 'icon-badge' }, [iconEl(device.icon || 'windowsColor', 18)]),
     el('h4', { textContent: device.name }),
-    el('span', { className: 'chevron', innerHTML: icon('back', 14), style: { transform: 'rotate(0deg)' } }),
+    el('span', { className: 'chevron', style: { transform: 'rotate(0deg)' } }, [iconEl('back', 14)]),
   ]);
 
   const body = el('div', { className: 'control-device-body' });

@@ -631,47 +631,16 @@ function logPCAction(action, ip, success, details = '') {
   console.log(`[PC-AUDIT] ${timestamp} | ${action} | IP: ${ip} | Success: ${success} | ${details}`);
 }
 
-function readWindowsPCConfig() {
-  if (!fs.existsSync(WINDOWS_PC_FILE)) {
-    const defaultConfig = {
-      macAddress: '',
-      ipAddress: '',
-      sshUser: '',
-      sshPassword: '',
-      sshPort: 22,
-      name: 'Windows PC',
-    };
-    fs.writeFileSync(WINDOWS_PC_FILE, JSON.stringify(defaultConfig, null, 2));
-    return defaultConfig;
-  }
-  const config = JSON.parse(fs.readFileSync(WINDOWS_PC_FILE, 'utf-8'));
-  // Decrypt SSH password for internal use
-  if (config.sshPassword) {
-    config._sshPasswordDecrypted = decryptValue(config.sshPassword);
-  }
-  return config;
-}
-
-function saveWindowsPCConfig(config) {
-  const toSave = { ...config };
-  // Encrypt SSH password before saving if it's not already encrypted
-  if (toSave.sshPassword && !toSave.sshPassword.startsWith('enc:')) {
-    toSave.sshPassword = encryptValue(toSave.sshPassword);
-  }
-  delete toSave._sshPasswordDecrypted;
-  fs.writeFileSync(WINDOWS_PC_FILE, JSON.stringify(toSave, null, 2));
-}
-
 function sendWakeOnLan(macAddress) {
   return new Promise((resolve, reject) => {
     // Validate MAC address format first
     if (!VALIDATION.macAddress.test(macAddress)) {
-      return reject(new Error('Ungültige MAC-Adresse'));
+      return reject(new Error('Invalid MAC address'));
     }
 
     const mac = macAddress.replace(/[:-]/g, '');
     if (!/^[0-9A-Fa-f]{12}$/.test(mac)) {
-      return reject(new Error('Ungültige MAC-Adresse'));
+      return reject(new Error('Invalid MAC address'));
     }
 
     // Magic Packet: 6x 0xFF + 16x MAC-Adresse
@@ -790,7 +759,17 @@ function readSiteConfig() {
     if (!fs.existsSync(CONFIG_FILE)) return null;
     const src = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const vm = require('vm');
-    const sandbox = {};
+    // Restricted sandbox: block access to process, require, global, etc.
+    const sandbox = Object.create(null);
+    sandbox.Object = Object;
+    sandbox.Array = Array;
+    sandbox.String = String;
+    sandbox.Number = Number;
+    sandbox.Boolean = Boolean;
+    sandbox.Math = Math;
+    sandbox.JSON = JSON;
+    sandbox.Date = Date;
+    sandbox.encodeURIComponent = encodeURIComponent;
     vm.createContext(sandbox);
     // const → var so siteConfig lands on the sandbox global object
     const modified = src.replace(/\bconst siteConfig\b/, 'var siteConfig');
@@ -936,16 +915,16 @@ function sshCommand(config, command) {
 
     // Validate all inputs before using them
     if (!VALIDATION.ipAddress.test(ipAddress)) {
-      return reject(new Error('Ungültige IP-Adresse'));
+      return reject(new Error('Invalid IP address'));
     }
     if (!VALIDATION.sshUser.test(sshUser)) {
-      return reject(new Error('Ungültiger SSH-Benutzername'));
+      return reject(new Error('Invalid SSH username'));
     }
     if (!VALIDATION.sshPort(sshPort)) {
-      return reject(new Error('Ungültiger SSH-Port'));
+      return reject(new Error('Invalid SSH port'));
     }
     if (typeof sshPassword !== 'string' || sshPassword.length === 0) {
-      return reject(new Error('SSH-Passwort fehlt'));
+      return reject(new Error('SSH password missing'));
     }
 
     // Use spawn with argument array to prevent command injection
@@ -977,26 +956,18 @@ function sshCommand(config, command) {
       if (code === 0 || stderr.includes('Connection') || stderr.includes('closed')) {
         resolve();
       } else {
-        reject(new Error('Shutdown fehlgeschlagen'));
+        reject(new Error('Command failed'));
       }
     });
 
     sshpass.on('error', (err) => {
       if (err.code === 'ENOENT') {
-        reject(new Error('sshpass nicht installiert'));
+        reject(new Error('sshpass not installed'));
       } else {
-        reject(new Error('SSH-Verbindung fehlgeschlagen'));
+        reject(new Error('SSH connection failed'));
       }
     });
   });
-}
-
-function shutdownWindowsPC(config) {
-  return sshCommand(config, 'shutdown /s /t 0');
-}
-
-function restartWindowsPC(config) {
-  return sshCommand(config, 'shutdown /r /t 0');
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1101,7 +1072,7 @@ app.get('/api/bootstrap', (req, res) => {
 });
 
 app.post('/api/login', (req, res) => {
-  const { username, password, deviceName = 'Unbekanntes Gerät', deviceToken } = req.body || {};
+  const { username, password, deviceName = 'Unknown device', deviceToken } = req.body || {};
   const clientIp = getClientIp(req);
 
   // Rate-Limiting Check
@@ -1112,7 +1083,7 @@ app.post('/api/login', (req, res) => {
       success: false,
       locked: true,
       remainingMs: lockStatus.remainingMs,
-      message: `Zu viele Fehlversuche. Bitte ${remainingMin} Min warten.`,
+      message: `Too many failed attempts. Please wait ${remainingMin} min.`,
     });
   }
 
@@ -1152,13 +1123,13 @@ app.post('/api/login', (req, res) => {
         success: false,
         locked: true,
         remainingMs: result.lockoutMs,
-        message: `Zu viele Fehlversuche. ${lockoutMin} Min gesperrt.`,
+        message: `Too many failed attempts. Locked for ${lockoutMin} min.`,
       });
     }
     return res.status(401).json({
       success: false,
       attemptsLeft: result.attemptsLeft,
-      message: `Falsche Zugangsdaten. Noch ${result.attemptsLeft} Versuche.`,
+      message: `Invalid credentials. ${result.attemptsLeft} attempts remaining.`,
     });
   }
 
@@ -1168,7 +1139,7 @@ app.post('/api/login', (req, res) => {
   const loginAt = Date.now();
   const expiresAt = loginAt + SESSION_EXPIRY_MS;
   const matchedFileToken = fileTokenEntries.find((t) => t.token === deviceToken);
-  const effectiveDeviceName = matchedFileToken?.name || deviceName || 'Unbekanntes Gerät';
+  const effectiveDeviceName = matchedFileToken?.name || deviceName || 'Unknown device';
   const previousSession = runtime.activeSession;
   runtime.activeSession = { token, deviceName: effectiveDeviceName, loginAt, expiresAt };
 
@@ -1200,7 +1171,7 @@ app.get('/api/state', authRequired, (req, res) => {
 app.post('/api/theme', authRequired, async (req, res) => {
   const { theme } = req.body || {};
   if (!['dark', 'light'].includes(theme)) {
-    return res.status(400).json({ error: 'Ungültiges Theme' });
+    return res.status(400).json({ error: 'Invalid theme' });
   }
   await withStateLock(() => {
     const state = readState();
@@ -1213,11 +1184,11 @@ app.post('/api/theme', authRequired, async (req, res) => {
 app.post('/api/ports/color', authRequired, async (req, res) => {
   const { group, id, color } = req.body || {};
   if (!group || !id || !color) {
-    return res.status(400).json({ error: 'Fehlende Werte' });
+    return res.status(400).json({ error: 'Missing values' });
   }
   // #12 Hex-Color validation
   if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
-    return res.status(400).json({ error: 'Ungültiges Farbformat (erwartet #RRGGBB)' });
+    return res.status(400).json({ error: 'Invalid color format (expected #RRGGBB)' });
   }
 
   await withStateLock(() => {
@@ -1225,7 +1196,7 @@ app.post('/api/ports/color', authRequired, async (req, res) => {
     const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
     const port = collection.find((p) => p.id === id);
     if (!port) {
-      return res.status(404).json({ error: 'Port nicht gefunden' });
+      return res.status(404).json({ error: 'Port not found' });
     }
     port.color = color;
     saveState(state);
@@ -1236,10 +1207,10 @@ app.post('/api/ports/color', authRequired, async (req, res) => {
 app.post('/api/ports/update', authRequired, async (req, res) => {
   const { group, id, label, status } = req.body || {};
   if (!group || !id) {
-    return res.status(400).json({ error: 'Fehlende Werte' });
+    return res.status(400).json({ error: 'Missing values' });
   }
   if (!['switch', 'router'].includes(group)) {
-    return res.status(400).json({ error: 'Ungültige Gruppe' });
+    return res.status(400).json({ error: 'Invalid group' });
   }
 
   await withStateLock(() => {
@@ -1247,7 +1218,7 @@ app.post('/api/ports/update', authRequired, async (req, res) => {
     const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
     const port = collection.find((p) => p.id === id);
     if (!port) {
-      return res.status(404).json({ error: 'Port nicht gefunden' });
+      return res.status(404).json({ error: 'Port not found' });
     }
 
     let changed = false;
@@ -1267,7 +1238,7 @@ app.post('/api/ports/update', authRequired, async (req, res) => {
     }
 
     if (changed) {
-      addVersion(state, `Port geändert: ${port.label}`, {
+      addVersion(state, `Port changed: ${port.label}`, {
         switchPorts: clonePorts(state.switchPorts),
         routerPorts: clonePorts(state.routerPorts),
       });
@@ -1327,7 +1298,7 @@ app.post('/api/speedport', authRequired, async (req, res) => {
     const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
     state.speedportInfo = next;
     if (changed) {
-      addSpeedportVersion(state, 'Speedport geändert', {
+      addSpeedportVersion(state, 'Speedport changed', {
         speedportInfo: { ...state.speedportInfo },
       });
     }
@@ -1366,7 +1337,7 @@ app.post('/api/raspberry', authRequired, async (req, res) => {
     const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
     state.raspberryInfo = next;
     if (changed) {
-      addRaspberryVersion(state, 'Raspberry geändert', {
+      addRaspberryVersion(state, 'Raspberry changed', {
         raspberryInfo: { ...state.raspberryInfo },
       });
     }
@@ -1422,7 +1393,7 @@ app.get('/api/speedtest/local-ping', authRequired, (req, res) => {
 
   // SSRF protection - validate target IP
   if (!isAllowedProxyTarget(host)) {
-    return res.status(400).json({ error: 'Ungültige Ziel-IP-Adresse' });
+    return res.status(400).json({ error: 'Invalid target IP address' });
   }
 
   const options = {
@@ -1473,7 +1444,7 @@ app.get('/api/speedtest/local-download-proxy', authRequired, async (req, res) =>
 
   // SSRF protection - validate target IP
   if (!isAllowedProxyTarget(host)) {
-    return res.status(400).json({ error: 'Ungültige Ziel-IP-Adresse' });
+    return res.status(400).json({ error: 'Invalid target IP address' });
   }
 
   const options = {
@@ -1526,7 +1497,7 @@ app.post('/api/speedtest/local-upload-proxy', authRequired, (req, res) => {
 
   // SSRF protection - validate target IP
   if (!isAllowedProxyTarget(host)) {
-    return res.status(400).json({ error: 'Ungültige Ziel-IP-Adresse' });
+    return res.status(400).json({ error: 'Invalid target IP address' });
   }
 
   const headers = {
@@ -1668,7 +1639,7 @@ app.post('/api/import', authRequired, async (req, res) => {
     saveState(newState);
     // Note: credentials not written since we keep the existing ones
 
-    res.json({ ok: true, message: 'Daten erfolgreich importiert (Zugangsdaten wurden nicht geändert)' });
+    res.json({ ok: true, message: 'Data imported successfully (credentials unchanged)' });
   });
 });
 
@@ -1709,16 +1680,16 @@ app.post('/api/control/:deviceId', authRequired, (req, res) => {
   const errors = [];
 
   if (macAddress !== undefined && macAddress !== '' && !validateWindowsPCInput('macAddress', macAddress)) {
-    errors.push('Ungültige MAC-Adresse (Format: XX:XX:XX:XX:XX:XX)');
+    errors.push('Invalid MAC address (format: XX:XX:XX:XX:XX:XX)');
   }
   if (sshUser !== undefined && sshUser !== '' && !validateWindowsPCInput('sshUser', sshUser)) {
-    errors.push('Ungültiger SSH-Benutzername (nur alphanumerisch, max 32 Zeichen)');
+    errors.push('Invalid SSH username (alphanumeric only, max 32 chars)');
   }
   if (sshPort !== undefined && !validateWindowsPCInput('sshPort', sshPort)) {
-    errors.push('Ungültiger SSH-Port (1-65535)');
+    errors.push('Invalid SSH port (1-65535)');
   }
   if (sshPassword !== undefined && !validateWindowsPCInput('sshPassword', sshPassword)) {
-    errors.push('Ungültiges Passwort (max 128 Zeichen)');
+    errors.push('Invalid password (max 128 chars)');
   }
 
   if (errors.length > 0) {
@@ -1751,7 +1722,7 @@ app.get('/api/control/:deviceId/status', authRequired, async (req, res) => {
   const clientIp = getClientIp(req);
 
   if (!checkPCStatusRateLimit(clientIp)) {
-    return res.status(429).json({ online: false, error: 'Zu viele Anfragen' });
+    return res.status(429).json({ online: false, error: 'Too many requests' });
   }
 
   const configDevices = readControlDevicesFromConfig();
@@ -1765,6 +1736,16 @@ app.get('/api/control/:deviceId/status', authRequired, async (req, res) => {
 // GET password - reveal decrypted SSH password
 app.get('/api/control/:deviceId/password', authRequired, (req, res) => {
   const deviceId = req.params.deviceId;
+  const clientIp = getClientIp(req);
+
+  if (!checkPCStatusRateLimit(clientIp)) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+
+  const configDevices = readControlDevicesFromConfig();
+  const device = configDevices.find(d => d.id === deviceId);
+  if (!device) return res.status(404).json({ error: 'Device not found' });
+
   const creds = readControlDeviceCredentials(deviceId);
   res.json({ password: creds._sshPasswordDecrypted || '' });
 });
@@ -1776,7 +1757,7 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
 
   if (!checkPCActionRateLimit(clientIp)) {
     logControlAction(deviceId, action.toUpperCase(), clientIp, false, 'Rate limited');
-    return res.status(429).json({ success: false, message: 'Zu viele Anfragen. Bitte warten.' });
+    return res.status(429).json({ success: false, message: 'Too many requests. Please wait.' });
   }
 
   const configDevices = readControlDevicesFromConfig();
@@ -1792,15 +1773,15 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
   if (action === 'wake') {
     if (!creds.macAddress) {
       logControlAction(deviceId, 'WAKE', clientIp, false, 'No MAC configured');
-      return res.status(400).json({ success: false, message: 'Keine MAC-Adresse konfiguriert' });
+      return res.status(400).json({ success: false, message: 'No MAC address configured' });
     }
     try {
       await sendWakeOnLan(creds.macAddress);
       logControlAction(deviceId, 'WAKE', clientIp, true, `MAC: ${creds.macAddress}`);
-      return res.json({ success: true, message: 'Wake-on-LAN Paket gesendet!' });
+      return res.json({ success: true, message: 'Wake-on-LAN packet sent' });
     } catch {
       logControlAction(deviceId, 'WAKE', clientIp, false, 'Send failed');
-      return res.status(500).json({ success: false, message: 'Fehler beim Senden des Wake-Pakets' });
+      return res.status(500).json({ success: false, message: 'Failed to send Wake-on-LAN packet' });
     }
   }
 
@@ -1812,7 +1793,7 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
 
   if (!device.ip || !creds.sshUser || !creds.sshPassword) {
     logControlAction(deviceId, action.toUpperCase(), clientIp, false, 'Incomplete SSH config');
-    return res.status(400).json({ success: false, message: 'SSH-Zugangsdaten nicht vollständig' });
+    return res.status(400).json({ success: false, message: 'Incomplete SSH credentials' });
   }
 
   const sshConfig = {
@@ -1825,10 +1806,10 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
   try {
     await sshCommand(sshConfig, command);
     logControlAction(deviceId, action.toUpperCase(), clientIp, true, `Target: ${device.ip}`);
-    res.json({ success: true, message: `${action}-Befehl gesendet!` });
+    res.json({ success: true, message: `${action} command sent` });
   } catch {
     logControlAction(deviceId, action.toUpperCase(), clientIp, false, 'SSH failed');
-    res.status(500).json({ success: false, message: `${action} fehlgeschlagen` });
+    res.status(500).json({ success: false, message: `${action} failed` });
   }
 });
 

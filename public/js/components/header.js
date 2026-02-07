@@ -6,7 +6,7 @@ import { t } from '../i18n.js';
 import { state, getConfig } from '../state.js';
 import { navigate, getCurrentRoute } from '../router.js';
 import { el } from '../ui.js';
-import { icon } from '../icons.js';
+import { iconEl } from '../icons.js';
 
 let headerEl = null;
 let pageContextEl = null;
@@ -35,7 +35,7 @@ export function renderHeader(container) {
           window.dispatchEvent(new CustomEvent('open-settings'));
         },
       }, [
-        el('span', { className: 'settings-icon', innerHTML: icon('settings', 18) }),
+        el('span', { className: 'settings-icon' }, [iconEl('settings', 18)]),
         el('span', { className: 'settings-text', textContent: t('app.settings'), 'data-i18n': 'app.settings' }),
       ]),
       pageContextEl,
@@ -43,10 +43,10 @@ export function renderHeader(container) {
 
     // Center: nav links
     el('div', { className: 'header-nav' }, [
-      createNavBtn('/', icon('home', 16), ''),
-      createNavBtn('/info', icon('info', 16), t('landing.info')),
-      createNavBtn('/start', icon('start', 16), t('landing.start')),
-      createNavBtn('/analysen', icon('analysen', 16), t('landing.analysen')),
+      createNavBtn('/', iconEl('home', 16), ''),
+      createNavBtn('/info', iconEl('info', 16), t('landing.info')),
+      createNavBtn('/start', iconEl('start', 16), t('landing.start')),
+      createNavBtn('/analysen', iconEl('analysen', 16), t('landing.analysen')),
     ]),
 
     // Right group: quick links + version chip
@@ -98,14 +98,14 @@ export function renderHeader(container) {
   return headerEl;
 }
 
-function createNavBtn(route, iconHtml, label) {
+function createNavBtn(route, iconNode, label) {
   const btn = el('button', {
     className: 'nav-btn',
     'data-route': route,
     onClick: () => navigate(route),
     'aria-label': label || 'Home',
   }, [
-    el('span', { className: 'nav-btn-icon', innerHTML: iconHtml }),
+    el('span', { className: 'nav-btn-icon' }, [iconNode]),
     ...(label ? [el('span', { className: 'nav-btn-label', textContent: label })] : []),
   ]);
   return btn;
@@ -128,10 +128,9 @@ function updatePageContext() {
   if (meta) {
     pageContextEl.appendChild(el('button', {
       className: 'page-context-back',
-      innerHTML: icon('back', 18),
       'aria-label': 'Back',
       onClick: () => navigate('/'),
-    }));
+    }, [iconEl('back', 18)]));
     pageContextEl.appendChild(el('span', {
       className: 'page-context-title',
       textContent: t(meta.titleKey),

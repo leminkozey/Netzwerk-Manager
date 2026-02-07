@@ -5,7 +5,7 @@
 import { t } from '../i18n.js';
 import { navigate } from '../router.js';
 import { el } from '../ui.js';
-import { icon } from '../icons.js';
+import { iconEl } from '../icons.js';
 import { getConfig } from '../state.js';
 
 function randomGreeting() {
@@ -38,7 +38,7 @@ export function renderLanding(container) {
       className: 'action-btn',
       onClick: () => navigate(action.route),
     }, [
-      el('span', { className: 'action-btn-icon', innerHTML: icon(action.icon, 28) }),
+      el('span', { className: 'action-btn-icon' }, [iconEl(action.icon, 28)]),
       el('div', { className: 'action-btn-text' }, [
         el('span', { className: 'action-btn-title', textContent: action.title }),
         el('span', { className: 'action-btn-sub', textContent: action.sub }),

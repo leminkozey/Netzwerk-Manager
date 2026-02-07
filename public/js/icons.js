@@ -273,6 +273,11 @@ export function iconEl(name, size = 20) {
   span.className = 'icon';
   span.style.cssText = `width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center`;
   span.setAttribute('aria-hidden', 'true');
-  span.innerHTML = icons[name] || '';
+  const svgStr = icons[name] || '';
+  if (svgStr) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = svgStr;
+    span.appendChild(tpl.content);
+  }
   return span;
 }
