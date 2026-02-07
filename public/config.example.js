@@ -138,7 +138,7 @@ const siteConfig = {
   // name: Anzeigename des Links
   // url:  Vollständige URL (muss mit http:// oder https:// beginnen)
   headerLinks: [
-    { name: 'Github', url: 'https://github.com/dein-username' },
-    { name: 'KanBan', url: 'https://example.com/kanban' },
+    { name: 'Github', url: 'https://github.com/leminkozey' },
+    { name: 'KanBan', url: 'https://leminkanban.de' },
   ],
 };
