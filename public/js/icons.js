@@ -166,6 +166,15 @@ export const icons = {
     <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
   </svg>`,
 
+  pause: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="6" y="4" width="4" height="16" rx="1"/>
+    <rect x="14" y="4" width="4" height="16" rx="1"/>
+  </svg>`,
+
+  play: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="5,3 19,12 5,21"/>
+  </svg>`,
+
   // ── Settings ──
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/>

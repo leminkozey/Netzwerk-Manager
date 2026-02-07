@@ -246,6 +246,10 @@ const translations = {
     'pihole.cached': 'Cache',
     'pihole.upstreamServers': 'Upstream Server',
     'pihole.clientActivity': 'Client Aktivität',
+    'pihole.blockingActive': 'Aktiv',
+    'pihole.blockingInactive': 'Inaktiv',
+    'pihole.pause': 'Pause',
+    'pihole.resume': 'Aktivieren',
   },
 
   en: {
@@ -486,6 +490,10 @@ const translations = {
     'pihole.cached': 'Cached',
     'pihole.upstreamServers': 'Upstream Servers',
     'pihole.clientActivity': 'Client Activity',
+    'pihole.blockingActive': 'Active',
+    'pihole.blockingInactive': 'Inactive',
+    'pihole.pause': 'Pause',
+    'pihole.resume': 'Resume',
   },
 };
 

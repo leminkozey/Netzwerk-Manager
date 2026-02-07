@@ -571,6 +571,32 @@ a:hover {
   box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(239, 68, 68, 0.3);
 }
 
+[data-button-style="simple"] .pause-btn {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+[data-button-style="simple"] .pause-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  color: #f59e0b;
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(245, 158, 11, 0.3);
+}
+
+[data-button-style="simple"] .resume-btn {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+}
+
+[data-button-style="simple"] .resume-btn:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+  color: #22c55e;
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(34, 197, 94, 0.3);
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Form Inputs
    ═══════════════════════════════════════════════════════════════════ */
@@ -2356,6 +2382,49 @@ label {
 .pc-shutdown-btn:active,
 .shutdown-btn:active {
   transform: scale(0.95);
+}
+
+.pause-btn {
+  background: rgba(245, 158, 11, 0.1);
+  border: 2px solid rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+  box-shadow: none;
+}
+
+.pause-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  transform: scale(1.08);
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(245, 158, 11, 0.3);
+}
+
+.pause-btn:active {
+  transform: scale(0.95);
+}
+
+.resume-btn {
+  background: rgba(34, 197, 94, 0.1);
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+  box-shadow: none;
+}
+
+.resume-btn:hover {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+  transform: scale(1.08);
+  box-shadow: 0 0 calc(24px * var(--glow-strength)) rgba(34, 197, 94, 0.3);
+}
+
+.resume-btn:active {
+  transform: scale(0.95);
+}
+
+.pause-btn:disabled,
+.resume-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .pc-info-grid {

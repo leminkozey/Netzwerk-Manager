@@ -247,6 +247,21 @@ export async function getPiholeUpstreams() {
   return res.json();
 }
 
+export async function getPiholeBlocking() {
+  const res = await request('/api/pihole/blocking');
+  if (!res.ok) throw new Error('Failed to get Pi-hole blocking status');
+  return res.json();
+}
+
+export async function setPiholeBlocking(enabled) {
+  const res = await request('/api/pihole/blocking', {
+    method: 'POST',
+    body: JSON.stringify({ blocking: enabled }),
+  });
+  if (!res.ok) throw new Error('Failed to set Pi-hole blocking');
+  return res.json();
+}
+
 // ── Uptime ──
 
 export async function getUptime() {

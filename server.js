@@ -1995,6 +1995,11 @@ function _doApiRequest(apiPath) {
           err.statusCode = 401;
           return reject(err);
         }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          const err = new Error(`Pi-hole returned ${res.statusCode}`);
+          err.statusCode = res.statusCode;
+          return reject(err);
+        }
         try {
           resolve(JSON.parse(body));
         } catch {
@@ -2011,15 +2016,98 @@ function _doApiRequest(apiPath) {
 
 async function piholeApiRequest(apiPath, retried) {
   await getPiholeSid();
+  const sidUsed = piholeSession.sid;
   try {
     return await _doApiRequest(apiPath);
   } catch (e) {
     if (e && e.statusCode === 401 && !retried) {
-      piholeSession.sid = null;
-      piholeSession.expiresAt = 0;
-      _piholeAuthPromise = null;
+      if (piholeSession.sid === sidUsed) {
+        piholeSession.sid = null;
+        piholeSession.expiresAt = 0;
+        _piholeAuthPromise = null;
+      }
       await getPiholeSid();
       return _doApiRequest(apiPath);
+    }
+    throw e;
+  }
+}
+
+function _doApiPostRequest(apiPath, body) {
+  return new Promise((resolve, reject) => {
+    const config = readPiholeConfig();
+    if (!config) return reject(new Error('Pi-hole not configured'));
+
+    const url = new URL(config.url);
+    const httpMod = piholeHttpModule(config.url);
+    const postData = JSON.stringify(body);
+
+    const options = {
+      hostname: url.hostname,
+      port: url.port || piholeDefaultPort(config.url),
+      path: apiPath,
+      method: 'POST',
+      headers: {
+        sid: piholeSession.sid,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+      timeout: 10000,
+    };
+
+    const req = httpMod.request(options, (res) => {
+      let respBody = '';
+      let bodySize = 0;
+      let aborted = false;
+      res.on('data', (chunk) => {
+        if (aborted) return;
+        bodySize += chunk.length;
+        if (bodySize > PIHOLE_MAX_BODY) { aborted = true; res.destroy(); return reject(new Error('Response too large')); }
+        respBody += chunk;
+      });
+      res.on('end', () => {
+        if (aborted) return;
+        if (res.statusCode === 401) {
+          const err = new Error('Pi-hole auth expired');
+          err.statusCode = 401;
+          return reject(err);
+        }
+        if (res.statusCode < 200 || res.statusCode >= 300) {
+          const err = new Error(`Pi-hole returned ${res.statusCode}`);
+          err.statusCode = res.statusCode;
+          return reject(err);
+        }
+        try {
+          resolve(JSON.parse(respBody));
+        } catch {
+          reject(new Error('Invalid JSON from Pi-hole'));
+        }
+      });
+    });
+
+    req.on('error', (e) => { console.error('[Pi-hole] POST error:', e.message); reject(new Error('Pi-hole service unavailable')); });
+    req.on('timeout', () => { req.destroy(); reject(new Error('Pi-hole request timeout')); });
+    req.write(postData);
+    req.end();
+  });
+}
+
+let _lastBlockingToggle = 0;
+
+async function piholeApiPost(apiPath, body, retried) {
+  await getPiholeSid();
+  const sidUsed = piholeSession.sid;
+  try {
+    return await _doApiPostRequest(apiPath, body);
+  } catch (e) {
+    if (e && e.statusCode === 401 && !retried) {
+      if (piholeSession.sid === sidUsed) {
+        piholeSession.sid = null;
+        piholeSession.expiresAt = 0;
+        _piholeAuthPromise = null;
+      }
+      await getPiholeSid();
+      return _doApiPostRequest(apiPath, body);
     }
     throw e;
   }
@@ -2106,6 +2194,44 @@ app.get('/api/pihole/upstreams', authRequired, async (req, res) => {
     res.json(data);
   } catch (e) {
     console.error('[Pi-hole] upstreams:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
+  }
+});
+
+function normalizeBlocking(raw) {
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'string') {
+    if (raw === 'enabled') return true;
+    if (raw === 'disabled') return false;
+  }
+  return null;
+}
+
+app.get('/api/pihole/blocking', authRequired, async (req, res) => {
+  try {
+    const data = await piholeApiRequest('/api/dns/blocking');
+    res.json({ blocking: normalizeBlocking(data.blocking) });
+  } catch (e) {
+    console.error('[Pi-hole] blocking GET:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
+  }
+});
+
+app.post('/api/pihole/blocking', authRequired, async (req, res) => {
+  const { blocking } = req.body || {};
+  if (typeof blocking !== 'boolean') {
+    return res.status(400).json({ error: 'blocking must be a boolean' });
+  }
+  const now = Date.now();
+  if (now - _lastBlockingToggle < 5000) {
+    return res.status(429).json({ error: 'Too many requests. Please wait.' });
+  }
+  _lastBlockingToggle = now;
+  try {
+    const data = await piholeApiPost('/api/dns/blocking', { blocking });
+    res.json({ blocking: normalizeBlocking(data.blocking) });
+  } catch (e) {
+    console.error('[Pi-hole] blocking POST:', e.message || e);
     res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
