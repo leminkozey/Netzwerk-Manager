@@ -1,20 +1,19 @@
-# Lokales Netzwerk Manager
+# Netzwerk Manager
 
-Eine Web-Anwendung zur Verwaltung und Dokumentation deines lokalen Netzwerks.
+Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Netzwerks.
 
-## Was ist das?
+## Features
 
-Diese Website hilft dir, den Überblick über dein Heimnetzwerk zu behalten:
-
-- **Switch-Ports** und **Router-Ports** dokumentieren (welches Kabel geht wohin)
-- **PiHole-Infos** speichern (IP, Hostname, URLs)
-- **Speedport-Infos** speichern (WLAN-Daten, Passwörter)
-- **Speed-Test** im lokalen Netzwerk durchführen
-- **Versionshistorie** aller Änderungen
-
-## Für wen ist das?
-
-Für jeden, der zu Hause ein Netzwerk mit Switch, Router und evtl. Raspberry Pi (PiHole) betreibt und den Überblick behalten möchte.
+- **Port-Dokumentation** – Switch- und Router-Ports beschriften (welches Kabel geht wohin)
+- **PiHole-Infos** – IP, Hostname und URLs deines Pi-hole speichern
+- **Speedport-Infos** – WLAN-Daten und Passwörter dokumentieren
+- **Speed-Test** – Download, Upload und Ping im lokalen Netzwerk messen
+- **Uptime Monitoring** – Geräte per Ping überwachen mit Live-Status
+- **Control Center** – Geräte per Wake-on-LAN, SSH-Shutdown und SSH-Restart steuern
+- **Versionshistorie** – Alle Änderungen automatisch versioniert und nachvollziehbar
+- **Daten-Export/Import** – Vollständiges Backup als JSON
+- **Multi-Language** – Deutsch und Englisch
+- **Theming** – Dark, Light und System-Theme mit anpassbarer Akzentfarbe
 
 ## Voraussetzungen
 
@@ -23,163 +22,300 @@ Für jeden, der zu Hause ein Netzwerk mit Switch, Router und evtl. Raspberry Pi 
 
 ## Installation
 
-1. Repository herunterladen oder klonen
-2. Im Projektordner Dependencies installieren:
+1. Repository klonen
+2. Dependencies installieren:
    ```bash
    npm install
    ```
-3. Server starten:
+3. Konfiguration erstellen:
+   ```bash
+   cp public/config.example.js public/config.js
+   ```
+4. `public/config.js` anpassen (siehe [Konfiguration](#konfiguration))
+
+> **Hinweis bei Updates:** Beim Pullen neuer Versionen wird `config.js` auf die leere Standard-Konfiguration zurückgesetzt. Sichere deine `config.js` vorher und übertrage deine Einstellungen danach zurück.
+5. Server starten:
    ```bash
    node server.js
    ```
-4. Im Browser öffnen: `http://localhost:5055`
+6. Im Browser öffnen: `http://localhost:5055`
+
+---
 
 ## Konfiguration
 
-### Data/Nutzer
+Die gesamte Konfiguration erfolgt über `public/config.js`. Diese Datei wird beim ersten Start nicht mitgeliefert – kopiere `config.example.js` als Vorlage.
 
-Diese Datei enthält den aktuellen Benutzernamen und das Passwort (jeweils in einer Zeile):
+Falls `config.js` fehlt oder nicht geladen werden kann, werden sichere Standardwerte verwendet.
 
+### Animationen (`animations`)
+
+Steuert alle visuellen Animationen der Oberfläche.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `enabled` | `boolean` | `true` | Master-Schalter. Bei `false` werden alle Animationen deaktiviert. |
+| `heroGradient` | `boolean` | `true` | Animierter Farbverlauf im Titel auf der Startseite. |
+| `fadeIn` | `boolean` | `true` | Einblend-Effekte beim Laden von Cards und Elementen. |
+| `modalSlide` | `boolean` | `true` | Slide-Animation beim Öffnen von Modals und Overlays. |
+| `panelFade` | `boolean` | `true` | Überblend-Effekt beim Tab-Wechsel in den Einstellungen. |
+| `themeSwitcher` | `boolean` | `true` | Animations-Effekte der Theme-Buttons (Sonne/Mond/System). |
+
+Die Einzel-Optionen wirken nur, wenn `enabled: true` ist.
+
+```js
+animations: {
+  enabled: true,
+  heroGradient: true,
+  fadeIn: true,
+  modalSlide: true,
+  panelFade: true,
+  themeSwitcher: true,
+},
 ```
-admin
-admin
+
+### Design-Defaults (`defaults`)
+
+Standard-Werte für neue Benutzer. Benutzer können diese Werte jederzeit in den Einstellungen überschreiben – die persönlichen Einstellungen werden im `localStorage` des Browsers gespeichert und haben Vorrang.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `theme` | `string` | `'dark'` | Standard-Theme: `'dark'`, `'light'` oder `'system'`. |
+| `buttonStyle` | `string` | `'default'` | Button-Stil: `'default'` (mit Rahmen) oder `'simple'` (flach). |
+| `language` | `string` | `'de'` | Sprache: `'de'` (Deutsch) oder `'en'` (Englisch). |
+| `accentColor` | `string` | `'#00d4ff'` | Akzentfarbe als Hex-Wert. Wird für Buttons, Links und Highlights verwendet. |
+
+```js
+defaults: {
+  theme: 'dark',
+  buttonStyle: 'default',
+  language: 'de',
+  accentColor: '#00d4ff',
+},
 ```
 
-**Wichtig:** Diese Datei ist nur zum **Einsehen** gedacht. Änderungen am Benutzernamen oder Passwort müssen über die Website selbst vorgenommen werden (Einstellungen → User).
+#### Glow-Effekt (`defaults.glow`)
 
-### Data/LoginToken.txt
+Leuchtendes Glühen um aktive Elemente und Buttons.
 
-Mit Login-Tokens können sich Geräte ohne Benutzername/Passwort anmelden. Das ist praktisch für vertrauenswürdige Geräte.
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `enabled` | `boolean` | `true` | Glow-Effekt an/aus. |
+| `strength` | `number` | `1` | Intensität von `0` (kein Glow) bis `2` (stark). |
+
+```js
+glow: {
+  enabled: true,
+  strength: 1,
+},
+```
+
+#### Session Timeout (`defaults.sessionTimeout`)
+
+Automatisches Ausloggen nach Inaktivität.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `enabled` | `boolean` | `false` | Timeout an/aus. |
+| `minutes` | `number` | `5` | Minuten bis zum automatischen Logout (1–60). |
+
+```js
+sessionTimeout: {
+  enabled: false,
+  minutes: 5,
+},
+```
+
+### Einstellungen-Sichtbarkeit (`settings`)
+
+Bestimmt, welche Bereiche der Einstellungen für den Benutzer sichtbar sind.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `showSettingsButton` | `boolean` | `true` | Einstellungen-Button (Zahnrad) komplett anzeigen oder verstecken. |
+
+#### Tabs (`settings.tabs`)
+
+| Tab | Default | Beschreibung |
+|-----|---------|--------------|
+| `design` | `true` | Theme, Akzentfarbe, Button-Stil, Glow-Einstellungen. |
+| `analysen` | `true` | Uptime-Daten zurücksetzen. |
+| `daten` | `true` | Versionshistorie, Daten-Export und -Import. |
+| `session` | `true` | Session-Timeout konfigurieren. |
+| `user` | `true` | Benutzername und Passwort ändern, Logout. |
+| Credits | immer | Entwickler-Info. Kann nicht deaktiviert werden. |
+
+```js
+settings: {
+  showSettingsButton: true,
+  tabs: {
+    design: true,
+    analysen: true,
+    daten: true,
+    session: true,
+    user: true,
+  },
+},
+```
+
+### Cards-Sichtbarkeit (`cards`)
+
+Einzelne Info-Cards auf der Startseite ein- oder ausblenden.
+
+| Card | Default | Beschreibung |
+|------|---------|--------------|
+| `switch` | `true` | Netzwerk-Switch mit 8 Ports. |
+| `router` | `true` | WLAN-Router mit Port-Dokumentation. |
+| `pihole` | `true` | Pi-hole DNS-Server Informationen. |
+| `speedport` | `true` | Speedport/Router-Zugangsdaten. |
+| `speedtest` | `true` | LAN Speed-Test (Download, Upload, Ping). |
+| `windowsPc` | `true` | Windows PC / Control Center Steuerung. |
+
+```js
+cards: {
+  switch: true,
+  router: true,
+  pihole: true,
+  speedport: true,
+  speedtest: true,
+  windowsPc: true,
+},
+```
+
+### Uptime Monitoring (`uptimeDevices`, `uptimeInterval`)
+
+Überwacht Geräte im Netzwerk per ICMP-Ping und zeigt den Live-Status im Frontend.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `uptimeInterval` | `number` | `10` | Ping-Intervall in Sekunden. Minimum: 10. |
+| `uptimeDevices` | `array` | `[]` | Liste der zu überwachenden Geräte. |
+
+Jedes Gerät hat folgende Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | `string` | Eindeutiger Schlüssel (lowercase, keine Leerzeichen). |
+| `name` | `string` | Anzeigename im Frontend. |
+| `ip` | `string` | IP-Adresse des Geräts im lokalen Netzwerk. |
+
+```js
+uptimeInterval: 10,
+uptimeDevices: [
+  { id: 'router',    name: 'Router',     ip: '192.168.1.1' },
+  { id: 'pihole',    name: 'PiHole',     ip: '192.168.1.100' },
+  { id: 'windowspc', name: 'Windows PC', ip: '192.168.1.50' },
+],
+```
+
+### Gerätesteuerung / Control Center (`controlDevices`)
+
+Ermöglicht die Fernsteuerung von Geräten per Wake-on-LAN und SSH. Die SSH-Zugangsdaten (Benutzer, Passwort, Port) und die MAC-Adresse werden pro Gerät in den Einstellungen konfiguriert und verschlüsselt auf dem Server gespeichert.
+
+Jedes Gerät hat folgende Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | `string` | Eindeutiger Schlüssel (lowercase, keine Leerzeichen). |
+| `name` | `string` | Anzeigename im Frontend. |
+| `icon` | `string` | Icon-Name aus `icons.js` (z.B. `'windowsColor'`, `'server'`). |
+| `type` | `string` | SSH-Typ: `'ssh-windows'` oder `'ssh-linux'`. Bestimmt welche Befehle für Shutdown/Restart verwendet werden. |
+| `ip` | `string` | IP-Adresse des Geräts. |
+| `actions` | `array` | Verfügbare Aktionen: `'wake'`, `'restart'`, `'shutdown'`. |
+
+**SSH-Befehle nach Typ:**
+
+| Typ | Shutdown | Restart |
+|-----|----------|---------|
+| `ssh-windows` | `shutdown /s /t 0` | `shutdown /r /t 0` |
+| `ssh-linux` | `sudo shutdown -h now` | `sudo reboot` |
+
+```js
+controlDevices: [
+  {
+    id: 'windowspc',
+    name: 'Windows PC',
+    icon: 'windowsColor',
+    type: 'ssh-windows',
+    ip: '192.168.1.50',
+    actions: ['wake', 'restart', 'shutdown'],
+  },
+  {
+    id: 'nas',
+    name: 'NAS Server',
+    icon: 'server',
+    type: 'ssh-linux',
+    ip: '192.168.1.200',
+    actions: ['wake', 'shutdown'],
+  },
+],
+```
+
+### Header Links (`headerLinks`)
+
+Links die oben rechts in der Topbar erscheinen. Jeder Link zeigt automatisch das Favicon der Ziel-Website.
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `name` | `string` | Anzeigename des Links. |
+| `url` | `string` | Vollständige URL (muss mit `http://` oder `https://` beginnen). |
+
+```js
+headerLinks: [
+  { name: 'Github', url: 'https://github.com/dein-username' },
+  { name: 'KanBan', url: 'https://example.com/kanban' },
+],
+```
+
+---
+
+## Benutzerverwaltung
+
+### Zugangsdaten (`Data/Nutzer`)
+
+Enthält Benutzername und Passwort (je eine Zeile). Standard: `admin` / `admin`.
+
+Änderungen nur über die Website vornehmen (Einstellungen → User).
+
+### Login-Tokens (`Data/LoginToken.txt`)
+
+Ermöglichen Login ohne Benutzername/Passwort für vertrauenswürdige Geräte.
 
 **Format:**
 ```
-# Jede Zeile: token|Geraetename
-abc123-uuid-hier|Beispielgerät von Maxmusterman
-def456-uuid-hier|iPhone von Maxmusterman
+# Jede Zeile: token|Gerätename
+abc123-uuid-hier|Laptop von Max
+def456-uuid-hier|iPhone von Max
 ```
 
-Der senkrechte Strich `|` und der Gerätename dahinter sind optional, helfen aber bei der Übersicht.
+**Token generieren:**
 
-**Token erstellen:**
+Mac: Doppelklick auf `generate-token.command`
 
-**Mac:**
-Doppelklick auf `generate-token.command` - es wird ein Token in der Konsole ausgegeben.
-
-**Andere Systeme:**
-Im Terminal ausführen:
+Andere Systeme:
 ```bash
 node -e "console.log(require('crypto').randomUUID())"
 ```
 
-Den generierten Token dann in `Data/LoginToken.txt` eintragen mit einem Geräte-Namen.
+---
 
-### Website-Konfiguration (config.js)
+## Sicherheit
 
-Die Datei `public/config.js` ermöglicht umfangreiche Anpassungen der Website ohne Code-Änderungen.
+- **Rate-Limiting** – Nach 5 falschen Login-Versuchen wird die IP gesperrt (5 Min, dann eskalierend)
+- **Verschlüsselung** – SSH-Passwörter werden mit AES-256-GCM verschlüsselt gespeichert
+- **SSH-Allowlist** – Nur vordefinierte Befehle können per SSH ausgeführt werden
+- **Session-Timeout** – Automatisches Ausloggen nach Inaktivität (konfigurierbar)
+- **Config-Sandbox** – `config.js` wird serverseitig in einer isolierten VM geparst
 
-**Animationen steuern:**
-```javascript
-animations: {
-  enabled: true,          // Master-Schalter (false = alle Animationen aus)
-  heroGradient: true,     // Titel-Farbverlauf-Animation
-  fadeIn: true,           // Einblend-Effekte
-  modalSlide: true,       // Modal-Einblendung
-  panelFade: true,        // Settings-Panel-Wechsel
-  themeSwitcher: true,    // Theme-Button-Animationen
-},
-```
+---
 
-**Design-Defaults festlegen:**
-```javascript
-defaults: {
-  theme: 'dark',          // 'dark' | 'light' | 'system'
-  buttonStyle: 'default', // 'default' | 'simple'
-  language: 'de',         // 'de' | 'en'
-  accentColor: '#00d4ff', // Hex-Farbe
-  glow: {
-    enabled: true,        // Glow-Effekt an/aus
-    strength: 1,          // Wert 0-2
-  },
-  sessionTimeout: {
-    enabled: true,        // Timeout an/aus
-    minutes: 5,           // Minuten bis Timeout (1-60)
-  },
-},
-```
+## Speed-Test
 
-**Einstellungen-Sichtbarkeit:**
-```javascript
-settings: {
-  showSettingsButton: true,  // Einstellungen-Button anzeigen
-  tabs: {
-    design: true,            // Design-Tab
-    daten: true,             // Daten-Tab (Export/Import)
-    session: true,           // Session-Tab
-    user: true,              // User-Tab
-    // credits: immer sichtbar
-  },
-},
-```
+Misst Download (Mbit/s), Upload (Mbit/s) und Ping (ms) im lokalen Netzwerk zwischen Browser und Server. Optional kann ein Raspberry Pi als Test-Gegenstelle konfiguriert werden (siehe `PI_SPEEDTEST_SERVER.md`).
 
-**Hinweise:**
-- Wenn `config.js` nicht geladen werden kann, werden sichere Defaults verwendet
-- Benutzer-Einstellungen (localStorage) haben Vorrang vor Config-Defaults
-- Der Credits-Tab kann nicht deaktiviert werden
+Der Speed-Test funktioniert nur über die LAN-IP (nicht über `localhost`).
 
-## Features
-
-### Port-Verwaltung
-
-Dokumentiere welches Gerät an welchem Port hängt. Jeder Port hat:
-- **Belegung**: Was ist angeschlossen?
-- **Farbe**: Zur visuellen Unterscheidung
-
-### Einstellungen
-
-Über den Zahnrad-Button oben links erreichst du die Einstellungen:
-
-- **Design**: Theme (Dark/Light) und Button-Stil (Default/Simpel) wählen
-- **Daten**: Versionshistorie einsehen + Export/Import
-- **Session**: Automatisches Ausloggen nach Inaktivität (einstellbar)
-- **User**: Benutzername und Passwort ändern, Logout
-- **Credits**: Entwickler-Info und Link zum Repository
-
-### Versionshistorie
-
-Jede Änderung an den Ports, PiHole- oder Speedport-Infos wird automatisch versioniert. Du kannst jederzeit ältere Versionen einsehen (Einstellungen → Daten) und nachvollziehen, was wann geändert wurde.
-
-### Daten exportieren / importieren
-
-Du kannst alle Daten als JSON-Datei sichern und wiederherstellen:
-
-**Export:**
-1. Einstellungen → Daten
-2. "Daten exportieren" klicken
-3. JSON-Datei wird heruntergeladen (enthält alle Einstellungen inkl. Zugangsdaten)
-
-**Import:**
-1. Einstellungen → Daten
-2. "Daten importieren" klicken
-3. JSON-Datei auswählen
-4. Bestätigen - Seite lädt neu mit importierten Daten
-
-**Hinweis:** Beim Import werden alle bestehenden Daten überschrieben.
-
-### Sicherheit
-
-- **Rate-Limiting**: Nach 5 falschen Login-Versuchen wird die IP gesperrt (5 Min, dann eskalierend)
-- **Session-Timeout**: Automatisches Ausloggen nach Inaktivität (einstellbar in Einstellungen → Session)
-
-### Speed-Test
-
-Der integrierte Speed-Test misst:
-- **Download-Geschwindigkeit** (Mbit/s)
-- **Upload-Geschwindigkeit** (Mbit/s)
-- **Ping** (ms)
-
-Der Test läuft im lokalen Netzwerk zwischen deinem Browser und dem Server. Optional kann ein Raspberry Pi als Test-Gegenstelle konfiguriert werden (siehe `PI_SPEEDTEST_SERVER.md`).
-
-**Hinweis:** Der Speed-Test funktioniert nur, wenn du die Website über die LAN-IP öffnest (nicht über `localhost`).
+---
 
 ## Credits
 

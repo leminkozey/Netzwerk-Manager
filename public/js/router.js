@@ -52,7 +52,7 @@ function handleRoute() {
 
   currentRoute = path;
   if (contentEl) {
-    contentEl.innerHTML = '';
+    contentEl.replaceChildren();
     handler(contentEl);
   }
 

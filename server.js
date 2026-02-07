@@ -1480,7 +1480,7 @@ app.get('/api/speedtest/local-download-proxy', authRequired, async (req, res) =>
     if (piRes.statusCode && piRes.statusCode >= 400) {
       piRes.resume();
       return res.status(piRes.statusCode).json({
-        error: 'Pi-Speedtest-Server Fehler',
+        error: 'Pi speedtest server error',
         status: piRes.statusCode,
       });
     }

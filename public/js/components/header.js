@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { t } from '../i18n.js';
-import { state, getConfig } from '../state.js';
+import { getConfig } from '../state.js';
 import { navigate, getCurrentRoute } from '../router.js';
 import { el } from '../ui.js';
 import { iconEl } from '../icons.js';

@@ -2,9 +2,9 @@
 // Settings Modal Component
 // ═══════════════════════════════════════════════════════════════════
 
-import { t, setLanguage, getCurrentLang, updateDOM } from '../i18n.js';
+import { t, setLanguage, getCurrentLang } from '../i18n.js';
 import { state, defaults, STORAGE_KEYS, getConfig } from '../state.js';
-import { el, applyTheme, applyGlowStrength, applyAccentColor, applyButtonStyle, showToast, hexToRgb } from '../ui.js';
+import { el, applyTheme, applyGlowStrength, applyAccentColor, applyButtonStyle, showToast } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 import { handleLogout } from '../auth.js';
