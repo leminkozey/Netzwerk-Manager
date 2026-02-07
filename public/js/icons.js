@@ -229,6 +229,18 @@ export const icons = {
     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
   </svg>`,
 
+  // ── Pi-hole DNS ──
+  piholeDns: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z"/>
+    <line x1="8" y1="12" x2="16" y2="12"/>
+  </svg>`,
+
+  piholeDnsColor: `<svg viewBox="0 0 24 24" fill="none">
+    <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z" fill="#ef4444" opacity="0.85"/>
+    <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z" stroke="#fca5a5" stroke-width="0.8" fill="none"/>
+    <line x1="8" y1="12" x2="16" y2="12" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+  </svg>`,
+
   // ── Theme ──
   moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/>

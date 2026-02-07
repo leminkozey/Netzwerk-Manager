@@ -9,57 +9,12 @@ import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 
 // =================================================================
-// Mock Data
-// =================================================================
-
-const MOCK_TRAFFIC_24H = [
-  12, 8, 5, 3, 2, 2, 4, 14, 38, 52, 61, 55,
-  48, 42, 50, 63, 71, 68, 54, 41, 32, 25, 18, 14,
-];
-
-const MOCK_TRAFFIC_TOTAL = { inGB: 14.7, outGB: 3.2 };
-
-const MOCK_LINK_SPEEDS = [
-  { device: 'Router',     speed: '1 Gbit/s',  label: '1G',   color: '#22c55e' },
-  { device: 'Switch',     speed: '1 Gbit/s',  label: '1G',   color: '#22c55e' },
-  { device: 'PiHole',     speed: '100 Mbit/s', label: '100M', color: '#f59e0b' },
-  { device: 'Windows PC', speed: '1 Gbit/s',  label: '1G',   color: '#22c55e' },
-];
-
-const MOCK_POWER = [
-  { device: 'Router',     watts: 12 },
-  { device: 'Switch',     watts: 8  },
-  { device: 'PiHole',     watts: 5  },
-  { device: 'Windows PC', watts: 120 },
-];
-
-// =================================================================
 // Helpers
 // =================================================================
 
 function isLocalhost() {
   const h = location.hostname;
   return h === 'localhost' || h === '127.0.0.1' || h === '::1';
-}
-
-function mockBadge() {
-  return el('span', {
-    className: 'mock-badge',
-    textContent: t('analysen.mockHint'),
-    style: {
-      display: 'inline-block',
-      padding: '2px 8px',
-      fontSize: '0.68rem',
-      fontWeight: '600',
-      color: 'var(--accent-warm)',
-      background: 'rgba(255, 107, 74, 0.12)',
-      border: '1px solid rgba(255, 107, 74, 0.25)',
-      borderRadius: '4px',
-      letterSpacing: '0.03em',
-      textTransform: 'uppercase',
-      lineHeight: '1.4',
-    },
-  });
 }
 
 const iconColors = {
@@ -70,6 +25,8 @@ const iconColors = {
   linkSpeed: 'icon-yellow',
   outage: 'icon-red',
   power: 'icon-purple',
+  piholeDns: 'icon-red',
+  piholeDnsColor: '',
 };
 
 function sectionTitle(titleText, iconName, badge) {
@@ -97,6 +54,11 @@ function formatLiveTimer(sinceTs) {
   if (m > 0 || h > 0 || d > 0) parts.push(`${m}m`);
   parts.push(`${s}s`);
   return parts.join(' ');
+}
+
+function formatNumber(n) {
+  if (typeof n !== 'number' || isNaN(n)) return '0';
+  return n.toLocaleString('de-DE');
 }
 
 // =================================================================
@@ -403,76 +365,6 @@ function buildDeviceUptimeCard(d, timerRefs) {
 }
 
 // =================================================================
-// Traffic Card (Mock)
-// =================================================================
-
-function buildTrafficCard() {
-  const svgW = 200, svgH = 60;
-  const max = Math.max(...MOCK_TRAFFIC_24H);
-  const padding = 4;
-  const points = MOCK_TRAFFIC_24H.map((v, i) => {
-    const x = padding + (i / (MOCK_TRAFFIC_24H.length - 1)) * (svgW - padding * 2);
-    const y = svgH - padding - ((v / max) * (svgH - padding * 2));
-    return `${x},${y}`;
-  }).join(' ');
-  const firstX = padding;
-  const lastX = svgW - padding;
-  const areaPoints = `${firstX},${svgH - padding} ${points} ${lastX},${svgH - padding}`;
-
-  const sparkSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  sparkSvg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
-  sparkSvg.style.cssText = 'width:100%;height:60px;display:block';
-  const areaFill = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-  areaFill.setAttribute('points', areaPoints);
-  areaFill.setAttribute('fill', 'var(--accent-glow)');
-  sparkSvg.appendChild(areaFill);
-  const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-  polyline.setAttribute('points', points);
-  polyline.setAttribute('fill', 'none');
-  polyline.setAttribute('stroke', 'var(--accent)');
-  polyline.setAttribute('stroke-width', '2');
-  polyline.setAttribute('stroke-linejoin', 'round');
-  polyline.setAttribute('stroke-linecap', 'round');
-  sparkSvg.appendChild(polyline);
-
-  return el('div', { className: 'card' }, [
-    sectionTitle(t('analysen.traffic'), 'traffic', mockBadge()),
-    el('div', { style: { padding: '12px 0', overflow: 'hidden' } }, [sparkSvg]),
-    el('div', { style: { display: 'flex', justifyContent: 'space-around', paddingTop: '12px', borderTop: '1px solid var(--border)' } }, [
-      el('div', { style: { textAlign: 'center' } }, [
-        el('div', { textContent: 'IN', style: { fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '4px' } }),
-        el('div', { textContent: MOCK_TRAFFIC_TOTAL.inGB + ' GB', style: { fontSize: '1.1rem', fontWeight: '700', color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace" } }),
-      ]),
-      el('div', { style: { textAlign: 'center' } }, [
-        el('div', { textContent: 'OUT', style: { fontSize: '0.72rem', fontWeight: '600', color: 'var(--text-muted)', letterSpacing: '0.05em', marginBottom: '4px' } }),
-        el('div', { textContent: MOCK_TRAFFIC_TOTAL.outGB + ' GB', style: { fontSize: '1.1rem', fontWeight: '700', color: 'var(--accent-warm)', fontFamily: "'JetBrains Mono', monospace" } }),
-      ]),
-    ]),
-  ]);
-}
-
-// =================================================================
-// Link Speed Card (Mock)
-// =================================================================
-
-function buildLinkSpeedCard() {
-  const badges = MOCK_LINK_SPEEDS.map(d =>
-    el('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--border)' } }, [
-      el('span', { textContent: d.device, style: { fontSize: '0.88rem', fontWeight: '500', color: 'var(--text-secondary)' } }),
-      el('span', { textContent: d.label, style: {
-        display: 'inline-block', padding: '4px 12px', fontSize: '0.78rem', fontWeight: '700', color: '#fff',
-        background: d.color, borderRadius: '20px', fontFamily: "'JetBrains Mono', monospace",
-        letterSpacing: '0.03em', boxShadow: `0 2px 8px ${d.color}44`,
-      } }),
-    ])
-  );
-  return el('div', { className: 'card' }, [
-    sectionTitle(t('analysen.linkspeed'), 'linkSpeed', mockBadge()),
-    ...badges,
-  ]);
-}
-
-// =================================================================
 // Outages Card (Real Data)
 // =================================================================
 
@@ -507,30 +399,342 @@ function buildOutagesCardFromData(outages) {
 }
 
 // =================================================================
-// Power Usage Card (Mock)
+// Pi-hole Dashboard
 // =================================================================
 
-function buildPowerCard() {
-  const maxWatts = Math.max(...MOCK_POWER.map(d => d.watts));
-  const totalWatts = MOCK_POWER.reduce((s, d) => s + d.watts, 0);
-  const bars = MOCK_POWER.map(d => {
-    const pct = (d.watts / maxWatts) * 100;
-    const barColor = d.watts > 50 ? '#ef4444' : d.watts > 10 ? '#f59e0b' : '#22c55e';
-    return el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0' } }, [
-      el('span', { textContent: d.device, style: { minWidth: '100px', fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-secondary)' } }),
-      el('div', { style: { flex: '1', height: '10px', borderRadius: '5px', background: 'var(--border)', overflow: 'hidden' } }, [
-        el('div', { style: { height: '100%', width: pct + '%', borderRadius: '5px', background: `linear-gradient(90deg, ${barColor}cc, ${barColor})`, transition: 'width 0.8s ease' } }),
+// Decorative SVG icon for summary cards (semi-transparent, right-aligned)
+function summaryCardIcon(svgContent) {
+  const wrapper = el('div', { className: 'pihole-stat-icon' });
+  const tpl = document.createElement('template');
+  tpl.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:100%;height:100%">${svgContent}</svg>`;
+  wrapper.appendChild(tpl.content);
+  return wrapper;
+}
+
+function buildPiholeSummaryCards(data) {
+  const queries = data?.queries?.total ?? data?.dns_queries_today ?? 0;
+  const blocked = data?.queries?.blocked ?? data?.ads_blocked_today ?? 0;
+  const percent = data?.queries?.percent_blocked ?? data?.ads_percentage_today ?? 0;
+  const blocklist = data?.gravity?.domains_being_blocked ?? data?.domains_being_blocked ?? 0;
+
+  const cards = [
+    {
+      label: t('pihole.totalQueries'), value: formatNumber(queries),
+      cls: 'pihole-stat-card--cyan',
+      icon: '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+    },
+    {
+      label: t('pihole.queriesBlocked'), value: formatNumber(blocked),
+      cls: 'pihole-stat-card--red',
+      icon: '<path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    },
+    {
+      label: t('pihole.percentBlocked'), value: (Math.round(percent * 10) / 10) + '%',
+      cls: 'pihole-stat-card--orange',
+      icon: '<path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 3a9 9 0 0 1 0 18V12z" fill="currentColor" opacity="0.4"/>',
+    },
+    {
+      label: t('pihole.domainsBlocked'), value: formatNumber(blocklist),
+      cls: 'pihole-stat-card--green',
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="8" x2="17" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="12" x2="17" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="16" x2="13" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+    },
+  ];
+
+  return el('div', { className: 'pihole-summary-grid' }, cards.map(c =>
+    el('div', { className: `pihole-stat-card ${c.cls}` }, [
+      el('div', { style: { position: 'relative', zIndex: '1' } }, [
+        el('div', { className: 'pihole-stat-value' }, [document.createTextNode(c.value)]),
+        el('div', { className: 'pihole-stat-label' }, [document.createTextNode(c.label)]),
       ]),
-      el('span', { textContent: d.watts + ' W', style: { minWidth: '56px', textAlign: 'right', fontSize: '0.85rem', fontWeight: '600', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' } }),
+      summaryCardIcon(c.icon),
+    ])
+  ));
+}
+
+function buildQueriesOverTimeChart(data) {
+  // Pi-hole v6: data.history is array of { timestamp, total, blocked, cached, forwarded }
+  const history = Array.isArray(data?.history) ? data.history : [];
+  if (history.length === 0) {
+    return el('div', { className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)' } }, [
+      el('span', { textContent: t('analysen.noData') }),
+    ]);
+  }
+
+  const svgW = 700, svgH = 240;
+  const padL = 50, padR = 15, padT = 15, padB = 40;
+  const chartW = svgW - padL - padR;
+  const chartH = svgH - padT - padB;
+
+  const maxVal = Math.max(...history.map(h => h.total ?? 0), 1);
+  const barW = chartW / history.length;
+  const barInner = Math.max(barW * 0.7, 1);
+
+  function toY(v) {
+    return padT + chartH - (v / maxVal) * chartH;
+  }
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+  svg.style.cssText = 'width:100%;height:auto;display:block';
+
+  // Y-axis grid lines
+  const ySteps = 4;
+  for (let i = 0; i <= ySteps; i++) {
+    const yVal = (maxVal / ySteps) * i;
+    const y = toY(yVal);
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', padL); line.setAttribute('x2', svgW - padR);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '0.5');
+    svg.appendChild(line);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', padL - 8); label.setAttribute('y', y + 4);
+    label.setAttribute('text-anchor', 'end'); label.setAttribute('fill', 'var(--text-muted)');
+    label.setAttribute('font-size', '10');
+    label.textContent = yVal >= 1000 ? Math.round(yVal / 1000) + 'k' : Math.round(yVal);
+    svg.appendChild(label);
+  }
+
+  // Stacked bars
+  const bottom = toY(0);
+  for (let i = 0; i < history.length; i++) {
+    const h = history[i];
+    const forwarded = h.forwarded ?? 0;
+    const cached = h.cached ?? 0;
+    const blocked = h.blocked ?? 0;
+    const total = h.total ?? (forwarded + cached + blocked);
+    if (total === 0) continue;
+
+    const x = padL + i * barW + (barW - barInner) / 2;
+
+    // Calculate segment heights proportionally from the total bar
+    const totalH = bottom - toY(total);
+
+    // Forwarded (bottom, blue)
+    if (forwarded > 0) {
+      const fH = (forwarded / total) * totalH;
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('width', barInner);
+      rect.setAttribute('y', bottom - fH); rect.setAttribute('height', fH);
+      rect.setAttribute('fill', '#3b82f6'); rect.setAttribute('rx', '0.5');
+      svg.appendChild(rect);
+    }
+
+    // Cached (middle, green)
+    if (cached > 0) {
+      const fH = (forwarded / total) * totalH;
+      const cH = (cached / total) * totalH;
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('width', barInner);
+      rect.setAttribute('y', bottom - fH - cH); rect.setAttribute('height', cH);
+      rect.setAttribute('fill', '#22c55e'); rect.setAttribute('rx', '0.5');
+      svg.appendChild(rect);
+    }
+
+    // Blocked (top, red)
+    if (blocked > 0) {
+      const fH = (forwarded / total) * totalH;
+      const cH = (cached / total) * totalH;
+      const bH = (blocked / total) * totalH;
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('width', barInner);
+      rect.setAttribute('y', bottom - fH - cH - bH); rect.setAttribute('height', bH);
+      rect.setAttribute('fill', '#ef4444'); rect.setAttribute('rx', '0.5');
+      svg.appendChild(rect);
+    }
+  }
+
+  // X-axis time labels
+  const labelCount = Math.min(12, history.length);
+  for (let i = 0; i < labelCount; i++) {
+    const idx = Math.round((i / (labelCount - 1)) * (history.length - 1));
+    const ts = history[idx]?.timestamp;
+    if (!ts) continue;
+    const d = new Date(ts * 1000);
+    const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', padL + idx * barW + barW / 2);
+    label.setAttribute('y', svgH - 8);
+    label.setAttribute('text-anchor', 'middle'); label.setAttribute('fill', 'var(--text-muted)');
+    label.setAttribute('font-size', '9');
+    label.textContent = timeStr;
+    svg.appendChild(label);
+  }
+
+  // Legend
+  const legend = el('div', { style: { display: 'flex', gap: '16px', justifyContent: 'center', paddingTop: '8px', flexWrap: 'wrap' } }, [
+    el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('div', { style: { width: '10px', height: '10px', borderRadius: '2px', background: '#3b82f6' } }),
+      el('span', { textContent: t('pihole.forwarded'), style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }),
+    ]),
+    el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('div', { style: { width: '10px', height: '10px', borderRadius: '2px', background: '#22c55e' } }),
+      el('span', { textContent: t('pihole.cached'), style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }),
+    ]),
+    el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('div', { style: { width: '10px', height: '10px', borderRadius: '2px', background: '#ef4444' } }),
+      el('span', { textContent: t('pihole.blocked'), style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }),
+    ]),
+  ]);
+
+  return el('div', { className: 'card' }, [
+    sectionTitle(t('pihole.queriesOverTime'), 'traffic'),
+    el('div', { style: { padding: '8px 0', overflow: 'hidden' } }, [svg]),
+    legend,
+  ]);
+}
+
+function buildDonutChart(title, iconName, entries, colors) {
+  if (!entries || entries.length === 0) {
+    return el('div', { className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)' } }, [
+      el('span', { textContent: t('analysen.noData') }),
+    ]);
+  }
+
+  const total = entries.reduce((s, e) => s + e.value, 0);
+  if (total === 0) {
+    return el('div', { className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)' } }, [
+      el('span', { textContent: t('analysen.noData') }),
+    ]);
+  }
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 200 200');
+  svg.style.cssText = 'width:100%;max-width:180px;height:auto;display:block;margin:0 auto';
+
+  const cx = 100, cy = 100, r = 80, inner = 50;
+  let startAngle = -Math.PI / 2;
+
+  entries.forEach((entry, i) => {
+    const sliceAngle = (entry.value / total) * 2 * Math.PI;
+    if (sliceAngle < 0.01) { startAngle += sliceAngle; return; }
+    const endAngle = startAngle + sliceAngle;
+    const largeArc = sliceAngle > Math.PI ? 1 : 0;
+
+    const path = document.createElementNS(ns, 'path');
+    const d = [
+      `M ${cx + r * Math.cos(startAngle)} ${cy + r * Math.sin(startAngle)}`,
+      `A ${r} ${r} 0 ${largeArc} 1 ${cx + r * Math.cos(endAngle)} ${cy + r * Math.sin(endAngle)}`,
+      `L ${cx + inner * Math.cos(endAngle)} ${cy + inner * Math.sin(endAngle)}`,
+      `A ${inner} ${inner} 0 ${largeArc} 0 ${cx + inner * Math.cos(startAngle)} ${cy + inner * Math.sin(startAngle)}`,
+      'Z',
+    ].join(' ');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', colors[i % colors.length]);
+    path.setAttribute('opacity', '0.85');
+    svg.appendChild(path);
+    startAngle = endAngle;
+  });
+
+  const legendItems = entries.slice(0, 8).map((entry, i) => {
+    const pctDisplay = Math.round((entry.value / total) * 1000) / 10;
+    return el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' } }, [
+      el('div', { style: { width: '10px', height: '10px', borderRadius: '3px', background: colors[i % colors.length], flexShrink: '0' } }),
+      el('span', {
+        textContent: entry.label,
+        style: { fontSize: '0.78rem', color: 'var(--text-secondary)', flex: '1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+      }),
+      el('span', { textContent: pctDisplay + '%', style: { fontSize: '0.78rem', fontWeight: '600', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-muted)' } }),
     ]);
   });
+
   return el('div', { className: 'card' }, [
-    sectionTitle(t('analysen.power'), 'power', mockBadge()),
-    ...bars,
-    el('div', { style: { display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingTop: '12px', borderTop: '1px solid var(--border)', marginTop: '8px' } }, [
-      el('span', { textContent: t('speedtest.total'), style: { fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-muted)' } }),
-      el('span', { textContent: '~' + totalWatts + ' W', style: { fontSize: '1rem', fontWeight: '700', color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace" } }),
-    ]),
+    sectionTitle(title, iconName),
+    el('div', { style: { padding: '12px 0' } }, [svg]),
+    el('div', { style: { padding: '4px 0' } }, legendItems),
+  ]);
+}
+
+function buildQueryTypesDonut(data) {
+  const types = data?.types || data?.querytypes || {};
+  const entries = Object.entries(types)
+    .filter(([, v]) => v > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value]) => ({ label, value }));
+
+  const colors = ['#ec4899', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
+  return buildDonutChart(t('pihole.queryTypes'), 'piholeDns', entries, colors);
+}
+
+function buildUpstreamsDonut(data) {
+  const upstreams = data?.upstreams || [];
+  let entries;
+  if (Array.isArray(upstreams)) {
+    entries = upstreams
+      .filter(u => (u.count || u.percentage || 0) > 0)
+      .sort((a, b) => (b.count || b.percentage || 0) - (a.count || a.percentage || 0))
+      .map(u => ({ label: u.name || u.ip || 'unknown', value: u.count || u.percentage || 0 }));
+  } else {
+    entries = Object.entries(upstreams)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value]) => ({ label, value }));
+  }
+
+  const colors = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+  return buildDonutChart(t('pihole.upstreamServers'), 'uptime', entries, colors);
+}
+
+function extractTopList(data, key) {
+  // Try multiple Pi-hole v6 response formats
+  const raw = data?.[key] || data?.domains || data?.top_domains || data?.top_clients || data?.clients || [];
+  if (Array.isArray(raw)) {
+    return raw.map(item => ({
+      name: item.domain || item.name || item.client || item.ip || 'unknown',
+      count: item.count || item.hits || 0,
+    }));
+  }
+  return Object.entries(raw).map(([name, count]) => ({ name, count }));
+}
+
+function buildTopList(title, iconName, items, color) {
+  if (!items || items.length === 0) {
+    return el('div', { className: 'card' }, [
+      sectionTitle(title, iconName),
+      el('div', { textContent: t('analysen.noData'), style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' } }),
+    ]);
+  }
+
+  const maxCount = Math.max(...items.map(i => i.count), 1);
+
+  const rows = items.slice(0, 10).map((item, idx) => {
+    const pct = (item.count / maxCount) * 100;
+    return el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 0' } }, [
+      el('span', {
+        textContent: String(idx + 1),
+        style: {
+          minWidth: '22px', fontSize: '0.72rem', fontWeight: '700',
+          color: 'var(--text-muted)', textAlign: 'right',
+        },
+      }),
+      el('div', { style: { flex: '1', minWidth: '0' } }, [
+        el('div', {
+          textContent: item.name,
+          style: {
+            fontSize: '0.82rem', fontWeight: '500', color: 'var(--text)',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          },
+        }),
+        el('div', { style: { height: '4px', borderRadius: '2px', background: 'var(--border)', marginTop: '4px', overflow: 'hidden' } }, [
+          el('div', { style: { height: '100%', width: pct + '%', borderRadius: '2px', background: color, transition: 'width 0.6s ease' } }),
+        ]),
+      ]),
+      el('span', {
+        textContent: formatNumber(item.count),
+        style: {
+          fontSize: '0.78rem', fontWeight: '600', fontFamily: "'JetBrains Mono', monospace",
+          color: 'var(--text-muted)', whiteSpace: 'nowrap',
+        },
+      }),
+    ]);
+  });
+
+  return el('div', { className: 'card' }, [
+    sectionTitle(title, iconName),
+    ...rows,
   ]);
 }
 
@@ -542,6 +746,7 @@ export function renderAnalysen(container) {
   let destroyed = false;
   let timerInterval = null;
   let pollInterval = null;
+  let piholeInterval = null;
   const timerRefs = []; // { el, ts } — updated every second
 
   // Read poll interval from config (default 60s, min 10s)
@@ -588,15 +793,13 @@ export function renderAnalysen(container) {
   ]);
   page.appendChild(outagesPlaceholder);
 
-  // Other monitoring
-  page.appendChild(el('div', { className: 'section-title', style: { marginTop: '28px', marginBottom: '16px' } }, [
-    el('h3', { textContent: t('section.monitoring') }),
-  ]));
-  page.appendChild(el('div', { className: 'grid three equal-height' }, [
-    buildTrafficCard(),
-    buildLinkSpeedCard(),
-    buildPowerCard(),
-  ]));
+  // Pi-hole section
+  const piholeContainer = el('div', { style: { marginTop: '28px' } });
+  piholeContainer.appendChild(el('div', {
+    textContent: t('pihole.loading'),
+    style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
+  }));
+  page.appendChild(piholeContainer);
 
   container.appendChild(page);
 
@@ -648,11 +851,103 @@ export function renderAnalysen(container) {
     });
   }
 
+  function refreshPihole() {
+    if (destroyed) return;
+
+    api.getPiholeStatus().then(status => {
+      if (destroyed) return;
+
+      if (!status.configured) {
+        piholeContainer.replaceChildren();
+        piholeContainer.appendChild(el('div', { className: 'card' }, [
+          sectionTitle(t('analysen.pihole'), 'piholeDnsColor'),
+          el('div', {
+            textContent: t('pihole.notConfigured'),
+            style: { padding: '24px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
+          }),
+        ]));
+        return;
+      }
+
+      if (!status.reachable) {
+        piholeContainer.replaceChildren();
+        piholeContainer.appendChild(el('div', { className: 'card' }, [
+          sectionTitle(t('analysen.pihole'), 'piholeDnsColor'),
+          el('div', {
+            textContent: t('pihole.unreachable'),
+            style: { padding: '24px 0', textAlign: 'center', color: '#ef4444', fontSize: '0.88rem' },
+          }),
+        ]));
+        return;
+      }
+
+      // Fetch all data in parallel
+      Promise.all([
+        api.getPiholeSummary(),
+        api.getPiholeHistory(),
+        api.getPiholeQueryTypes(),
+        api.getPiholeTopDomains(10),
+        api.getPiholeTopBlocked(10),
+        api.getPiholeTopClients(10),
+        api.getPiholeUpstreams(),
+      ]).then(([summary, history, queryTypes, topDomains, topBlocked, topClients, upstreams]) => {
+        if (destroyed) return;
+
+        piholeContainer.replaceChildren();
+
+        // Section title
+        piholeContainer.appendChild(el('div', { className: 'section-title', style: { marginBottom: '16px' } }, [
+          el('div', { className: 'section-header' }, [
+            el('span', { className: 'icon-badge icon-red' }, [iconEl('piholeDnsColor', 22)]),
+            el('h3', { textContent: t('analysen.pihole') }),
+          ]),
+        ]));
+
+        // Summary cards
+        piholeContainer.appendChild(buildPiholeSummaryCards(summary));
+
+        // Queries over time (full width)
+        piholeContainer.appendChild(buildQueriesOverTimeChart(history));
+
+        // Donuts row: query types + upstream servers (2 columns)
+        const donutsRow = el('div', { className: 'pihole-donuts-row' }, [
+          buildQueryTypesDonut(queryTypes),
+          buildUpstreamsDonut(upstreams),
+        ]);
+        piholeContainer.appendChild(donutsRow);
+
+        // Top lists: 3 columns
+        const topListsRow = el('div', { className: 'grid three equal-height' }, [
+          buildTopList(t('pihole.topDomains'), 'traffic', extractTopList(topDomains, 'domains'), 'var(--accent)'),
+          buildTopList(t('pihole.topBlocked'), 'outage', extractTopList(topBlocked, 'domains'), '#ef4444'),
+          buildTopList(t('pihole.topClients'), 'power', extractTopList(topClients, 'clients'), '#8b5cf6'),
+        ]);
+        piholeContainer.appendChild(topListsRow);
+      }).catch(() => {
+        if (destroyed) return;
+        piholeContainer.replaceChildren();
+        piholeContainer.appendChild(el('div', { className: 'card' }, [
+          sectionTitle(t('analysen.pihole'), 'piholeDnsColor'),
+          el('div', {
+            textContent: t('pihole.unreachable'),
+            style: { padding: '24px 0', textAlign: 'center', color: '#ef4444', fontSize: '0.88rem' },
+          }),
+        ]));
+      });
+    }).catch(() => {
+      // Status check failed — likely not configured
+      if (destroyed) return;
+      piholeContainer.replaceChildren();
+    });
+  }
+
   // Initial fetch
   refreshUptime();
+  refreshPihole();
 
   // Auto-poll at configured interval for live status updates
   pollInterval = setInterval(() => refreshUptime(), pollMs);
+  piholeInterval = setInterval(() => refreshPihole(), 60000);
 
   // Live-update when uptime is reset from settings
   const onReset = () => refreshUptime();
@@ -662,6 +957,7 @@ export function renderAnalysen(container) {
     destroyed = true;
     if (timerInterval) clearInterval(timerInterval);
     if (pollInterval) clearInterval(pollInterval);
+    if (piholeInterval) clearInterval(piholeInterval);
     window.removeEventListener('uptime-reset', onReset);
     // Restore parent .page max-width for other pages
     if (parentPage) parentPage.style.maxWidth = '';

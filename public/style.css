@@ -3222,3 +3222,113 @@ label {
     grid-template-columns: 1fr;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Pi-hole DNS Analytics
+   ═══════════════════════════════════════════════════════════════════ */
+
+.pihole-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pihole-stat-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  padding: 20px 16px;
+  text-align: left;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.pihole-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.pihole-stat-card--cyan {
+  background: linear-gradient(135deg, #0891b2, #06b6d4);
+  color: #fff;
+}
+.pihole-stat-card--red {
+  background: linear-gradient(135deg, #dc2626, #ef4444);
+  color: #fff;
+}
+.pihole-stat-card--orange {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+  color: #fff;
+}
+.pihole-stat-card--green {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #fff;
+}
+
+.pihole-stat-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  opacity: 0.2;
+  color: #fff;
+  pointer-events: none;
+}
+
+.pihole-stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.2;
+  margin-bottom: 4px;
+  color: inherit;
+}
+
+.pihole-stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pihole-donuts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.pihole-charts-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .pihole-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pihole-charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pihole-donuts-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .pihole-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .pihole-stat-value {
+    font-size: 1.2rem;
+  }
+}

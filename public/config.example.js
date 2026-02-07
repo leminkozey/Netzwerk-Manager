@@ -84,6 +84,16 @@ const siteConfig = {
   // Ping-Intervall in Sekunden. Der Server pingt alle Geräte in
   // diesem Intervall und das Frontend aktualisiert die Anzeige.
   // Minimum: 10 Sekunden
+  // ══════════════════════════════════════════════
+  // PI-HOLE v6 DNS ANALYTICS
+  // ══════════════════════════════════════════════
+  // Verbindung zur Pi-hole v6 REST-API für DNS-Statistiken
+  // auf der Analysen-Seite. Der Server fungiert als Proxy.
+  pihole: {
+    url: 'http://192.168.1.100',       // Pi-hole v6 Base-URL
+    password: 'your-pihole-password',   // Web-Interface Passwort
+  },
+
   uptimeInterval: 10,
 
   // Geräte die per Ping überwacht werden sollen

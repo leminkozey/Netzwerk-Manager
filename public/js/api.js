@@ -197,6 +197,56 @@ export async function controlDeviceAction(deviceId, action) {
   return res.json();
 }
 
+// ── Pi-hole ──
+
+export async function getPiholeStatus() {
+  const res = await request('/api/pihole/status');
+  if (!res.ok) throw new Error('Failed to get Pi-hole status');
+  return res.json();
+}
+
+export async function getPiholeSummary() {
+  const res = await request('/api/pihole/summary');
+  if (!res.ok) throw new Error('Failed to get Pi-hole summary');
+  return res.json();
+}
+
+export async function getPiholeQueryTypes() {
+  const res = await request('/api/pihole/query-types');
+  if (!res.ok) throw new Error('Failed to get Pi-hole query types');
+  return res.json();
+}
+
+export async function getPiholeTopDomains(count = 10) {
+  const res = await request(`/api/pihole/top-domains?count=${count}`);
+  if (!res.ok) throw new Error('Failed to get Pi-hole top domains');
+  return res.json();
+}
+
+export async function getPiholeTopBlocked(count = 10) {
+  const res = await request(`/api/pihole/top-blocked?count=${count}`);
+  if (!res.ok) throw new Error('Failed to get Pi-hole top blocked');
+  return res.json();
+}
+
+export async function getPiholeTopClients(count = 10) {
+  const res = await request(`/api/pihole/top-clients?count=${count}`);
+  if (!res.ok) throw new Error('Failed to get Pi-hole top clients');
+  return res.json();
+}
+
+export async function getPiholeHistory() {
+  const res = await request('/api/pihole/history');
+  if (!res.ok) throw new Error('Failed to get Pi-hole history');
+  return res.json();
+}
+
+export async function getPiholeUpstreams() {
+  const res = await request('/api/pihole/upstreams');
+  if (!res.ok) throw new Error('Failed to get Pi-hole upstreams');
+  return res.json();
+}
+
 // ── Uptime ──
 
 export async function getUptime() {
