@@ -3,6 +3,8 @@ node_modules/
 
 # Laufzeit-Daten (wird automatisch erstellt)
 Data/state.json
+Data/UptimeData.json
+Data/uptime.json
 
 # Sensible Daten
 Data/Nutzer
