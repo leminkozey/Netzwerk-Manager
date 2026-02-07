@@ -559,7 +559,11 @@ function syncViewToLive() {
 function pickTextColor(hex) {
   if (!hex) return '#ffffff';
   const c = hex.replace('#', '');
-  const bigint = parseInt(c.length === 3 ? c.repeat(2) : c, 16);
+  // Expand 3-char hex correctly: "F0A" → "FF00AA"
+  const full = c.length === 3
+    ? c[0] + c[0] + c[1] + c[1] + c[2] + c[2]
+    : c;
+  const bigint = parseInt(full, 16);
   const r = (bigint >> 16) & 255;
   const g = (bigint >> 8) & 255;
   const b = bigint & 255;

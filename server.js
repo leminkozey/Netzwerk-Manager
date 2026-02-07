@@ -11,17 +11,13 @@ const { spawn } = require('child_process');
 // Security Utilities
 // ═══════════════════════════════════════════════════════════════════
 
-// Constant-time string comparison to prevent timing attacks
+// Constant-time string comparison using HMAC to prevent timing attacks
 function timingSafeEqual(a, b) {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  if (bufA.length !== bufB.length) {
-    // Still do comparison to maintain constant time
-    crypto.timingSafeEqual(bufA, Buffer.alloc(bufA.length));
-    return false;
-  }
-  return crypto.timingSafeEqual(bufA, bufB);
+  const key = crypto.randomBytes(32);
+  const hmacA = crypto.createHmac('sha256', key).update(a).digest();
+  const hmacB = crypto.createHmac('sha256', key).update(b).digest();
+  return crypto.timingSafeEqual(hmacA, hmacB);
 }
 
 // Simple password hashing (for local network use)
@@ -41,6 +37,46 @@ function verifyPassword(password, stored) {
 // Check if stored password is hashed or plaintext (for migration)
 function isHashedPassword(stored) {
   return typeof stored === 'string' && stored.includes(':') && stored.length > 100;
+}
+
+// Symmetric encryption for sensitive data at rest (SSH passwords etc.)
+const ENCRYPTION_KEY_FILE = path.join(__dirname, 'Data', '.encryption-key');
+function getEncryptionKey() {
+  if (fs.existsSync(ENCRYPTION_KEY_FILE)) {
+    return Buffer.from(fs.readFileSync(ENCRYPTION_KEY_FILE, 'utf-8').trim(), 'hex');
+  }
+  const key = crypto.randomBytes(32);
+  fs.writeFileSync(ENCRYPTION_KEY_FILE, key.toString('hex'), 'utf-8');
+  return key;
+}
+
+function encryptValue(plaintext) {
+  if (!plaintext) return '';
+  const key = getEncryptionKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const tag = cipher.getAuthTag().toString('hex');
+  return `enc:${iv.toString('hex')}:${tag}:${encrypted}`;
+}
+
+function decryptValue(stored) {
+  if (!stored || !stored.startsWith('enc:')) return stored || '';
+  try {
+    const parts = stored.split(':');
+    const iv = Buffer.from(parts[1], 'hex');
+    const tag = Buffer.from(parts[2], 'hex');
+    const encrypted = parts[3];
+    const key = getEncryptionKey();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(tag);
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch {
+    return '';
+  }
 }
 
 // HTML escape to prevent XSS
@@ -77,6 +113,8 @@ const DATA_FILE = path.join(DATA_DIR, 'state.json');
 const USER_FILE = path.join(DATA_DIR, 'Nutzer');
 const LOGIN_TOKEN_FILE = path.join(DATA_DIR, 'LoginToken.txt');
 const WINDOWS_PC_FILE = path.join(DATA_DIR, 'WindowsPC.json');
+const UPTIME_FILE = path.join(DATA_DIR, 'uptime.json');
+const CONFIG_FILE = path.join(__dirname, 'public', 'config.js');
 const MAX_VERSIONS = 100;
 
 // Rate-Limiting Konstanten
@@ -147,7 +185,14 @@ function resetAttempts(ip) {
 }
 
 // Raw body parser für Upload-Tests (muss VOR json() kommen)
-app.use('/api/speedtest/upload', express.raw({ type: '*/*', limit: '50mb' }));
+// #17 Auth-Check VOR Body-Parsing um DoS durch unauthentifizierte 50MB-Uploads zu verhindern
+app.use('/api/speedtest/upload', (req, res, next) => {
+  const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
+  if (!token || !isSessionValid() || !timingSafeEqual(runtime.activeSession.token, token)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}, express.raw({ type: '*/*', limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 
 // Security headers middleware
@@ -167,6 +212,27 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   // XSS protection for older browsers
   res.setHeader('X-XSS-Protection', '1; mode=block');
+  // #23 HSTS - enforce HTTPS for 1 year (only effective when served over HTTPS)
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+
+// CSRF protection: validate Origin header on state-mutating requests
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    const origin = req.headers.origin;
+    if (origin) {
+      const allowed = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+      // Also allow the actual host the request came to
+      const host = req.headers.host;
+      if (host) {
+        allowed.push(`http://${host}`, `https://${host}`);
+      }
+      if (!allowed.includes(origin)) {
+        return res.status(403).json({ error: 'Invalid origin' });
+      }
+    }
+  }
   next();
 });
 
@@ -226,13 +292,13 @@ function ensureDataFile() {
   }
   ensureLoginTokenFile();
   if (!fs.existsSync(DATA_FILE)) {
+    // Hash default password on first run
     const initial = { ...defaultState, versions: [] };
+    initial.credentials.password = hashPassword(initial.credentials.password);
     fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2));
-    // Write initial credentials with plaintext (default: admin/admin)
     writeCredentialsFile({
       username: initial.credentials.username,
       password: initial.credentials.password,
-      plaintext: initial.credentials.password, // Initial password is plaintext
     });
   } else {
     const existing = readState();
@@ -240,7 +306,48 @@ function ensureDataFile() {
     if (fileCredentials) {
       existing.credentials = { ...existing.credentials, ...fileCredentials };
     }
+    // Migrate plaintext passwords to hashed on startup
+    if (!isHashedPassword(existing.credentials.password)) {
+      existing.credentials.password = hashPassword(existing.credentials.password);
+      writeCredentialsFile({
+        username: existing.credentials.username,
+        password: existing.credentials.password,
+      });
+    }
     saveState(existing);
+  }
+}
+
+// Synchronous mutex for state file operations to prevent race conditions
+let _stateLocked = false;
+const _stateWaiters = [];
+
+function acquireStateLock() {
+  return new Promise((resolve) => {
+    if (!_stateLocked) {
+      _stateLocked = true;
+      resolve();
+    } else {
+      _stateWaiters.push(resolve);
+    }
+  });
+}
+
+function releaseStateLock() {
+  if (_stateWaiters.length > 0) {
+    const next = _stateWaiters.shift();
+    next();
+  } else {
+    _stateLocked = false;
+  }
+}
+
+async function withStateLock(fn) {
+  await acquireStateLock();
+  try {
+    return fn();
+  } finally {
+    releaseStateLock();
   }
 }
 
@@ -336,13 +443,11 @@ function addRaspberryVersion(state, summary, snapshot) {
 // Credentials file format:
 // Line 1: username
 // Line 2: hashed password (for secure comparison)
-// Line 3: plaintext password (for admin reference - optional)
 function writeCredentialsFile(credentials) {
   if (!credentials) return;
   const username = credentials.username ?? '';
   const password = credentials.password ?? '';
-  const plaintext = credentials.plaintext ?? ''; // Original plaintext if available
-  const content = `${username}\n${password}\n${plaintext}\n`;
+  const content = `${username}\n${password}\n`;
   fs.writeFileSync(USER_FILE, content, 'utf-8');
 }
 
@@ -380,6 +485,18 @@ function readLoginTokens() {
     .filter((entry) => entry.token);
 }
 
+// #20 Cache for default-password check to avoid PBKDF2 on every request
+let _defaultPwCache = { hash: null, result: false };
+
+function isDefaultPassword(state) {
+  if (state.credentials.username !== 'admin') return false;
+  const hash = state.credentials.password;
+  if (_defaultPwCache.hash === hash) return _defaultPwCache.result;
+  const result = verifyPassword('admin', hash);
+  _defaultPwCache = { hash, result };
+  return result;
+}
+
 function maskStateForClient(state) {
   return {
     theme: state.theme,
@@ -391,6 +508,8 @@ function maskStateForClient(state) {
     raspberryInfo: state.raspberryInfo,
     raspberryVersions: state.raspberryVersions,
     username: state.credentials.username,
+    // #20 Warn client if default credentials are still in use
+    defaultPassword: isDefaultPassword(state),
   };
 }
 
@@ -470,8 +589,8 @@ function checkPCActionRateLimit(ip) {
   const now = Date.now();
   const data = pcActionLimits.get(ip);
 
-  if (!data || now - data.lastAction > PC_ACTION_LIMIT_WINDOW) {
-    pcActionLimits.set(ip, { lastAction: now, count: 1 });
+  if (!data || now - data.windowStart > PC_ACTION_LIMIT_WINDOW) {
+    pcActionLimits.set(ip, { windowStart: now, count: 1 });
     return true;
   }
 
@@ -480,7 +599,6 @@ function checkPCActionRateLimit(ip) {
   }
 
   data.count++;
-  data.lastAction = now;
   return true;
 }
 
@@ -493,8 +611,8 @@ function checkPCStatusRateLimit(ip) {
   const now = Date.now();
   const data = pcStatusLimits.get(ip);
 
-  if (!data || now - data.lastAction > PC_STATUS_LIMIT_WINDOW) {
-    pcStatusLimits.set(ip, { lastAction: now, count: 1 });
+  if (!data || now - data.windowStart > PC_STATUS_LIMIT_WINDOW) {
+    pcStatusLimits.set(ip, { windowStart: now, count: 1 });
     return true;
   }
 
@@ -503,7 +621,6 @@ function checkPCStatusRateLimit(ip) {
   }
 
   data.count++;
-  data.lastAction = now;
   return true;
 }
 
@@ -526,11 +643,22 @@ function readWindowsPCConfig() {
     fs.writeFileSync(WINDOWS_PC_FILE, JSON.stringify(defaultConfig, null, 2));
     return defaultConfig;
   }
-  return JSON.parse(fs.readFileSync(WINDOWS_PC_FILE, 'utf-8'));
+  const config = JSON.parse(fs.readFileSync(WINDOWS_PC_FILE, 'utf-8'));
+  // Decrypt SSH password for internal use
+  if (config.sshPassword) {
+    config._sshPasswordDecrypted = decryptValue(config.sshPassword);
+  }
+  return config;
 }
 
 function saveWindowsPCConfig(config) {
-  fs.writeFileSync(WINDOWS_PC_FILE, JSON.stringify(config, null, 2));
+  const toSave = { ...config };
+  // Encrypt SSH password before saving if it's not already encrypted
+  if (toSave.sshPassword && !toSave.sshPassword.startsWith('enc:')) {
+    toSave.sshPassword = encryptValue(toSave.sshPassword);
+  }
+  delete toSave._sshPasswordDecrypted;
+  fs.writeFileSync(WINDOWS_PC_FILE, JSON.stringify(toSave, null, 2));
 }
 
 function sendWakeOnLan(macAddress) {
@@ -602,9 +730,195 @@ function pingHost(ipAddress) {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// Uptime Monitoring
+// ═══════════════════════════════════════════════════════════════════
+
+function readUptimeData() {
+  try {
+    if (fs.existsSync(UPTIME_FILE)) {
+      return JSON.parse(fs.readFileSync(UPTIME_FILE, 'utf-8'));
+    }
+  } catch { /* ignore */ }
+  return { devices: {}, outages: [] };
+}
+
+function saveUptimeData(data) {
+  fs.writeFileSync(UPTIME_FILE, JSON.stringify(data, null, 2));
+}
+
+function pruneHistory(history) {
+  const maxEntries = 10080; // 7 days at 1 entry/min
+  if (history.length > maxEntries) {
+    return history.slice(history.length - maxEntries);
+  }
+  return history;
+}
+
+function calculateUptimePercent(history, windowMs) {
+  if (history.length === 0) return 0;
+  const cutoff = Date.now() - windowMs;
+  const relevant = history.filter(e => e[0] >= cutoff);
+  if (relevant.length === 0) return 0;
+  const onlineCount = relevant.filter(e => e[1]).length;
+  return Math.round((onlineCount / relevant.length) * 1000) / 10;
+}
+
+function formatDuration(ms) {
+  if (!ms || ms < 0) return '0min';
+  const totalMin = Math.floor(ms / 60000);
+  const days = Math.floor(totalMin / 1440);
+  const hours = Math.floor((totalMin % 1440) / 60);
+  const mins = totalMin % 60;
+  const parts = [];
+  if (days > 0) parts.push(`${days}T`);
+  if (hours > 0) parts.push(`${hours}h`);
+  parts.push(`${mins}min`);
+  return parts.join(' ');
+}
+
+function formatTimestamp(ts) {
+  const d = new Date(ts);
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Read uptimeDevices from public/config.js
+function readUptimeDevicesFromConfig() {
+  try {
+    if (!fs.existsSync(CONFIG_FILE)) return [];
+    const src = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const vm = require('vm');
+    const sandbox = {};
+    vm.createContext(sandbox);
+    // const → var so siteConfig lands on the sandbox global object
+    const modified = src.replace(/\bconst siteConfig\b/, 'var siteConfig');
+    vm.runInContext(modified, sandbox, { timeout: 1000 });
+    const devices = sandbox.siteConfig?.uptimeDevices;
+    if (!Array.isArray(devices)) return [];
+    // Validate each entry
+    return devices.filter(d =>
+      d && typeof d.id === 'string' && d.id.length > 0
+        && typeof d.name === 'string' && d.name.length > 0
+        && typeof d.ip === 'string' && VALIDATION.ipAddress.test(d.ip)
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function runUptimePingCycle() {
+  const configDevices = readUptimeDevicesFromConfig();
+  if (configDevices.length === 0) return;
+
+  const data = readUptimeData();
+  const now = Date.now();
+
+  // Ensure each configured device has a data entry
+  for (const cd of configDevices) {
+    if (!data.devices[cd.id]) {
+      data.devices[cd.id] = { history: [], onlineSince: null, lastSeen: null };
+    }
+  }
+
+  const pingResults = await Promise.all(
+    configDevices.map(cd => pingHost(cd.ip))
+  );
+
+  for (let i = 0; i < configDevices.length; i++) {
+    const cd = configDevices[i];
+    const online = pingResults[i];
+    const dev = data.devices[cd.id];
+
+    const wasOnline = dev.history.length > 0 ? dev.history[dev.history.length - 1][1] : null;
+
+    // Record history entry
+    dev.history.push([now, online]);
+    dev.history = pruneHistory(dev.history);
+
+    if (online) {
+      dev.lastSeen = now;
+      // Came online (was offline or first contact)
+      if (wasOnline === false || wasOnline === null) {
+        dev.onlineSince = now;
+        // Close any ongoing outage for this device
+        for (const outage of data.outages) {
+          if (outage.device === cd.id && !outage.end) {
+            outage.end = now;
+            outage.durationMs = now - outage.start;
+          }
+        }
+      }
+    } else {
+      // Went offline (was online)
+      if (wasOnline === true) {
+        dev.onlineSince = null;
+        data.outages.push({ device: cd.id, start: now, end: null, durationMs: null });
+      }
+    }
+  }
+
+  // Keep only last 50 outages
+  if (data.outages.length > 50) {
+    data.outages = data.outages.slice(data.outages.length - 50);
+  }
+
+  saveUptimeData(data);
+}
+
+function buildUptimeResponse() {
+  const configDevices = readUptimeDevicesFromConfig();
+  const data = readUptimeData();
+  const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  // Build name lookup from config
+  const nameMap = {};
+  for (const cd of configDevices) {
+    nameMap[cd.id] = cd.name;
+  }
+
+  const devices = configDevices.map(cd => {
+    const dev = data.devices[cd.id] || { history: [], onlineSince: null, lastSeen: null };
+    const lastEntry = dev.history.length > 0 ? dev.history[dev.history.length - 1] : null;
+    const online = lastEntry ? lastEntry[1] : false;
+    const uptime24h = calculateUptimePercent(dev.history, DAY_MS);
+    const uptime7d = calculateUptimePercent(dev.history, 7 * DAY_MS);
+    const onlineSinceTs = dev.onlineSince || null;
+    const onlineSince = onlineSinceTs ? formatDuration(now - onlineSinceTs) : null;
+
+    return {
+      id: cd.id,
+      name: cd.name,
+      ip: cd.ip,
+      online,
+      uptime24h,
+      uptime7d,
+      onlineSince,
+      onlineSinceTs,
+    };
+  });
+
+  // Build outages list (most recent first), limit 20
+  const outages = data.outages
+    .slice()
+    .reverse()
+    .slice(0, 20)
+    .map(o => ({
+      device: nameMap[o.device] || o.device,
+      deviceId: o.device,
+      timestamp: formatTimestamp(o.start),
+      duration: o.end ? formatDuration(o.durationMs) : null,
+      ongoing: !o.end,
+    }));
+
+  return { devices, outages };
+}
+
 function shutdownWindowsPC(config) {
   return new Promise((resolve, reject) => {
-    const { ipAddress, sshUser, sshPassword, sshPort } = config;
+    const { ipAddress, sshUser, sshPort } = config;
+    const sshPassword = config._sshPasswordDecrypted || decryptValue(config.sshPassword);
 
     // Validate all inputs before using them
     if (!VALIDATION.ipAddress.test(ipAddress)) {
@@ -696,7 +1010,10 @@ app.post('/api/login', (req, res) => {
   const fileTokenEntries = fileTokens.filter((t) => t.token);
   const fileTokenList = fileTokenEntries.map((t) => t.token);
 
-  const isWhitelisted = deviceToken && (state.deviceTokens.includes(deviceToken) || fileTokenList.includes(deviceToken));
+  const isWhitelisted = deviceToken && (
+    state.deviceTokens.some(t => timingSafeEqual(t, deviceToken)) ||
+    fileTokenList.some(t => timingSafeEqual(t, deviceToken))
+  );
 
   // Use timing-safe comparison for credentials
   const storedPassword = state.credentials.password;
@@ -765,36 +1082,43 @@ app.get('/api/state', authRequired, (req, res) => {
   res.json(maskStateForClient(state));
 });
 
-app.post('/api/theme', authRequired, (req, res) => {
+app.post('/api/theme', authRequired, async (req, res) => {
   const { theme } = req.body || {};
   if (!['dark', 'light'].includes(theme)) {
     return res.status(400).json({ error: 'Ungültiges Theme' });
   }
-  const state = readState();
-  state.theme = theme;
-  saveState(state);
-  res.json({ ok: true, theme, versions: state.versions });
+  await withStateLock(() => {
+    const state = readState();
+    state.theme = theme;
+    saveState(state);
+    res.json({ ok: true, theme, versions: state.versions });
+  });
 });
 
-app.post('/api/ports/color', authRequired, (req, res) => {
+app.post('/api/ports/color', authRequired, async (req, res) => {
   const { group, id, color } = req.body || {};
   if (!group || !id || !color) {
     return res.status(400).json({ error: 'Fehlende Werte' });
   }
-
-  const state = readState();
-  const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
-  const port = collection.find((p) => p.id === id);
-  if (!port) {
-    return res.status(404).json({ error: 'Port nicht gefunden' });
+  // #12 Hex-Color validation
+  if (!/^#[0-9A-Fa-f]{6}$/.test(color)) {
+    return res.status(400).json({ error: 'Ungültiges Farbformat (erwartet #RRGGBB)' });
   }
 
-  port.color = color;
-  saveState(state);
-  res.json({ ok: true, switchPorts: state.switchPorts, routerPorts: state.routerPorts, versions: state.versions });
+  await withStateLock(() => {
+    const state = readState();
+    const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
+    const port = collection.find((p) => p.id === id);
+    if (!port) {
+      return res.status(404).json({ error: 'Port nicht gefunden' });
+    }
+    port.color = color;
+    saveState(state);
+    res.json({ ok: true, switchPorts: state.switchPorts, routerPorts: state.routerPorts, versions: state.versions });
+  });
 });
 
-app.post('/api/ports/update', authRequired, (req, res) => {
+app.post('/api/ports/update', authRequired, async (req, res) => {
   const { group, id, label, status } = req.body || {};
   if (!group || !id) {
     return res.status(400).json({ error: 'Fehlende Werte' });
@@ -803,42 +1127,42 @@ app.post('/api/ports/update', authRequired, (req, res) => {
     return res.status(400).json({ error: 'Ungültige Gruppe' });
   }
 
-  const state = readState();
-  const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
-  const port = collection.find((p) => p.id === id);
-  if (!port) {
-    return res.status(404).json({ error: 'Port nicht gefunden' });
-  }
-
-  let changed = false;
-  if (typeof label === 'string') {
-    const next = label.trim();
-    if (next !== port.label) {
-      port.label = next;
-      changed = true;
+  await withStateLock(() => {
+    const state = readState();
+    const collection = group === 'switch' ? state.switchPorts : state.routerPorts;
+    const port = collection.find((p) => p.id === id);
+    if (!port) {
+      return res.status(404).json({ error: 'Port nicht gefunden' });
     }
-  }
-  if (typeof status === 'string') {
-    const next = status.trim();
-    if (next !== port.status) {
-      port.status = next;
-      changed = true;
-    }
-  }
 
-  if (changed) {
-    addVersion(state, `Port geändert: ${port.label}`, {
-      switchPorts: clonePorts(state.switchPorts),
-      routerPorts: clonePorts(state.routerPorts),
-    });
+    let changed = false;
+    if (typeof label === 'string') {
+      const next = label.trim();
+      if (next !== port.label) {
+        port.label = next;
+        changed = true;
+      }
+    }
+    if (typeof status === 'string') {
+      const next = status.trim();
+      if (next !== port.status) {
+        port.status = next;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      addVersion(state, `Port geändert: ${port.label}`, {
+        switchPorts: clonePorts(state.switchPorts),
+        routerPorts: clonePorts(state.routerPorts),
+      });
+    }
     saveState(state);
-  } else {
-    saveState(state);
-  }
-  res.json({ ok: true, switchPorts: state.switchPorts, routerPorts: state.routerPorts, versions: state.versions });
+    res.json({ ok: true, switchPorts: state.switchPorts, routerPorts: state.routerPorts, versions: state.versions });
+  });
 });
 
-app.post('/api/settings/credentials', authRequired, (req, res) => {
+app.post('/api/settings/credentials', authRequired, async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Benutzername und Passwort sind erforderlich' });
@@ -847,74 +1171,96 @@ app.post('/api/settings/credentials', authRequired, (req, res) => {
     return res.status(400).json({ error: 'Passwort muss mindestens 4 Zeichen lang sein' });
   }
 
-  const state = readState();
-  state.credentials.username = username;
-  // Hash the password for secure storage in state.json
-  state.credentials.password = hashPassword(password);
-  saveState(state);
-  // Write to Nutzer file with plaintext backup (only in file, not in state.json)
-  writeCredentialsFile({
-    username,
-    password: state.credentials.password, // hashed
-    plaintext: password, // original for admin reference
+  await withStateLock(() => {
+    const state = readState();
+    state.credentials.username = username;
+    // Hash the password for secure storage
+    state.credentials.password = hashPassword(password);
+    saveState(state);
+    writeCredentialsFile({
+      username,
+      password: state.credentials.password,
+    });
+    // Invalidate active session to force re-login with new credentials
+    runtime.activeSession = null;
+    res.json({ ok: true, username, sessionInvalidated: true });
   });
-  res.json({ ok: true, username });
 });
 
-app.post('/api/speedport', authRequired, (req, res) => {
+app.post('/api/speedport', authRequired, async (req, res) => {
   const { wifiName, wifiPassword, serialNumber, configuration, remoteUrl, devicePassword, modemId } = req.body || {};
-  const state = readState();
-  const next = {
-    wifiName: wifiName ?? '',
-    wifiPassword: wifiPassword ?? '',
-    serialNumber: serialNumber ?? '',
-    configuration: configuration ?? '',
-    remoteUrl: remoteUrl ?? '',
-    devicePassword: devicePassword ?? '',
-    modemId: modemId ?? '',
-  };
-  const prev = state.speedportInfo || {};
-  const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
-  state.speedportInfo = next;
-  if (changed) {
-    addSpeedportVersion(state, 'Speedport geändert', {
-      speedportInfo: { ...state.speedportInfo },
-    });
+  // #13 Längen-Limit für alle Speedport-Felder
+  const MAX_FIELD_LEN = 256;
+  const fields = { wifiName, wifiPassword, serialNumber, configuration, remoteUrl, devicePassword, modemId };
+  for (const [key, val] of Object.entries(fields)) {
+    if (typeof val === 'string' && val.length > MAX_FIELD_LEN) {
+      return res.status(400).json({ error: `Feld ${key} zu lang (max ${MAX_FIELD_LEN} Zeichen)` });
+    }
   }
-  saveState(state);
-  res.json({
-    ok: true,
-    speedportInfo: state.speedportInfo,
-    speedportVersions: state.speedportVersions,
+  await withStateLock(() => {
+    const state = readState();
+    const next = {
+      wifiName: wifiName ?? '',
+      wifiPassword: wifiPassword ?? '',
+      serialNumber: serialNumber ?? '',
+      configuration: configuration ?? '',
+      remoteUrl: remoteUrl ?? '',
+      devicePassword: devicePassword ?? '',
+      modemId: modemId ?? '',
+    };
+    const prev = state.speedportInfo || {};
+    const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
+    state.speedportInfo = next;
+    if (changed) {
+      addSpeedportVersion(state, 'Speedport geändert', {
+        speedportInfo: { ...state.speedportInfo },
+      });
+    }
+    saveState(state);
+    res.json({
+      ok: true,
+      speedportInfo: state.speedportInfo,
+      speedportVersions: state.speedportVersions,
+    });
   });
 });
 
-app.post('/api/raspberry', authRequired, (req, res) => {
+app.post('/api/raspberry', authRequired, async (req, res) => {
   const { model, hostname, ipAddress, vpnIp, macAddress, sshUser, piholeUrl, piholeRemoteUrl } = req.body || {};
-  const state = readState();
-  const next = {
-    model: model ?? '',
-    hostname: hostname ?? '',
-    ipAddress: ipAddress ?? '',
-    vpnIp: vpnIp ?? '',
-    macAddress: macAddress ?? '',
-    sshUser: sshUser ?? '',
-    piholeUrl: piholeUrl ?? '',
-    piholeRemoteUrl: piholeRemoteUrl ?? '',
-  };
-  const prev = state.raspberryInfo || {};
-  const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
-  state.raspberryInfo = next;
-  if (changed) {
-    addRaspberryVersion(state, 'Raspberry geändert', {
-      raspberryInfo: { ...state.raspberryInfo },
-    });
+  // #13 Längen-Limit für alle Raspberry-Felder
+  const MAX_FIELD_LEN = 256;
+  const fields = { model, hostname, ipAddress, vpnIp, macAddress, sshUser, piholeUrl, piholeRemoteUrl };
+  for (const [key, val] of Object.entries(fields)) {
+    if (typeof val === 'string' && val.length > MAX_FIELD_LEN) {
+      return res.status(400).json({ error: `Feld ${key} zu lang (max ${MAX_FIELD_LEN} Zeichen)` });
+    }
   }
-  saveState(state);
-  res.json({
-    ok: true,
-    raspberryInfo: state.raspberryInfo,
-    raspberryVersions: state.raspberryVersions,
+  await withStateLock(() => {
+    const state = readState();
+    const next = {
+      model: model ?? '',
+      hostname: hostname ?? '',
+      ipAddress: ipAddress ?? '',
+      vpnIp: vpnIp ?? '',
+      macAddress: macAddress ?? '',
+      sshUser: sshUser ?? '',
+      piholeUrl: piholeUrl ?? '',
+      piholeRemoteUrl: piholeRemoteUrl ?? '',
+    };
+    const prev = state.raspberryInfo || {};
+    const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
+    state.raspberryInfo = next;
+    if (changed) {
+      addRaspberryVersion(state, 'Raspberry geändert', {
+        raspberryInfo: { ...state.raspberryInfo },
+      });
+    }
+    saveState(state);
+    res.json({
+      ok: true,
+      raspberryInfo: state.raspberryInfo,
+      raspberryVersions: state.raspberryVersions,
+    });
   });
 });
 
@@ -1105,29 +1451,31 @@ app.post('/api/speedtest/local-upload-proxy', authRequired, (req, res) => {
   req.pipe(piRequest);
 });
 
-app.post('/api/speedtest/save', authRequired, (req, res) => {
+app.post('/api/speedtest/save', authRequired, async (req, res) => {
   const { download, upload, ping, type, timestamp } = req.body || {};
-  const state = readState();
+  await withStateLock(() => {
+    const state = readState();
 
-  const testResult = {
-    id: randomUUID(),
-    download: parseFloat(download) || 0,
-    upload: parseFloat(upload) || 0,
-    ping: parseFloat(ping) || 0,
-    type: type || 'unknown',
-    timestamp: timestamp || Date.now(),
-  };
+    const testResult = {
+      id: randomUUID(),
+      download: parseFloat(download) || 0,
+      upload: parseFloat(upload) || 0,
+      ping: parseFloat(ping) || 0,
+      type: type || 'unknown',
+      timestamp: timestamp || Date.now(),
+    };
 
-  state.speedTestHistory = Array.isArray(state.speedTestHistory) ? state.speedTestHistory : [];
-  state.speedTestHistory.unshift(testResult);
+    state.speedTestHistory = Array.isArray(state.speedTestHistory) ? state.speedTestHistory : [];
+    state.speedTestHistory.unshift(testResult);
 
-  // Keep only last 50 tests
-  if (state.speedTestHistory.length > 50) {
-    state.speedTestHistory = state.speedTestHistory.slice(0, 50);
-  }
+    // Keep only last 50 tests
+    if (state.speedTestHistory.length > 50) {
+      state.speedTestHistory = state.speedTestHistory.slice(0, 50);
+    }
 
-  saveState(state);
-  res.json({ ok: true, history: state.speedTestHistory });
+    saveState(state);
+    res.json({ ok: true, history: state.speedTestHistory });
+  });
 });
 
 app.get('/api/speedtest/history', authRequired, (req, res) => {
@@ -1137,17 +1485,27 @@ app.get('/api/speedtest/history', authRequired, (req, res) => {
 
 app.get('/api/export', authRequired, (req, res) => {
   const state = readState();
+  // Strip sensitive data from export
+  const safeState = { ...state };
+  delete safeState.credentials;
+  delete safeState.deviceTokens;
+  // Strip passwords from device info
+  if (safeState.speedportInfo) {
+    safeState.speedportInfo = { ...safeState.speedportInfo };
+    delete safeState.speedportInfo.wifiPassword;
+    delete safeState.speedportInfo.devicePassword;
+  }
   const exportData = {
     exportedAt: new Date().toISOString(),
     version: '1.5.0',
-    data: state,
+    data: safeState,
   };
   res.setHeader('Content-Type', 'application/json');
   res.setHeader('Content-Disposition', 'attachment; filename="netzwerk-manager-backup.json"');
   res.json(exportData);
 });
 
-app.post('/api/import', authRequired, (req, res) => {
+app.post('/api/import', authRequired, async (req, res) => {
   const { data } = req.body || {};
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ error: 'Ungueltige Daten' });
@@ -1167,29 +1525,36 @@ app.post('/api/import', authRequired, (req, res) => {
     };
   }
 
-  // Merge mit Default-State um fehlende Felder zu ergaenzen
-  const currentState = readState();
-  const newState = {
-    ...defaultState,
-    // SECURITY: Never import credentials from external files!
-    credentials: currentState.credentials, // Keep existing credentials
-    speedportInfo: { ...defaultState.speedportInfo, ...(data.speedportInfo || {}) },
-    raspberryInfo: { ...defaultState.raspberryInfo, ...(data.raspberryInfo || {}) },
-    // Sanitize port data
-    switchPorts: (data.switchPorts || currentState.switchPorts).map(sanitizePort),
-    routerPorts: (data.routerPorts || currentState.routerPorts).map(sanitizePort),
-    versions: Array.isArray(data.versions) ? data.versions : [],
-    speedportVersions: Array.isArray(data.speedportVersions) ? data.speedportVersions : [],
-    raspberryVersions: Array.isArray(data.raspberryVersions) ? data.raspberryVersions : [],
-    // SECURITY: Never import device tokens from external files!
-    deviceTokens: currentState.deviceTokens, // Keep existing tokens
-    speedTestHistory: Array.isArray(data.speedTestHistory) ? data.speedTestHistory : [],
-  };
+  // #14 Array-Größen begrenzen um DoS zu verhindern
+  const MAX_PORTS = 64;
+  const MAX_VERSIONS = 200;
+  const MAX_HISTORY = 50;
 
-  saveState(newState);
-  // Note: credentials not written since we keep the existing ones
+  await withStateLock(() => {
+    // Merge mit Default-State um fehlende Felder zu ergaenzen
+    const currentState = readState();
+    const newState = {
+      ...defaultState,
+      // SECURITY: Never import credentials from external files!
+      credentials: currentState.credentials, // Keep existing credentials
+      speedportInfo: { ...defaultState.speedportInfo, ...(data.speedportInfo || {}) },
+      raspberryInfo: { ...defaultState.raspberryInfo, ...(data.raspberryInfo || {}) },
+      // Sanitize port data (capped)
+      switchPorts: (data.switchPorts || currentState.switchPorts).slice(0, MAX_PORTS).map(sanitizePort),
+      routerPorts: (data.routerPorts || currentState.routerPorts).slice(0, MAX_PORTS).map(sanitizePort),
+      versions: Array.isArray(data.versions) ? data.versions.slice(0, MAX_VERSIONS) : [],
+      speedportVersions: Array.isArray(data.speedportVersions) ? data.speedportVersions.slice(0, MAX_VERSIONS) : [],
+      raspberryVersions: Array.isArray(data.raspberryVersions) ? data.raspberryVersions.slice(0, MAX_VERSIONS) : [],
+      // SECURITY: Never import device tokens from external files!
+      deviceTokens: currentState.deviceTokens, // Keep existing tokens
+      speedTestHistory: Array.isArray(data.speedTestHistory) ? data.speedTestHistory.slice(0, MAX_HISTORY) : [],
+    };
 
-  res.json({ ok: true, message: 'Daten erfolgreich importiert (Zugangsdaten wurden nicht geändert)' });
+    saveState(newState);
+    // Note: credentials not written since we keep the existing ones
+
+    res.json({ ok: true, message: 'Daten erfolgreich importiert (Zugangsdaten wurden nicht geändert)' });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1209,11 +1574,11 @@ app.get('/api/windows-pc', authRequired, (req, res) => {
   });
 });
 
-// GET password - reveal SSH password (authenticated)
+// GET password - reveal SSH password (authenticated, decrypted)
 app.get('/api/windows-pc/password', authRequired, (req, res) => {
   const config = readWindowsPCConfig();
   res.json({
-    password: config.sshPassword || '',
+    password: config._sshPasswordDecrypted || '',
   });
 });
 
@@ -1342,6 +1707,12 @@ app.post('/api/windows-pc/shutdown', authRequired, async (req, res) => {
   }
 });
 
+// ── Uptime API ──
+
+app.get('/api/uptime', authRequired, (req, res) => {
+  res.json(buildUptimeResponse());
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -1354,23 +1725,43 @@ function startServer() {
   const wss = new WebSocket.Server({ server });
 
   wss.on('connection', (socket, req) => {
-    const params = new URLSearchParams(req.url.replace('/?', ''));
-    const token = params.get('token');
-
     socket.isAlive = true;
+    let authenticatedToken = null;
 
-    // SECURITY: Only store socket if token matches active session
-    if (token && isSessionValid() && timingSafeEqual(runtime.activeSession.token, token)) {
-      runtime.sockets.set(token, socket);
-    }
+    // Authenticate via first message instead of URL query
+    socket.on('message', (data) => {
+      if (authenticatedToken) return; // Already authenticated
+      try {
+        const msg = JSON.parse(data.toString());
+        if (msg.type === 'auth' && msg.token) {
+          if (isSessionValid() && timingSafeEqual(runtime.activeSession.token, msg.token)) {
+            authenticatedToken = msg.token;
+            runtime.sockets.set(authenticatedToken, socket);
+            socket.send(JSON.stringify({ type: 'auth', success: true }));
+          } else {
+            socket.close(4001, 'Unauthorized');
+          }
+        }
+      } catch {
+        // ignore non-JSON
+      }
+    });
+
+    // Close unauthenticated connections after 5 seconds
+    const authTimeout = setTimeout(() => {
+      if (!authenticatedToken) {
+        socket.close(4001, 'Auth timeout');
+      }
+    }, 5000);
 
     socket.on('pong', () => {
       socket.isAlive = true;
     });
 
     socket.on('close', () => {
-      if (token) {
-        runtime.sockets.delete(token);
+      clearTimeout(authTimeout);
+      if (authenticatedToken) {
+        runtime.sockets.delete(authenticatedToken);
       }
     });
 
@@ -1415,12 +1806,25 @@ function startServer() {
     }
 
     // Cleanup PC control limits
-    for (const [ip, data] of pcControlLimits.entries()) {
-      if (data.lastAction < oneHourAgo) {
-        pcControlLimits.delete(ip);
+    for (const [ip, data] of pcActionLimits.entries()) {
+      if (data.windowStart < oneHourAgo) {
+        pcActionLimits.delete(ip);
+      }
+    }
+    for (const [ip, data] of pcStatusLimits.entries()) {
+      if (data.windowStart < oneHourAgo) {
+        pcStatusLimits.delete(ip);
       }
     }
   }, 3600000); // Every hour
+
+  // Uptime monitoring: first ping after 5s, then every 60s
+  setTimeout(() => {
+    runUptimePingCycle().catch(() => {});
+    setInterval(() => {
+      runUptimePingCycle().catch(() => {});
+    }, 60000);
+  }, 5000);
 }
 
 // Server starten

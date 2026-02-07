@@ -69,6 +69,19 @@ const siteConfig = {
   },
 
   // ══════════════════════════════════════════════
+  // UPTIME MONITORING
+  // ══════════════════════════════════════════════
+  // Geräte die per Ping überwacht werden sollen
+  // id: eindeutiger Schlüssel (lowercase, keine Leerzeichen)
+  // name: Anzeigename
+  // ip: IP-Adresse des Geräts
+  uptimeDevices: [
+    { id: 'router',    name: 'Router',     ip: 'xxx.xxx.xxx.xxx' },
+    { id: 'pihole',    name: 'PiHole',     ip: 'xxx.xxx.xxx.xxx' },
+    { id: 'windowspc', name: 'Windows PC', ip: 'xxx.xxx.xx.xx' },
+  ],
+
+  // ══════════════════════════════════════════════
   // HEADER LINKS
   // ══════════════════════════════════════════════
   // Links erscheinen in der Topbar mit Favicon
@@ -78,3 +91,21 @@ const siteConfig = {
     { name: 'KanBan', url: 'https://leminkanban.de'},
   ],
 };
+
+// #21 Prevent runtime tampering with config
+if (typeof Object.freeze === 'function') {
+  Object.freeze(siteConfig);
+  Object.freeze(siteConfig.animations);
+  Object.freeze(siteConfig.defaults);
+  if (siteConfig.defaults.glow) Object.freeze(siteConfig.defaults.glow);
+  if (siteConfig.defaults.sessionTimeout) Object.freeze(siteConfig.defaults.sessionTimeout);
+  Object.freeze(siteConfig.settings);
+  if (siteConfig.settings.tabs) Object.freeze(siteConfig.settings.tabs);
+  Object.freeze(siteConfig.cards);
+  if (siteConfig.uptimeDevices) {
+    siteConfig.uptimeDevices.forEach(d => Object.freeze(d));
+    Object.freeze(siteConfig.uptimeDevices);
+  }
+  siteConfig.headerLinks.forEach(link => Object.freeze(link));
+  Object.freeze(siteConfig.headerLinks);
+}

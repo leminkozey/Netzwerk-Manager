@@ -8,6 +8,7 @@ Data/state.json
 Data/Nutzer
 Data/LoginToken.txt
 Data/WindowsPC.json
+Data/.encryption-key
 
 # macOS
 .DS_Store
