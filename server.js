@@ -1839,31 +1839,47 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════
 
 const piholeSession = { sid: null, expiresAt: 0 };
+let _piholeAuthPromise = null;
+const PIHOLE_CONFIG_FILE = path.join(DATA_DIR, 'pihole.json');
+const PIHOLE_MAX_BODY = 10 * 1024 * 1024; // 10 MB
 
 function readPiholeConfig() {
-  const cfg = readSiteConfig();
-  const ph = cfg?.pihole;
-  if (!ph || !ph.url || !ph.password) return null;
-  return { url: ph.url.replace(/\/+$/, ''), password: ph.password };
+  try {
+    if (!fs.existsSync(PIHOLE_CONFIG_FILE)) return null;
+    const raw = JSON.parse(fs.readFileSync(PIHOLE_CONFIG_FILE, 'utf-8'));
+    if (!raw || !raw.url || !raw.password) return null;
+    const url = raw.url.replace(/\/+$/, '');
+    // SSRF protection — validate hostname
+    try {
+      const parsed = new URL(url);
+      if (!isAllowedProxyTarget(parsed.hostname)) return null;
+    } catch { return null; }
+    return { url, password: raw.password };
+  } catch {
+    return null;
+  }
 }
 
-function getPiholeSid() {
+function piholeHttpModule(urlStr) {
+  return urlStr.startsWith('https') ? require('https') : require('http');
+}
+
+function piholeDefaultPort(urlStr) {
+  return urlStr.startsWith('https') ? 443 : 80;
+}
+
+function _doAuthenticate() {
   return new Promise((resolve, reject) => {
     const config = readPiholeConfig();
     if (!config) return reject(new Error('Pi-hole not configured'));
 
-    // Return cached SID if still valid
-    if (piholeSession.sid && Date.now() < piholeSession.expiresAt) {
-      return resolve(piholeSession.sid);
-    }
-
-    const http = require('http');
     const url = new URL(config.url);
+    const httpMod = piholeHttpModule(config.url);
 
     const postData = JSON.stringify({ password: config.password });
     const options = {
       hostname: url.hostname,
-      port: url.port || 80,
+      port: url.port || piholeDefaultPort(config.url),
       path: '/api/auth',
       method: 'POST',
       headers: {
@@ -1873,17 +1889,25 @@ function getPiholeSid() {
       timeout: 5000,
     };
 
-    const req = http.request(options, (res) => {
+    const req = httpMod.request(options, (res) => {
       let body = '';
-      res.on('data', (chunk) => { body += chunk; });
+      let bodySize = 0;
+      let aborted = false;
+      res.on('data', (chunk) => {
+        if (aborted) return;
+        bodySize += chunk.length;
+        if (bodySize > PIHOLE_MAX_BODY) { aborted = true; res.destroy(); return reject(new Error('Auth response too large')); }
+        body += chunk;
+      });
       res.on('end', () => {
+        if (aborted) return;
         try {
           const data = JSON.parse(body);
-          if (data.session && data.session.sid) {
-            piholeSession.sid = data.session.sid;
-            // Cache for 4 minutes (Pi-hole sessions last ~5min)
+          const sid = data?.session?.sid;
+          if (typeof sid === 'string' && sid.length > 0 && sid.length <= 256) {
+            piholeSession.sid = sid;
             piholeSession.expiresAt = Date.now() + 4 * 60 * 1000;
-            resolve(piholeSession.sid);
+            resolve(sid);
           } else {
             reject(new Error('Pi-hole auth failed'));
           }
@@ -1893,45 +1917,56 @@ function getPiholeSid() {
       });
     });
 
-    req.on('error', (e) => reject(new Error('Pi-hole unreachable: ' + e.message)));
+    req.on('error', (e) => { console.error('[Pi-hole] Auth error:', e.message); reject(new Error('Pi-hole unreachable')); });
     req.on('timeout', () => { req.destroy(); reject(new Error('Pi-hole timeout')); });
     req.write(postData);
     req.end();
   });
 }
 
-function piholeApiRequest(apiPath, retried) {
-  return new Promise(async (resolve, reject) => {
-    let sid;
-    try {
-      sid = await getPiholeSid();
-    } catch (e) {
-      return reject(e);
-    }
+function getPiholeSid() {
+  if (piholeSession.sid && Date.now() < piholeSession.expiresAt) {
+    return Promise.resolve(piholeSession.sid);
+  }
+  if (!_piholeAuthPromise) {
+    _piholeAuthPromise = _doAuthenticate().finally(() => { _piholeAuthPromise = null; });
+  }
+  return _piholeAuthPromise;
+}
 
+function _doApiRequest(apiPath) {
+  return new Promise((resolve, reject) => {
     const config = readPiholeConfig();
-    const http = require('http');
+    if (!config) return reject(new Error('Pi-hole not configured'));
+
     const url = new URL(config.url);
+    const httpMod = piholeHttpModule(config.url);
 
     const options = {
       hostname: url.hostname,
-      port: url.port || 80,
+      port: url.port || piholeDefaultPort(config.url),
       path: apiPath,
       method: 'GET',
-      headers: { sid },
+      headers: { sid: piholeSession.sid },
       timeout: 10000,
     };
 
-    const req = http.request(options, (res) => {
+    const req = httpMod.request(options, (res) => {
       let body = '';
-      res.on('data', (chunk) => { body += chunk; });
+      let bodySize = 0;
+      let aborted = false;
+      res.on('data', (chunk) => {
+        if (aborted) return;
+        bodySize += chunk.length;
+        if (bodySize > PIHOLE_MAX_BODY) { aborted = true; res.destroy(); return reject(new Error('Response too large')); }
+        body += chunk;
+      });
       res.on('end', () => {
-        if (res.statusCode === 401 && !retried) {
-          // Invalidate cached SID and retry once
-          piholeSession.sid = null;
-          piholeSession.expiresAt = 0;
-          piholeApiRequest(apiPath, true).then(resolve).catch(reject);
-          return;
+        if (aborted) return;
+        if (res.statusCode === 401) {
+          const err = new Error('Pi-hole auth expired');
+          err.statusCode = 401;
+          return reject(err);
         }
         try {
           resolve(JSON.parse(body));
@@ -1941,10 +1976,26 @@ function piholeApiRequest(apiPath, retried) {
       });
     });
 
-    req.on('error', (e) => reject(new Error('Pi-hole request failed: ' + e.message)));
+    req.on('error', (e) => { console.error('[Pi-hole] Request error:', e.message); reject(new Error('Pi-hole service unavailable')); });
     req.on('timeout', () => { req.destroy(); reject(new Error('Pi-hole request timeout')); });
     req.end();
   });
+}
+
+async function piholeApiRequest(apiPath, retried) {
+  await getPiholeSid();
+  try {
+    return await _doApiRequest(apiPath);
+  } catch (e) {
+    if (e && e.statusCode === 401 && !retried) {
+      piholeSession.sid = null;
+      piholeSession.expiresAt = 0;
+      _piholeAuthPromise = null;
+      await getPiholeSid();
+      return _doApiRequest(apiPath);
+    }
+    throw e;
+  }
 }
 
 // Pi-hole proxy endpoints
@@ -1964,7 +2015,8 @@ app.get('/api/pihole/summary', authRequired, async (req, res) => {
     const data = await piholeApiRequest('/api/stats/summary');
     res.json(data);
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('[Pi-hole] summary:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
 
@@ -1973,7 +2025,8 @@ app.get('/api/pihole/query-types', authRequired, async (req, res) => {
     const data = await piholeApiRequest('/api/stats/query_types');
     res.json(data);
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('[Pi-hole] query-types:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
 
@@ -1983,7 +2036,8 @@ app.get('/api/pihole/top-domains', authRequired, async (req, res) => {
     const data = await piholeApiRequest(`/api/stats/top_domains?blocked=false&count=${count}`);
     res.json(data);
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('[Pi-hole] top-domains:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
 
@@ -1993,7 +2047,8 @@ app.get('/api/pihole/top-blocked', authRequired, async (req, res) => {
     const data = await piholeApiRequest(`/api/stats/top_domains?blocked=true&count=${count}`);
     res.json(data);
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('[Pi-hole] top-blocked:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
 
@@ -2003,7 +2058,8 @@ app.get('/api/pihole/top-clients', authRequired, async (req, res) => {
     const data = await piholeApiRequest(`/api/stats/top_clients?count=${count}`);
     res.json(data);
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('[Pi-hole] top-clients:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
 
@@ -2012,7 +2068,8 @@ app.get('/api/pihole/history', authRequired, async (req, res) => {
     const data = await piholeApiRequest('/api/history');
     res.json(data);
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('[Pi-hole] history:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
 
@@ -2021,7 +2078,8 @@ app.get('/api/pihole/upstreams', authRequired, async (req, res) => {
     const data = await piholeApiRequest('/api/stats/upstreams');
     res.json(data);
   } catch (e) {
-    res.status(502).json({ error: e.message });
+    console.error('[Pi-hole] upstreams:', e.message || e);
+    res.status(502).json({ error: 'Pi-hole service unavailable' });
   }
 });
 

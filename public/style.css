@@ -345,7 +345,8 @@ a:hover {
   grid-template-columns: 1fr 1fr;
 }
 
-.grid.two.equal-height > .card {
+.grid.two.equal-height > .card,
+.grid.three.equal-height > .card {
   height: 100%;
   margin-bottom: 0;
 }
@@ -3302,20 +3303,9 @@ label {
   margin-bottom: 16px;
 }
 
-.pihole-charts-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
 @media (max-width: 900px) {
   .pihole-summary-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .pihole-charts-row {
-    grid-template-columns: 1fr;
   }
 
   .pihole-donuts-row {

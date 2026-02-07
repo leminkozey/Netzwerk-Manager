@@ -12,6 +12,7 @@ Data/LoginToken.txt
 Data/WindowsPC.json
 Data/ControlDevices.json
 Data/.encryption-key
+Data/pihole.json
 public/config.js
 
 # macOS

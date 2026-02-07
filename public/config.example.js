@@ -87,12 +87,15 @@ const siteConfig = {
   // ══════════════════════════════════════════════
   // PI-HOLE v6 DNS ANALYTICS
   // ══════════════════════════════════════════════
-  // Verbindung zur Pi-hole v6 REST-API für DNS-Statistiken
-  // auf der Analysen-Seite. Der Server fungiert als Proxy.
-  pihole: {
-    url: 'http://192.168.1.100',       // Pi-hole v6 Base-URL
-    password: 'your-pihole-password',   // Web-Interface Passwort
-  },
+  // Konfiguration liegt in Data/pihole.json (nicht öffentlich).
+  // Erstelle die Datei mit:
+  // {
+  //   "url": "http://192.168.1.100",
+  //   "password": "your-pihole-password"
+  // }
+  //
+  // Aktualisierungs-Intervall (Sekunden, Minimum 30, Standard 60):
+  piholeInterval: 60,
 
   uptimeInterval: 10,
 

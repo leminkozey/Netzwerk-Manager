@@ -2,7 +2,7 @@
 // Analysen Page – Analytics / Monitoring Dashboard
 // =================================================================
 
-import { t } from '../i18n.js';
+import { t, getCurrentLang } from '../i18n.js';
 import { getConfig } from '../state.js';
 import { el, showToast } from '../ui.js';
 import { iconEl } from '../icons.js';
@@ -58,7 +58,8 @@ function formatLiveTimer(sinceTs) {
 
 function formatNumber(n) {
   if (typeof n !== 'number' || isNaN(n)) return '0';
-  return n.toLocaleString('de-DE');
+  const locale = getCurrentLang() === 'en' ? 'en-US' : 'de-DE';
+  return n.toLocaleString(locale);
 }
 
 // =================================================================
@@ -403,11 +404,19 @@ function buildOutagesCardFromData(outages) {
 // =================================================================
 
 // Decorative SVG icon for summary cards (semi-transparent, right-aligned)
-function summaryCardIcon(svgContent) {
+function summaryCardIcon(pathDefs) {
+  const ns = 'http://www.w3.org/2000/svg';
   const wrapper = el('div', { className: 'pihole-stat-icon' });
-  const tpl = document.createElement('template');
-  tpl.innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor" style="width:100%;height:100%">${svgContent}</svg>`;
-  wrapper.appendChild(tpl.content);
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'currentColor');
+  svg.style.cssText = 'width:100%;height:100%';
+  for (const def of pathDefs) {
+    const node = document.createElementNS(ns, def.tag);
+    for (const [k, v] of Object.entries(def.attrs || {})) node.setAttribute(k, v);
+    svg.appendChild(node);
+  }
+  wrapper.appendChild(svg);
   return wrapper;
 }
 
@@ -421,22 +430,36 @@ function buildPiholeSummaryCards(data) {
     {
       label: t('pihole.totalQueries'), value: formatNumber(queries),
       cls: 'pihole-stat-card--cyan',
-      icon: '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" fill="none" stroke="currentColor" stroke-width="1.5"/>',
+      icon: [
+        { tag: 'circle', attrs: { cx: '12', cy: '12', r: '10', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+        { tag: 'path', attrs: { d: 'M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+      ],
     },
     {
       label: t('pihole.queriesBlocked'), value: formatNumber(blocked),
       cls: 'pihole-stat-card--red',
-      icon: '<path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+      icon: [
+        { tag: 'path', attrs: { d: 'M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+        { tag: 'line', attrs: { x1: '8', y1: '12', x2: '16', y2: '12', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round' } },
+      ],
     },
     {
       label: t('pihole.percentBlocked'), value: (Math.round(percent * 10) / 10) + '%',
       cls: 'pihole-stat-card--orange',
-      icon: '<path d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 3a9 9 0 0 1 0 18V12z" fill="currentColor" opacity="0.4"/>',
+      icon: [
+        { tag: 'path', attrs: { d: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+        { tag: 'path', attrs: { d: 'M12 3a9 9 0 0 1 0 18V12z', fill: 'currentColor', opacity: '0.4' } },
+      ],
     },
     {
       label: t('pihole.domainsBlocked'), value: formatNumber(blocklist),
       cls: 'pihole-stat-card--green',
-      icon: '<rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="7" y1="8" x2="17" y2="8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="12" x2="17" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="7" y1="16" x2="13" y2="16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+      icon: [
+        { tag: 'rect', attrs: { x: '3', y: '3', width: '18', height: '18', rx: '2', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5' } },
+        { tag: 'line', attrs: { x1: '7', y1: '8', x2: '17', y2: '8', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round' } },
+        { tag: 'line', attrs: { x1: '7', y1: '12', x2: '17', y2: '12', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round' } },
+        { tag: 'line', attrs: { x1: '7', y1: '16', x2: '13', y2: '16', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round' } },
+      ],
     },
   ];
 
@@ -549,7 +572,7 @@ function buildQueriesOverTimeChart(data) {
   // X-axis time labels
   const labelCount = Math.min(12, history.length);
   for (let i = 0; i < labelCount; i++) {
-    const idx = Math.round((i / (labelCount - 1)) * (history.length - 1));
+    const idx = labelCount <= 1 ? 0 : Math.round((i / (labelCount - 1)) * (history.length - 1));
     const ts = history[idx]?.timestamp;
     if (!ts) continue;
     const d = new Date(ts * 1000);
@@ -679,15 +702,17 @@ function buildUpstreamsDonut(data) {
 }
 
 function extractTopList(data, key) {
-  // Try multiple Pi-hole v6 response formats
-  const raw = data?.[key] || data?.domains || data?.top_domains || data?.top_clients || data?.clients || [];
+  const raw = data?.[key] || [];
   if (Array.isArray(raw)) {
     return raw.map(item => ({
       name: item.domain || item.name || item.client || item.ip || 'unknown',
       count: item.count || item.hits || 0,
     }));
   }
-  return Object.entries(raw).map(([name, count]) => ({ name, count }));
+  if (typeof raw === 'object' && raw !== null) {
+    return Object.entries(raw).map(([name, count]) => ({ name, count }));
+  }
+  return [];
 }
 
 function buildTopList(title, iconName, items, color) {
@@ -749,10 +774,12 @@ export function renderAnalysen(container) {
   let piholeInterval = null;
   const timerRefs = []; // { el, ts } — updated every second
 
-  // Read poll interval from config (default 60s, min 10s)
+  // Read poll intervals from config
   const cfg = getConfig();
   const pollSec = (cfg?.uptimeInterval && cfg.uptimeInterval >= 10) ? cfg.uptimeInterval : 60;
   const pollMs = pollSec * 1000;
+  const piholeSec = (cfg?.piholeInterval && cfg.piholeInterval >= 30) ? cfg.piholeInterval : 60;
+  const piholeMs = piholeSec * 1000;
 
   // Unlock the parent .page max-width so analysen uses the full viewport
   const parentPage = container.closest('.page');
@@ -947,7 +974,7 @@ export function renderAnalysen(container) {
 
   // Auto-poll at configured interval for live status updates
   pollInterval = setInterval(() => refreshUptime(), pollMs);
-  piholeInterval = setInterval(() => refreshPihole(), 60000);
+  piholeInterval = setInterval(() => refreshPihole(), piholeMs);
 
   // Live-update when uptime is reset from settings
   const onReset = () => refreshUptime();
