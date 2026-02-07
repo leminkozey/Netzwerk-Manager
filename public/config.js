@@ -34,7 +34,7 @@ const siteConfig = {
 
     // Session Timeout
     sessionTimeout: {
-      enabled: true,            // Timeout an/aus
+      enabled: false,            // Timeout an/aus
       minutes: 5,               // Minuten bis Timeout
     },
   },
@@ -91,21 +91,3 @@ const siteConfig = {
     { name: 'KanBan', url: 'https://leminkanban.de'},
   ],
 };
-
-// #21 Prevent runtime tampering with config
-if (typeof Object.freeze === 'function') {
-  Object.freeze(siteConfig);
-  Object.freeze(siteConfig.animations);
-  Object.freeze(siteConfig.defaults);
-  if (siteConfig.defaults.glow) Object.freeze(siteConfig.defaults.glow);
-  if (siteConfig.defaults.sessionTimeout) Object.freeze(siteConfig.defaults.sessionTimeout);
-  Object.freeze(siteConfig.settings);
-  if (siteConfig.settings.tabs) Object.freeze(siteConfig.settings.tabs);
-  Object.freeze(siteConfig.cards);
-  if (siteConfig.uptimeDevices) {
-    siteConfig.uptimeDevices.forEach(d => Object.freeze(d));
-    Object.freeze(siteConfig.uptimeDevices);
-  }
-  siteConfig.headerLinks.forEach(link => Object.freeze(link));
-  Object.freeze(siteConfig.headerLinks);
-}

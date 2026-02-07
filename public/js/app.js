@@ -326,6 +326,30 @@ function applyConfigSettings() {
   const cfg = typeof siteConfig !== 'undefined' && siteConfig != null ? siteConfig : null;
   if (!cfg) return;
 
+  // Freeze config to prevent runtime tampering
+  if (typeof Object.freeze === 'function') {
+    if (cfg.animations) Object.freeze(cfg.animations);
+    if (cfg.defaults) {
+      if (cfg.defaults.glow) Object.freeze(cfg.defaults.glow);
+      if (cfg.defaults.sessionTimeout) Object.freeze(cfg.defaults.sessionTimeout);
+      Object.freeze(cfg.defaults);
+    }
+    if (cfg.settings) {
+      if (cfg.settings.tabs) Object.freeze(cfg.settings.tabs);
+      Object.freeze(cfg.settings);
+    }
+    if (cfg.cards) Object.freeze(cfg.cards);
+    if (cfg.uptimeDevices) {
+      cfg.uptimeDevices.forEach(d => Object.freeze(d));
+      Object.freeze(cfg.uptimeDevices);
+    }
+    if (cfg.headerLinks) {
+      cfg.headerLinks.forEach(l => Object.freeze(l));
+      Object.freeze(cfg.headerLinks);
+    }
+    Object.freeze(cfg);
+  }
+
   // Animation config
   const anim = cfg.animations || {};
   if (!anim.enabled) document.body.setAttribute('data-animations', 'off');

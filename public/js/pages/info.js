@@ -335,7 +335,10 @@ function buildWindowsPCCard() {
 // ═══════════════════════════════════════════════════════════════════
 
 export function renderInfo(container) {
-  const page = el('div', { className: 'page-wide' });
+  const parentPage = container.closest('.page');
+  if (parentPage) parentPage.style.maxWidth = 'none';
+
+  const page = el('div', { className: 'page-wide', style: { maxWidth: 'none' } });
 
   // Netzwerkgeräte
   page.appendChild(sectionHeading(t('section.devices')));
@@ -356,4 +359,8 @@ export function renderInfo(container) {
   page.appendChild(buildWindowsPCCard());
 
   container.appendChild(page);
+
+  return function cleanup() {
+    if (parentPage) parentPage.style.maxWidth = '';
+  };
 }
