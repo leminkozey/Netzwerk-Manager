@@ -35,6 +35,7 @@ const translations = {
     'pi.vpnIp': 'VPN-IP',
     'pi.mac': 'MAC-Adresse',
     'pi.sshUser': 'SSH-User',
+    'pi.sshPassword': 'SSH-Passwort',
     'pi.piholeUrl': 'Pi-hole Admin URL',
     'pi.piholeVpnUrl': 'Pi-hole VPN URL',
 
@@ -158,6 +159,29 @@ const translations = {
     'msg.confirmOverwrite': 'Alle Daten werden ueberschrieben. Fortfahren?',
     'msg.confirmShutdown': 'PC wirklich herunterfahren?',
 
+    // UI
+    'ui.cancel': 'Abbrechen',
+    'ui.confirm': 'Bestätigen',
+    'ui.copied': 'Kopiert!',
+    'ui.copyFailed': 'Kopieren fehlgeschlagen',
+    'ui.copy': 'Kopieren',
+    'ui.show': 'Anzeigen',
+    'ui.hide': 'Verstecken',
+
+    // Landing Greetings
+    'landing.greetings': [
+      'Was geht dir durch den Kopf?',
+      'Wo möchtest du starten?',
+      'Was steht heute an?',
+      'Alles im Netzwerk klar?',
+      'Was möchtest du wissen?',
+      'Bereit loszulegen?',
+      'Was darf es sein?',
+      'Wohin soll es gehen?',
+      'Was beschäftigt dich?',
+      'Schön dich zu sehen.',
+    ],
+
     'version.change': 'Änderung',
     'version.noData': '(keine Daten verfügbar)',
     'version.none': 'Keine Versionen vorhanden',
@@ -233,6 +257,7 @@ const translations = {
     'pi.vpnIp': 'VPN IP',
     'pi.mac': 'MAC Address',
     'pi.sshUser': 'SSH User',
+    'pi.sshPassword': 'SSH Password',
     'pi.piholeUrl': 'Pi-hole Admin URL',
     'pi.piholeVpnUrl': 'Pi-hole VPN URL',
 
@@ -355,6 +380,29 @@ const translations = {
     'msg.invalidJson': 'Invalid JSON file',
     'msg.confirmOverwrite': 'All data will be overwritten. Continue?',
     'msg.confirmShutdown': 'Really shut down the PC?',
+
+    // UI
+    'ui.cancel': 'Cancel',
+    'ui.confirm': 'Confirm',
+    'ui.copied': 'Copied!',
+    'ui.copyFailed': 'Copy failed',
+    'ui.copy': 'Copy',
+    'ui.show': 'Show',
+    'ui.hide': 'Hide',
+
+    // Landing Greetings
+    'landing.greetings': [
+      'What\'s on your mind?',
+      'Where would you like to start?',
+      'What\'s on the agenda today?',
+      'Everything good on the network?',
+      'What would you like to know?',
+      'Ready to get started?',
+      'What can I help with?',
+      'Where to next?',
+      'What are you working on?',
+      'Good to see you.',
+    ],
 
     'version.change': 'Change',
     'version.noData': '(no data available)',

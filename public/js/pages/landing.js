@@ -8,21 +8,12 @@ import { el } from '../ui.js';
 import { icon } from '../icons.js';
 import { getConfig } from '../state.js';
 
-const greetings = [
-  'Was geht dir durch den Kopf?',
-  'Wo möchtest du starten?',
-  'Was steht heute an?',
-  'Alles im Netzwerk klar?',
-  'Was möchtest du wissen?',
-  'Bereit loszulegen?',
-  'Was darf es sein?',
-  'Wohin soll es gehen?',
-  'Was beschäftigt dich?',
-  'Schön dich zu sehen.',
-];
-
 function randomGreeting() {
-  return greetings[Math.floor(Math.random() * greetings.length)];
+  const greetings = t('landing.greetings');
+  if (Array.isArray(greetings)) {
+    return greetings[Math.floor(Math.random() * greetings.length)];
+  }
+  return greetings;
 }
 
 export function renderLanding(container) {

@@ -14,7 +14,7 @@ function copyBtn(textFn) {
   return el('button', {
     className: 'copy-btn',
     innerHTML: icon('copy', 14),
-    title: 'Kopieren',
+    title: t('ui.copy'),
     onClick: (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -29,14 +29,14 @@ function eyeToggle(input) {
   const btn = el('button', {
     className: 'eye-btn',
     innerHTML: icon('eye', 16),
-    title: 'Anzeigen',
+    title: t('ui.show'),
     onClick: (e) => {
       e.preventDefault();
       e.stopPropagation();
       visible = !visible;
       input.type = visible ? 'text' : 'password';
       btn.innerHTML = icon(visible ? 'eyeOff' : 'eye', 16);
-      btn.title = visible ? 'Verstecken' : 'Anzeigen';
+      btn.title = visible ? t('ui.hide') : t('ui.show');
     },
   });
   return btn;
@@ -174,7 +174,7 @@ function buildPiholeCard() {
     { key: 'vpnIp',           label: t('pi.vpnIp') },
     { key: 'macAddress',      label: t('pi.mac') },
     { key: 'sshUser',         label: t('pi.sshUser') },
-    { key: 'sshPassword',     label: 'SSH Passwort', password: true },
+    { key: 'sshPassword',     label: t('pi.sshPassword'), password: true },
     { key: 'piholeUrl',       label: t('pi.piholeUrl') },
     { key: 'piholeRemoteUrl', label: t('pi.piholeVpnUrl') },
   ];
@@ -291,11 +291,11 @@ function buildWindowsPCCard() {
     Object.assign(state.windowsPCInfo, data);
 
     const fields = [
-      { key: 'hostname',    label: 'Hostname' },
+      { key: 'hostname',    label: t('pi.hostname') },
       { key: 'ipAddress',   label: t('pc.ip') },
       { key: 'macAddress',  label: t('pc.mac') },
       { key: 'sshUser',     label: t('pc.sshUser') },
-      { key: 'sshPassword', label: 'SSH Passwort', password: true },
+      { key: 'sshPassword', label: t('pc.sshPassword'), password: true },
     ];
 
     for (const f of fields) {

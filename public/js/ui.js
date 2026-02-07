@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { state, defaults, STORAGE_KEYS } from './state.js';
+import { t } from './i18n.js';
 
 // ── Debounce ──
 export function debounce(fn, wait) {
@@ -132,7 +133,7 @@ export function showConfirm(title, message, onConfirm, onCancel) {
       el('div', { className: 'confirm-buttons' }, [
         el('button', {
           className: 'btn secondary',
-          textContent: 'Abbrechen',
+          textContent: t('ui.cancel'),
           onClick: () => {
             overlay.remove();
             onCancel?.();
@@ -140,7 +141,7 @@ export function showConfirm(title, message, onConfirm, onCancel) {
         }),
         el('button', {
           className: 'btn danger',
-          textContent: 'Bestätigen',
+          textContent: t('ui.confirm'),
           onClick: () => {
             overlay.remove();
             onConfirm?.();
@@ -162,9 +163,9 @@ export function showConfirm(title, message, onConfirm, onCancel) {
 export async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
-    showToast('Kopiert!');
+    showToast(t('ui.copied'));
   } catch {
-    showToast('Kopieren fehlgeschlagen', true);
+    showToast(t('ui.copyFailed'), true);
   }
 }
 
