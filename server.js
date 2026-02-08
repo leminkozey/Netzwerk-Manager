@@ -1006,9 +1006,12 @@ function pingLatency(ipAddress) {
     }
 
     const isWindows = process.platform === 'win32';
+    const isMac = process.platform === 'darwin';
     const args = isWindows
       ? ['-n', '1', '-w', '2000', ipAddress]
-      : ['-c', '1', '-W', '2', ipAddress];
+      : isMac
+        ? ['-c', '1', '-t', '3', ipAddress]
+        : ['-c', '1', '-W', '2', ipAddress];
 
     const ping = spawn('ping', args, { timeout: 5000 });
 
@@ -1019,12 +1022,17 @@ function pingLatency(ipAddress) {
 
     ping.on('close', (code) => {
       if (code !== 0) return resolve(null);
-      const match = stdout.match(/(?:time|zeit)[=<](\d+(?:\.\d+)?)\s*ms/i);
-      if (match) {
-        resolve(parseFloat(match[1]));
-      } else {
-        resolve(null);
+      // Try per-packet line: "time=12.3 ms"
+      const perPacket = stdout.match(/(?:time|zeit)[=<](\d+(?:\.\d+)?)\s*ms/i);
+      if (perPacket) {
+        return resolve(parseFloat(perPacket[1]));
       }
+      // Fallback: round-trip stats line (macOS/BSD): "min/avg/max/stddev = 9.9/9.9/9.9/0.0 ms"
+      const stats = stdout.match(/=\s*[\d.]+\/([\d.]+)\/[\d.]+\/[\d.nan]+\s*ms/);
+      if (stats) {
+        return resolve(parseFloat(stats[1]));
+      }
+      resolve(null);
     });
 
     ping.on('error', () => {
