@@ -396,12 +396,12 @@ function buildDeviceUptimeCard(d, timerRefs) {
 
 function buildOutagesCardFromData(outages) {
   if (outages.length === 0) {
-    return el('div', { className: 'card' }, [
+    return el('div', { className: 'card', style: { display: 'flex', flexDirection: 'column', minHeight: '0', overflow: 'hidden' } }, [
       sectionTitle(t('analysen.outages'), 'outage'),
-      el('div', { textContent: t('analysen.noOutages'), style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' } }),
+      el('div', { textContent: t('analysen.noOutages'), style: { flex: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' } }),
     ]);
   }
-  const rows = outages.slice(0, 3).map(d => {
+  const rows = outages.map(d => {
     const isOngoing = d.ongoing;
     return el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border)' } }, [
       el('div', { style: { color: isOngoing ? '#ef4444' : 'var(--accent-warm)', flexShrink: '0', display: 'flex', alignItems: 'center' } }, [iconEl('outage', 18)]),
@@ -421,7 +421,10 @@ function buildOutagesCardFromData(outages) {
       }),
     ]);
   });
-  return el('div', { className: 'card' }, [sectionTitle(t('analysen.outages'), 'outage'), ...rows]);
+  const scrollContainer = el('div', {
+    style: { flex: '1', minHeight: '0', overflowY: 'auto', overflowX: 'hidden' },
+  }, rows);
+  return el('div', { className: 'card', style: { display: 'flex', flexDirection: 'column', minHeight: '0', overflow: 'hidden' } }, [sectionTitle(t('analysen.outages'), 'outage'), scrollContainer]);
 }
 
 // =================================================================

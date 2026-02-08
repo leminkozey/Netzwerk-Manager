@@ -3270,9 +3270,12 @@ label {
 
 .analysen-top {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 340px 260px 1fr;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+}
+.analysen-top > .card {
+  margin-bottom: 0;
 }
 
 @media (max-width: 1100px) {
