@@ -93,12 +93,19 @@ function escapeHtml(str) {
 // Validate IP is not internal/dangerous for SSRF protection
 function isAllowedProxyTarget(ip) {
   if (!ip) return false;
-  // Block localhost
-  if (ip === '127.0.0.1' || ip === 'localhost' || ip === '::1') return false;
-  // Block link-local
-  if (ip.startsWith('169.254.')) return false;
-  // Block cloud metadata endpoints
-  if (ip === '169.254.169.254') return false;
+  const lower = ip.toLowerCase().trim();
+  // Block hostnames (only allow IPv4 addresses to prevent DNS rebinding)
+  if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(lower)) return false;
+  const parts = lower.split('.').map(Number);
+  if (parts.some(p => isNaN(p) || p < 0 || p > 255)) return false;
+  // Block loopback (entire 127.0.0.0/8 range)
+  if (parts[0] === 127) return false;
+  // Block 0.0.0.0
+  if (parts[0] === 0) return false;
+  // Block link-local (169.254.0.0/16)
+  if (parts[0] === 169 && parts[1] === 254) return false;
+  // Block broadcast
+  if (parts.every(p => p === 255)) return false;
   // Allow private network ranges (expected for local network manager)
   return true;
 }
@@ -194,7 +201,7 @@ app.use('/api/speedtest/upload', (req, res, next) => {
   }
   next();
 }, express.raw({ type: '*/*', limit: '50mb' }));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '1mb' }));
 
 // Security headers middleware
 app.use((req, res, next) => {
@@ -540,11 +547,9 @@ function getPiSpeedtestTarget(state) {
 }
 
 function sendPiUnavailable(res, host, port, reason) {
+  console.error(`[Speedtest] Pi unreachable at ${host}:${port} - ${reason}`);
   res.status(503).json({
-    error: 'Raspberry Pi unreachable',
-    message: `${host}:${port} is unreachable. Is the Pi speedtest server running?`,
-    piIp: host,
-    reason,
+    error: 'Speedtest server unreachable',
   });
 }
 
@@ -1394,21 +1399,50 @@ app.get('/api/versions', authRequired, (req, res) => {
 // Maximum allowed speedtest size (50 MB) to prevent DoS
 const MAX_SPEEDTEST_SIZE_MB = 50;
 
-app.get('/api/speedtest/download', authRequired, (req, res) => {
+// Concurrency limiter for CPU-intensive speedtest endpoints
+let activeSpeedtests = 0;
+const MAX_CONCURRENT_SPEEDTESTS = 2;
+
+function speedtestConcurrencyGuard(req, res, next) {
+  if (activeSpeedtests >= MAX_CONCURRENT_SPEEDTESTS) {
+    return res.status(429).json({ error: 'Too many concurrent speedtests' });
+  }
+  activeSpeedtests++;
+  let released = false;
+  function release() {
+    if (!released) { released = true; activeSpeedtests--; }
+  }
+  res.on('finish', release);
+  res.on('close', release);
+  next();
+}
+
+app.get('/api/speedtest/download', authRequired, speedtestConcurrencyGuard, (req, res) => {
   // Cap size to prevent memory exhaustion DoS
   const sizeMB = Math.min(Math.max(parseInt(req.query.size) || 1, 1), MAX_SPEEDTEST_SIZE_MB);
   const sizeBytes = sizeMB * 1024 * 1024;
 
-  // Generate random data for download test
-  const buffer = Buffer.alloc(sizeBytes);
-  for (let i = 0; i < sizeBytes; i += 1024) {
-    buffer.writeUInt32BE(Math.random() * 0xffffffff, i);
-  }
-
   res.setHeader('Content-Type', 'application/octet-stream');
   res.setHeader('Content-Length', sizeBytes);
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.send(buffer);
+
+  // Stream random data in chunks to avoid memory exhaustion
+  const chunkSize = 64 * 1024; // 64 KB
+  let sent = 0;
+  function sendChunk() {
+    while (sent < sizeBytes) {
+      const remaining = sizeBytes - sent;
+      const size = Math.min(chunkSize, remaining);
+      const chunk = crypto.randomBytes(size);
+      sent += size;
+      if (!res.write(chunk)) {
+        res.once('drain', sendChunk);
+        return;
+      }
+    }
+    res.end();
+  }
+  sendChunk();
 });
 
 app.post('/api/speedtest/upload', authRequired, (req, res) => {
@@ -1457,21 +1491,34 @@ app.get('/api/speedtest/local-ping', authRequired, (req, res) => {
   piRequest.end();
 });
 
-app.get('/api/speedtest/local-download-proxy', authRequired, async (req, res) => {
+app.get('/api/speedtest/local-download-proxy', authRequired, speedtestConcurrencyGuard, async (req, res) => {
   // Cap size to prevent DoS
   const sizeMB = Math.min(Math.max(parseInt(req.query.size, 10) || 1, 1), MAX_SPEEDTEST_SIZE_MB);
 
   if (!usePiSpeedtest()) {
     const sizeBytes = sizeMB * 1024 * 1024;
-    const buffer = Buffer.alloc(sizeBytes);
-    for (let i = 0; i < sizeBytes; i += 1024) {
-      buffer.writeUInt32BE(Math.random() * 0xffffffff, i);
-    }
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Length', sizeBytes);
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('X-Pi-Status', 'disabled');
-    return res.send(buffer);
+
+    const chunkSize = 64 * 1024;
+    let sent = 0;
+    function sendChunk() {
+      while (sent < sizeBytes) {
+        const remaining = sizeBytes - sent;
+        const size = Math.min(chunkSize, remaining);
+        const chunk = crypto.randomBytes(size);
+        sent += size;
+        if (!res.write(chunk)) {
+          res.once('drain', sendChunk);
+          return;
+        }
+      }
+      res.end();
+    }
+    sendChunk();
+    return;
   }
 
   const http = require('http');
@@ -1510,21 +1557,39 @@ app.get('/api/speedtest/local-download-proxy', authRequired, async (req, res) =>
   });
 
   piRequest.on('error', (e) => {
-    sendPiUnavailable(res, host, port, e?.message || 'error');
+    if (!res.headersSent) sendPiUnavailable(res, host, port, e?.message || 'error');
+    else res.destroy();
   });
 
   piRequest.on('timeout', () => {
     piRequest.destroy();
-    sendPiUnavailable(res, host, port, 'timeout');
+    if (!res.headersSent) sendPiUnavailable(res, host, port, 'timeout');
+    else res.destroy();
   });
 
   piRequest.end();
 });
 
 app.post('/api/speedtest/local-upload-proxy', authRequired, (req, res) => {
+  const maxUploadBytes = MAX_SPEEDTEST_SIZE_MB * 1024 * 1024;
+
   if (!usePiSpeedtest()) {
-    const receivedBytes = req.body ? req.body.length : 0;
-    return res.json({ ok: true, bytes: receivedBytes, piStatus: 'disabled' });
+    // Consume the raw body stream and count bytes (with size limit)
+    let receivedBytes = 0;
+    req.on('data', (chunk) => {
+      receivedBytes += chunk.length;
+      if (receivedBytes > maxUploadBytes) {
+        req.destroy();
+        if (!res.headersSent) res.status(413).json({ error: 'Upload too large' });
+      }
+    });
+    req.on('end', () => {
+      if (!res.headersSent) res.json({ ok: true, bytes: receivedBytes, piStatus: 'disabled' });
+    });
+    req.on('error', () => {
+      if (!res.headersSent) res.json({ ok: true, bytes: receivedBytes, piStatus: 'disabled' });
+    });
+    return;
   }
 
   const http = require('http');
@@ -1558,12 +1623,14 @@ app.post('/api/speedtest/local-upload-proxy', authRequired, (req, res) => {
   });
 
   piRequest.on('error', (e) => {
-    sendPiUnavailable(res, host, port, e?.message || 'error');
+    if (!res.headersSent) sendPiUnavailable(res, host, port, e?.message || 'error');
+    else res.destroy();
   });
 
   piRequest.on('timeout', () => {
     piRequest.destroy();
-    sendPiUnavailable(res, host, port, 'timeout');
+    if (!res.headersSent) sendPiUnavailable(res, host, port, 'timeout');
+    else res.destroy();
   });
 
   req.on('aborted', () => {
@@ -1575,16 +1642,26 @@ app.post('/api/speedtest/local-upload-proxy', authRequired, (req, res) => {
 
 app.post('/api/speedtest/save', authRequired, async (req, res) => {
   const { download, upload, ping, type, timestamp } = req.body || {};
+
+  function safeFloat(v, max = 100000) {
+    const n = parseFloat(v);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.min(n, max);
+  }
+
+  const allowedTypes = ['local', 'internet', 'unknown'];
+
   await withStateLock(() => {
     const state = readState();
 
     const testResult = {
       id: randomUUID(),
-      download: parseFloat(download) || 0,
-      upload: parseFloat(upload) || 0,
-      ping: parseFloat(ping) || 0,
-      type: type || 'unknown',
-      timestamp: timestamp || Date.now(),
+      download: safeFloat(download),
+      upload: safeFloat(upload),
+      ping: safeFloat(ping, 60000),
+      type: allowedTypes.includes(type) ? type : 'unknown',
+      timestamp: (typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0)
+        ? timestamp : Date.now(),
     };
 
     state.speedTestHistory = Array.isArray(state.speedTestHistory) ? state.speedTestHistory : [];

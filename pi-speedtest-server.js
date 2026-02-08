@@ -1,6 +1,7 @@
 const http = require('http');
 const { randomBytes } = require('crypto');
 const { URL } = require('url');
+const { time } = require('console');
 
 const PORT = parseInt(process.env.PI_SPEEDTEST_PORT, 10) || 8080;
 const MAX_MB = 50;

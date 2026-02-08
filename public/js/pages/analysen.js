@@ -168,9 +168,16 @@ function buildSpeedtestSection() {
     const pings = [];
     for (let i = 0; i < 8; i++) {
       const start = performance.now();
-      try { await api.speedtestPing(); } catch {}
-      pings.push(performance.now() - start);
+      try {
+        const res = await api.speedtestPing();
+        if (res.ok || res.status === 204) {
+          pings.push(performance.now() - start);
+        }
+      } catch {
+        // Skip failed pings
+      }
     }
+    if (pings.length === 0) return 0;
     pings.sort((a, b) => a - b);
     const best75 = pings.slice(0, Math.ceil(pings.length * 0.75));
     return Math.round((best75.reduce((s, v) => s + v, 0) / best75.length) * 10) / 10;
@@ -184,11 +191,12 @@ function buildSpeedtestSection() {
       const start = performance.now();
       try {
         const res = await api.speedtestDownload(size);
-        const blob = await res.blob();
-        const mbps = (blob.size * 8) / ((performance.now() - start) / 1000) / 1e6;
+        if (!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        const mbps = (buf.byteLength * 8) / ((performance.now() - start) / 1000) / 1e6;
         if (mbps > bestMbps) bestMbps = mbps;
         setGauge(bestMbps);
-      } catch { break; }
+      } catch { continue; }
     }
     return Math.round(bestMbps * 100) / 100;
   }
@@ -199,22 +207,34 @@ function buildSpeedtestSection() {
     let bestMbps = 0;
     for (const sizeMB of sizes) {
       const data = new Uint8Array(sizeMB * 1024 * 1024);
+      for (let off = 0; off < data.byteLength; off += 65536) {
+        crypto.getRandomValues(new Uint8Array(data.buffer, off, Math.min(65536, data.byteLength - off)));
+      }
       const start = performance.now();
       try {
-        await api.speedtestUpload(data);
+        const res = await api.speedtestUpload(data);
+        if (!res.ok) continue;
         const mbps = (data.byteLength * 8) / ((performance.now() - start) / 1000) / 1e6;
         if (mbps > bestMbps) bestMbps = mbps;
         setGauge(bestMbps);
-      } catch { break; }
+      } catch { continue; }
     }
     return Math.round(bestMbps * 100) / 100;
+  }
+
+  function setBtnRunning(text) {
+    startBtn.replaceChildren(iconEl('speedtest', 18), document.createTextNode(' ' + text));
+  }
+
+  function setBtnReady() {
+    startBtn.replaceChildren(iconEl('speedtest', 18), document.createTextNode(' ' + t('speedtest.start')));
   }
 
   startBtn.addEventListener('click', async () => {
     if (running) return;
     running = true;
     startBtn.disabled = true;
-    startBtn.textContent = t('speedtest.starting');
+    setBtnRunning(t('speedtest.starting'));
     setGauge(0);
     dlValue.textContent = '-';
     ulValue.textContent = '-';
@@ -227,8 +247,12 @@ function buildSpeedtestSection() {
       setGauge(0);
       const ul = await measureUpload();
       ulValue.textContent = ul + ' Mbps';
-      setGauge(dl);
-      try { await api.saveSpeedtest({ download: dl, upload: ul, ping }); } catch {}
+      setGauge(Math.max(dl, ul));
+      try {
+        await api.saveSpeedtest({ download: dl, upload: ul, ping, type: 'local' });
+      } catch {
+        showToast(t('msg.error'), true);
+      }
       noteEl.textContent = t('speedtest.complete');
     } catch {
       noteEl.textContent = t('speedtest.error');
@@ -236,8 +260,7 @@ function buildSpeedtestSection() {
     } finally {
       running = false;
       startBtn.disabled = false;
-      startBtn.textContent = '';
-      startBtn.append(iconEl('speedtest', 18), ' ' + t('speedtest.start'));
+      setBtnReady();
     }
   });
 
