@@ -113,6 +113,7 @@ export function handleLogout() {
 // ── Force Logout ──
 export function handleForceLogout(deviceName, timeMs) {
   state.token = null;
+  localStorage.removeItem(STORAGE_KEYS.deviceToken);
   closeSocket();
   stopSessionTimer();
   emit('forceLogout', { deviceName, timeMs });

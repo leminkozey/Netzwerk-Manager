@@ -246,15 +246,18 @@ app.use((req, res, next) => {
       try { checkValue = new URL(referer).origin; } catch { /* invalid referer */ }
     }
 
-    if (checkValue) {
-      const allowed = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
-      const host = req.headers.host;
-      if (host) {
-        allowed.push(`http://${host}`, `https://${host}`);
-      }
-      if (!allowed.includes(checkValue)) {
-        return res.status(403).json({ error: 'Invalid origin' });
-      }
+    // Reject if we couldn't extract a valid origin from either header
+    if (!checkValue) {
+      return res.status(403).json({ error: 'Invalid origin' });
+    }
+
+    const allowed = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+    const host = req.headers.host;
+    if (host) {
+      allowed.push(`http://${host}`, `https://${host}`);
+    }
+    if (!allowed.includes(checkValue)) {
+      return res.status(403).json({ error: 'Invalid origin' });
     }
   }
   next();
@@ -1788,7 +1791,10 @@ app.post('/api/import', authRequired, async (req, res) => {
     const result = {};
     for (const [key, val] of Object.entries(obj)) {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
-      result[key] = typeof val === 'string' ? escapeHtml(val) : val;
+      // Only accept strings — reject objects/arrays to prevent injection
+      if (typeof val === 'string') {
+        result[key] = escapeHtml(val);
+      }
     }
     return result;
   }

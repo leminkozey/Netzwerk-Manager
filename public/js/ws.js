@@ -19,6 +19,8 @@ export function connectSocket() {
   state.socket = ws;
 
   ws.addEventListener('open', () => {
+    // Guard: token may have been cleared between connect and open
+    if (!state.token) { ws.close(); return; }
     // Authenticate via first message (not URL query) to avoid token in logs
     ws.send(JSON.stringify({ type: 'auth', token: state.token }));
     reconnectDelay = 1000; // Reset on successful connection
@@ -28,7 +30,8 @@ export function connectSocket() {
     try {
       const msg = JSON.parse(e.data);
       if (msg.type === 'forceLogout' && typeof msg.deviceName === 'string') {
-        handleForceLogout(msg.deviceName, msg.loginAt);
+        const loginAt = typeof msg.loginAt === 'number' ? msg.loginAt : null;
+        handleForceLogout(msg.deviceName, loginAt);
       }
     } catch {
       // ignore non-JSON messages

@@ -283,7 +283,7 @@ async function init() {
   });
 
   // Register routes
-  registerRoute('/login', renderLogin);
+  registerRoute('/login', wrapPage(renderLogin));
   registerRoute('/', wrapPage(renderLanding));
   registerRoute('/info', wrapPage(renderInfo));
   registerRoute('/start', wrapPage(renderStart));
