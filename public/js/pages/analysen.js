@@ -401,7 +401,7 @@ function buildOutagesCardFromData(outages) {
       el('div', { textContent: t('analysen.noOutages'), style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' } }),
     ]);
   }
-  const rows = outages.map(d => {
+  const rows = outages.slice(0, 3).map(d => {
     const isOngoing = d.ongoing;
     return el('div', { style: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid var(--border)' } }, [
       el('div', { style: { color: isOngoing ? '#ef4444' : 'var(--accent-warm)', flexShrink: '0', display: 'flex', alignItems: 'center' } }, [iconEl('outage', 18)]),
@@ -428,321 +428,172 @@ function buildOutagesCardFromData(outages) {
 // Ping Monitor Section
 // =================================================================
 
-function buildMiniLatencyChart(chartData) {
-  if (!chartData || chartData.length === 0) return el('div');
-
-  const ns = 'http://www.w3.org/2000/svg';
-  const w = 300, h = 100;
-  const padL = 35, padR = 8, padT = 8, padB = 20;
-  const cW = w - padL - padR;
-  const cH = h - padT - padB;
-
-  const validPoints = chartData.filter(p => p.ms !== null);
-  if (validPoints.length < 2) return el('div');
-
-  const msValues = validPoints.map(p => p.ms);
-  const maxMs = Math.max(...msValues, 1);
-  const minMs = Math.min(...msValues, 0);
-  const range = maxMs - minMs || 1;
-
-  function toX(i) { return padL + (i / (chartData.length - 1)) * cW; }
-  function toY(ms) { return padT + cH - ((ms - minMs) / range) * cH; }
-
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-  svg.style.cssText = 'width:100%;height:auto;display:block';
-
-  // Y-axis labels (3 levels)
-  for (let i = 0; i <= 2; i++) {
-    const val = minMs + (range / 2) * i;
-    const y = toY(val);
-    const line = document.createElementNS(ns, 'line');
-    line.setAttribute('x1', padL); line.setAttribute('x2', w - padR);
-    line.setAttribute('y1', y); line.setAttribute('y2', y);
-    line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '0.5');
-    svg.appendChild(line);
-
-    const label = document.createElementNS(ns, 'text');
-    label.setAttribute('x', padL - 4); label.setAttribute('y', y + 3);
-    label.setAttribute('text-anchor', 'end'); label.setAttribute('fill', 'var(--text-muted)');
-    label.setAttribute('font-size', '8');
-    label.textContent = Math.round(val) + '';
-    svg.appendChild(label);
-  }
-
-  // Build polyline points and area fill
-  let polyPoints = '';
-  let areaPoints = '';
-  let firstX = null, lastX = null;
-  for (let i = 0; i < chartData.length; i++) {
-    if (chartData[i].ms === null) continue;
-    const x = toX(i);
-    const y = toY(chartData[i].ms);
-    polyPoints += `${x},${y} `;
-    areaPoints += `${x},${y} `;
-    if (firstX === null) firstX = x;
-    lastX = x;
-  }
-
-  if (firstX !== null) {
-    // Area fill
-    const area = document.createElementNS(ns, 'polygon');
-    area.setAttribute('points', `${areaPoints}${lastX},${padT + cH} ${firstX},${padT + cH}`);
-    area.setAttribute('fill', 'var(--accent)');
-    area.setAttribute('opacity', '0.08');
-    svg.appendChild(area);
-
-    // Line
-    const polyline = document.createElementNS(ns, 'polyline');
-    polyline.setAttribute('points', polyPoints.trim());
-    polyline.setAttribute('fill', 'none');
-    polyline.setAttribute('stroke', 'var(--accent)');
-    polyline.setAttribute('stroke-width', '1.5');
-    polyline.setAttribute('stroke-linejoin', 'round');
-    svg.appendChild(polyline);
-  }
-
-  // X-axis time labels (3 labels)
-  const timeIndices = [0, Math.floor(chartData.length / 2), chartData.length - 1];
-  for (const idx of timeIndices) {
-    if (idx >= chartData.length) continue;
-    const ts = chartData[idx].ts;
-    const d = new Date(ts);
-    const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    const label = document.createElementNS(ns, 'text');
-    label.setAttribute('x', toX(idx));
-    label.setAttribute('y', h - 4);
-    label.setAttribute('text-anchor', 'middle'); label.setAttribute('fill', 'var(--text-muted)');
-    label.setAttribute('font-size', '8');
-    label.textContent = timeStr;
-    svg.appendChild(label);
-  }
-
-  return svg;
-}
-
-function buildPingHostCard(host) {
-  const isReachable = host.currentPing !== null;
-  const statusColor = isReachable ? '#22c55e' : '#ef4444';
-  const pingDisplay = isReachable ? host.currentPing.toFixed(1) : '—';
-  const pingColor = isReachable ? 'var(--accent)' : '#ef4444';
-
-  function statItem(label, value, unit) {
-    return el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' } }, [
-      el('span', {
-        textContent: label,
-        style: { fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' },
-      }),
-      el('span', {
-        textContent: value !== null ? value + (unit || '') : '—',
-        style: { fontSize: '0.82rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' },
-      }),
-    ]);
-  }
-
-  const statsRow = el('div', {
-    style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', padding: '10px 0 8px', borderTop: '1px solid var(--border)' },
-  }, [
-    statItem(t('pingMonitor.avg'), host.avg, ' ms'),
-    statItem(t('pingMonitor.min'), host.min, ' ms'),
-    statItem(t('pingMonitor.max'), host.max, ' ms'),
-    statItem(t('pingMonitor.loss'), host.lossPercent !== null ? host.lossPercent : null, '%'),
-  ]);
-
-  const chart = buildMiniLatencyChart(host.chart);
-
-  return el('div', { className: 'card', style: { marginBottom: '0' } }, [
-    // Header: dot + name + ip | status
-    el('div', {
-      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' },
-    }, [
-      el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
-        el('div', {
-          style: {
-            width: '8px', height: '8px', borderRadius: '50%',
-            background: statusColor, boxShadow: `0 0 6px ${statusColor}88`, flexShrink: '0',
-          },
-        }),
-        el('span', {
-          textContent: host.name,
-          style: { fontSize: '0.95rem', fontWeight: '600', color: 'var(--text)' },
-        }),
-      ]),
-      el('span', {
-        textContent: isReachable ? 'Online' : t('pingMonitor.unreachable'),
-        style: {
-          padding: '2px 10px', fontSize: '0.68rem', fontWeight: '700',
-          color: statusColor, borderRadius: '20px', textTransform: 'uppercase',
-          letterSpacing: '0.04em',
-          background: isReachable ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
-          border: `1px solid ${isReachable ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'}`,
-        },
-      }),
-    ]),
-    // IP
-    el('div', {
-      textContent: host.ip,
-      style: {
-        fontSize: '0.72rem', color: 'var(--text-muted)',
-        fontFamily: "'JetBrains Mono', monospace", marginBottom: '6px', paddingLeft: '16px',
-      },
-    }),
-    // Current ping (large)
-    el('div', {
-      style: { textAlign: 'center', padding: '8px 0 12px' },
-    }, [
-      el('span', {
-        textContent: pingDisplay,
-        style: {
-          fontSize: '2rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace",
-          color: pingColor, letterSpacing: '-0.02em',
-        },
-      }),
-      el('span', {
-        textContent: isReachable ? ' ms' : '',
-        style: { fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-muted)' },
-      }),
-    ]),
-    // Stats row
-    statsRow,
-    // Mini chart
-    el('div', { style: { padding: '6px 0 0', overflow: 'hidden' } }, [chart]),
-  ]);
-}
-
-function buildLatencyComparisonChart(hosts) {
-  const hostColors = ['#00d4ff', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#ec4899'];
-  const allCharts = hosts.filter(h => h.chart && h.chart.length > 1);
-  if (allCharts.length === 0) return el('div');
-
-  const ns = 'http://www.w3.org/2000/svg';
-  const w = 700, h = 240;
-  const padL = 50, padR = 15, padT = 15, padB = 40;
-  const cW = w - padL - padR;
-  const cH = h - padT - padB;
-
-  // Find global max across all hosts
-  let globalMax = 1;
-  for (const host of allCharts) {
-    for (const p of host.chart) {
-      if (p.ms !== null && p.ms > globalMax) globalMax = p.ms;
-    }
-  }
-
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
-  svg.style.cssText = 'width:100%;height:auto;display:block';
-
-  function toY(ms) { return padT + cH - (ms / globalMax) * cH; }
-
-  // Y-axis grid
-  const ySteps = 4;
-  for (let i = 0; i <= ySteps; i++) {
-    const val = (globalMax / ySteps) * i;
-    const y = toY(val);
-    const line = document.createElementNS(ns, 'line');
-    line.setAttribute('x1', padL); line.setAttribute('x2', w - padR);
-    line.setAttribute('y1', y); line.setAttribute('y2', y);
-    line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '0.5');
-    svg.appendChild(line);
-
-    const label = document.createElementNS(ns, 'text');
-    label.setAttribute('x', padL - 8); label.setAttribute('y', y + 4);
-    label.setAttribute('text-anchor', 'end'); label.setAttribute('fill', 'var(--text-muted)');
-    label.setAttribute('font-size', '10');
-    label.textContent = Math.round(val) + ' ms';
-    svg.appendChild(label);
-  }
-
-  // Draw lines per host
-  for (let hi = 0; hi < allCharts.length; hi++) {
-    const host = allCharts[hi];
-    const color = hostColors[hi % hostColors.length];
-    const chart = host.chart;
-    let points = '';
-    for (let i = 0; i < chart.length; i++) {
-      if (chart[i].ms === null) continue;
-      const x = padL + (i / (chart.length - 1)) * cW;
-      const y = toY(chart[i].ms);
-      points += `${x},${y} `;
-    }
-    if (points) {
-      const polyline = document.createElementNS(ns, 'polyline');
-      polyline.setAttribute('points', points.trim());
-      polyline.setAttribute('fill', 'none');
-      polyline.setAttribute('stroke', color);
-      polyline.setAttribute('stroke-width', '2');
-      polyline.setAttribute('stroke-linejoin', 'round');
-      polyline.setAttribute('opacity', '0.85');
-      svg.appendChild(polyline);
-    }
-  }
-
-  // X-axis time labels
-  const refChart = allCharts[0].chart;
-  const labelCount = Math.min(6, refChart.length);
-  for (let i = 0; i < labelCount; i++) {
-    const idx = labelCount <= 1 ? 0 : Math.round((i / (labelCount - 1)) * (refChart.length - 1));
-    const ts = refChart[idx]?.ts;
-    if (!ts) continue;
-    const d = new Date(ts);
-    const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    const label = document.createElementNS(ns, 'text');
-    label.setAttribute('x', padL + (idx / (refChart.length - 1)) * cW);
-    label.setAttribute('y', h - 8);
-    label.setAttribute('text-anchor', 'middle'); label.setAttribute('fill', 'var(--text-muted)');
-    label.setAttribute('font-size', '9');
-    label.textContent = timeStr;
-    svg.appendChild(label);
-  }
-
-  // Legend
-  const legendItems = allCharts.map((host, i) =>
-    el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
-      el('div', { style: { width: '10px', height: '10px', borderRadius: '2px', background: hostColors[i % hostColors.length] } }),
-      el('span', { textContent: host.name, style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }),
-    ])
-  );
-  const legend = el('div', { style: { display: 'flex', gap: '16px', justifyContent: 'center', paddingTop: '8px', flexWrap: 'wrap' } }, legendItems);
-
-  return el('div', { className: 'card' }, [
-    sectionTitle(t('pingMonitor.latency') + ' – ' + t('pingMonitor.last24h'), 'pingMonitor'),
-    el('div', { style: { padding: '8px 0', overflow: 'hidden' } }, [svg]),
-    legend,
-  ]);
-}
-
 function buildPingMonitorSection(data) {
+  const hostColors = ['#00d4ff', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#ec4899'];
   const frag = document.createDocumentFragment();
-
-  // Section header
-  frag.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
-    el('div', { className: 'section-header' }, [
-      el('span', { className: 'icon-badge icon-cyan' }, [iconEl('pingMonitorColor', 22)]),
-      el('h3', { textContent: t('analysen.pingMonitor') }),
-    ]),
-  ]));
 
   if (!data || !data.hosts || data.hosts.length === 0) {
     frag.appendChild(el('div', {
       className: 'card',
-      style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
+      style: { padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' },
     }, [el('span', { textContent: t('pingMonitor.noData') })]));
     return frag;
   }
 
-  // Host cards grid
-  const grid = el('div', { className: 'analysen-pingmon-grid' });
-  for (const host of data.hosts) {
-    grid.appendChild(buildPingHostCard(host));
-  }
-  frag.appendChild(grid);
+  const hosts = data.hosts;
 
-  // Comparison chart (if more than 1 host with data)
-  const hostsWithData = data.hosts.filter(h => h.chart && h.chart.length > 1);
-  if (hostsWithData.length > 1) {
-    frag.appendChild(buildLatencyComparisonChart(data.hosts));
+  // ── Compact host stats: one row per host ──
+  function hostRow(host, color) {
+    const isReachable = host.currentPing !== null;
+    const statusColor = isReachable ? '#22c55e' : '#ef4444';
+    const pingDisplay = isReachable ? host.currentPing.toFixed(1) : '—';
+
+    function stat(label, value, unit) {
+      return el('span', {
+        style: { fontSize: '0.68rem', color: 'var(--text-muted)' },
+      }, [
+        document.createTextNode(label + ' '),
+        el('span', {
+          textContent: value !== null ? value + (unit || '') : '—',
+          style: { fontWeight: '600', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' },
+        }),
+      ]);
+    }
+
+    return el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0' } }, [
+      // Color dot
+      el('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: color, flexShrink: '0' } }),
+      // Name + IP
+      el('div', { style: { minWidth: '110px' } }, [
+        el('span', { textContent: host.name, style: { fontSize: '0.82rem', fontWeight: '600', color: 'var(--text)' } }),
+        el('span', { textContent: '  ' + host.ip, style: { fontSize: '0.65rem', color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" } }),
+      ]),
+      // Current ping
+      el('div', { style: { minWidth: '65px', textAlign: 'right' } }, [
+        el('span', {
+          textContent: pingDisplay,
+          style: { fontSize: '1.1rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", color },
+        }),
+        el('span', { textContent: isReachable ? ' ms' : '', style: { fontSize: '0.68rem', color: 'var(--text-muted)' } }),
+      ]),
+      // Status dot
+      el('div', { style: { width: '6px', height: '6px', borderRadius: '50%', background: statusColor, flexShrink: '0' } }),
+      // Inline stats
+      el('div', { style: { display: 'flex', gap: '10px', marginLeft: 'auto', flexWrap: 'wrap' } }, [
+        stat(t('pingMonitor.avg'), host.avg, ''),
+        stat(t('pingMonitor.min'), host.min, ''),
+        stat(t('pingMonitor.max'), host.max, ''),
+        stat(t('pingMonitor.loss'), host.lossPercent !== null ? host.lossPercent : null, '%'),
+      ]),
+    ]);
   }
+
+  const statsBlock = el('div', {
+    style: { borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '4px' },
+  }, hosts.map((h, i) => hostRow(h, hostColors[i % hostColors.length])));
+
+  // ── Compact combined chart ──
+  const allCharts = hosts.filter(h => h.chart && h.chart.length > 1);
+  let chartEl = el('div');
+
+  if (allCharts.length > 0) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const w = 700, h = 140;
+    const padL = 38, padR = 8, padT = 8, padB = 22;
+    const cW = w - padL - padR;
+    const cH = h - padT - padB;
+
+    let globalMax = 1;
+    for (const host of allCharts) {
+      for (const p of host.chart) {
+        if (p.ms !== null && p.ms > globalMax) globalMax = p.ms;
+      }
+    }
+
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.style.cssText = 'width:100%;height:auto;display:block';
+
+    function toY(ms) { return padT + cH - (ms / globalMax) * cH; }
+
+    // Y-axis grid (2 lines)
+    for (let i = 0; i <= 2; i++) {
+      const val = (globalMax / 2) * i;
+      const y = toY(val);
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', padL); line.setAttribute('x2', w - padR);
+      line.setAttribute('y1', y); line.setAttribute('y2', y);
+      line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '0.5');
+      svg.appendChild(line);
+
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', padL - 4); label.setAttribute('y', y + 3);
+      label.setAttribute('text-anchor', 'end'); label.setAttribute('fill', 'var(--text-muted)');
+      label.setAttribute('font-size', '8');
+      label.textContent = Math.round(val) + '';
+      svg.appendChild(label);
+    }
+
+    // Draw area + line per host
+    for (let hi = 0; hi < allCharts.length; hi++) {
+      const host = allCharts[hi];
+      const color = hostColors[hi % hostColors.length];
+      const chart = host.chart;
+      let points = '';
+      let firstX = null, lastX = null;
+      for (let i = 0; i < chart.length; i++) {
+        if (chart[i].ms === null) continue;
+        const x = padL + (i / (chart.length - 1)) * cW;
+        const y = toY(chart[i].ms);
+        points += `${x},${y} `;
+        if (firstX === null) firstX = x;
+        lastX = x;
+      }
+      if (points && firstX !== null) {
+        const area = document.createElementNS(ns, 'polygon');
+        area.setAttribute('points', `${points}${lastX},${padT + cH} ${firstX},${padT + cH}`);
+        area.setAttribute('fill', color);
+        area.setAttribute('opacity', '0.06');
+        svg.appendChild(area);
+
+        const polyline = document.createElementNS(ns, 'polyline');
+        polyline.setAttribute('points', points.trim());
+        polyline.setAttribute('fill', 'none');
+        polyline.setAttribute('stroke', color);
+        polyline.setAttribute('stroke-width', '1.8');
+        polyline.setAttribute('stroke-linejoin', 'round');
+        polyline.setAttribute('opacity', '0.85');
+        svg.appendChild(polyline);
+      }
+    }
+
+    // X-axis time labels
+    const refChart = allCharts[0].chart;
+    const labelCount = Math.min(5, refChart.length);
+    for (let i = 0; i < labelCount; i++) {
+      const idx = labelCount <= 1 ? 0 : Math.round((i / (labelCount - 1)) * (refChart.length - 1));
+      const ts = refChart[idx]?.ts;
+      if (!ts) continue;
+      const d = new Date(ts);
+      const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      const label = document.createElementNS(ns, 'text');
+      label.setAttribute('x', padL + (idx / (refChart.length - 1)) * cW);
+      label.setAttribute('y', h - 4);
+      label.setAttribute('text-anchor', 'middle'); label.setAttribute('fill', 'var(--text-muted)');
+      label.setAttribute('font-size', '8');
+      label.textContent = timeStr;
+      svg.appendChild(label);
+    }
+
+    chartEl = el('div', { style: { overflow: 'hidden' } }, [svg]);
+  }
+
+  // ── Single compact card ──
+  frag.appendChild(el('div', { className: 'card' }, [
+    sectionTitle(t('analysen.pingMonitor'), 'pingMonitorColor'),
+    statsBlock,
+    chartEl,
+  ]));
 
   return frag;
 }
@@ -1158,18 +1009,18 @@ export function renderAnalysen(container) {
   ]);
   rightSide.appendChild(uptimeGrid);
 
-  topRow.appendChild(rightSide);
-  page.appendChild(topRow);
-
-  // Outages
-  const outagesPlaceholder = el('div', { className: 'card', style: { marginTop: '16px' } }, [
+  // Outages — inside the right column, below uptime
+  const outagesPlaceholder = el('div', { className: 'card', style: { marginTop: '12px' } }, [
     sectionTitle(t('analysen.outages'), 'outage'),
     el('div', { textContent: '...', style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' } }),
   ]);
-  page.appendChild(outagesPlaceholder);
+  rightSide.appendChild(outagesPlaceholder);
+
+  topRow.appendChild(rightSide);
+  page.appendChild(topRow);
 
   // Ping Monitor section
-  const pingMonContainer = el('div', { style: { marginTop: '28px' } });
+  const pingMonContainer = el('div', { style: { marginTop: '16px' } });
   page.appendChild(pingMonContainer);
 
   // Pi-hole section
