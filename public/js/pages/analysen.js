@@ -421,10 +421,11 @@ function buildOutagesCardFromData(outages) {
       }),
     ]);
   });
-  const scrollContainer = el('div', {
-    style: { flex: '1', minHeight: '0', overflowY: 'auto', overflowX: 'hidden' },
+  const scrollInner = el('div', {
+    style: { position: 'absolute', top: '0', left: '0', right: '0', bottom: '0', overflowY: 'auto', overflowX: 'hidden' },
   }, rows);
-  return el('div', { className: 'card', style: { display: 'flex', flexDirection: 'column', minHeight: '0', overflow: 'hidden' } }, [sectionTitle(t('analysen.outages'), 'outage'), scrollContainer]);
+  const scrollWrapper = el('div', { style: { position: 'relative', flex: '1', minHeight: '0' } }, [scrollInner]);
+  return el('div', { className: 'card', style: { display: 'flex', flexDirection: 'column', minHeight: '0', overflow: 'hidden' } }, [sectionTitle(t('analysen.outages'), 'outage'), scrollWrapper]);
 }
 
 // =================================================================
