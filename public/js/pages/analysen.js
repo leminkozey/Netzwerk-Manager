@@ -7,6 +7,7 @@ import { getConfig } from '../state.js';
 import { el, showToast } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
+import { wsConnected } from '../ws.js';
 
 // =================================================================
 // Helpers
@@ -1039,7 +1040,9 @@ export function renderAnalysen(container) {
   // Outages element ref (may be replaced)
   let currentOutages = outagesPlaceholder;
 
-  function refreshUptime() {
+  // ── Render helpers (shared by fetch + WS push) ──
+
+  function renderUptimeData(data) {
     if (destroyed) return;
 
     // Clear old timer
@@ -1047,53 +1050,51 @@ export function renderAnalysen(container) {
     timerInterval = null;
     timerRefs.length = 0;
 
-    api.getUptime().then(data => {
-      if (destroyed) return;
-
-      if (data && data.devices && data.devices.length > 0) {
-        uptimeGrid.replaceChildren();
-        for (const d of data.devices) {
-          uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
-        }
-      } else {
-        uptimeGrid.replaceChildren();
-        uptimeGrid.appendChild(el('div', {
-          className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
-        }, [el('span', { textContent: t('analysen.noData') })]));
+    if (data && data.devices && data.devices.length > 0) {
+      uptimeGrid.replaceChildren();
+      for (const d of data.devices) {
+        uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
       }
-
-      if (data && data.outages !== undefined) {
-        const newOutages = buildOutagesCardFromData(data.outages);
-        currentOutages.replaceWith(newOutages);
-        currentOutages = newOutages;
-      }
-
-      // Start live timer
-      if (timerRefs.length > 0) {
-        timerInterval = setInterval(() => {
-          for (const ref of timerRefs) {
-            ref.el.textContent = formatLiveTimer(ref.ts);
-          }
-        }, 1000);
-      }
-    }).catch(() => {
+    } else {
       uptimeGrid.replaceChildren();
       uptimeGrid.appendChild(el('div', {
         className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
       }, [el('span', { textContent: t('analysen.noData') })]));
+    }
+
+    if (data && data.outages !== undefined) {
+      const newOutages = buildOutagesCardFromData(data.outages);
+      currentOutages.replaceWith(newOutages);
+      currentOutages = newOutages;
+    }
+
+    // Start live timer
+    if (timerRefs.length > 0) {
+      timerInterval = setInterval(() => {
+        for (const ref of timerRefs) {
+          ref.el.textContent = formatLiveTimer(ref.ts);
+        }
+      }, 1000);
+    }
+  }
+
+  function renderPingMonitorData(data) {
+    if (destroyed) return;
+    pingMonContainer.replaceChildren();
+    pingMonContainer.appendChild(buildPingMonitorSection(data));
+  }
+
+  function refreshUptime() {
+    if (destroyed) return;
+    api.getUptime().then(data => renderUptimeData(data)).catch(() => {
+      renderUptimeData(null);
     });
   }
 
   function refreshPingMonitor() {
     if (destroyed) return;
-    api.getPingMonitor().then(data => {
-      if (destroyed) return;
-      pingMonContainer.replaceChildren();
-      pingMonContainer.appendChild(buildPingMonitorSection(data));
-    }).catch(() => {
-      if (destroyed) return;
-      pingMonContainer.replaceChildren();
-      pingMonContainer.appendChild(buildPingMonitorSection(null));
+    api.getPingMonitor().then(data => renderPingMonitorData(data)).catch(() => {
+      renderPingMonitorData(null);
     });
   }
 
@@ -1207,14 +1208,49 @@ export function renderAnalysen(container) {
     });
   }
 
-  // Initial fetch
+  // ── Fallback polling management ──
+
+  function startFallbackPolling() {
+    stopFallbackPolling();
+    pollInterval = setInterval(() => refreshUptime(), pollMs);
+    if (pingMonEnabled) pingMonInterval = setInterval(() => refreshPingMonitor(), pollMs);
+  }
+
+  function stopFallbackPolling() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+    if (pingMonInterval) { clearInterval(pingMonInterval); pingMonInterval = null; }
+  }
+
+  // ── WebSocket event handlers ──
+
+  const onWsUptime = (e) => renderUptimeData(e.detail);
+  const onWsPingMonitor = (e) => renderPingMonitorData(e.detail);
+
+  const onWsConnected = () => {
+    stopFallbackPolling();
+  };
+
+  const onWsDisconnected = () => {
+    startFallbackPolling();
+  };
+
+  window.addEventListener('ws:uptime', onWsUptime);
+  if (pingMonEnabled) window.addEventListener('ws:pingMonitor', onWsPingMonitor);
+  window.addEventListener('ws:connected', onWsConnected);
+  window.addEventListener('ws:disconnected', onWsDisconnected);
+
+  // ── Initial fetch (always, for immediate data) ──
+
   refreshUptime();
   if (pingMonEnabled) refreshPingMonitor();
   refreshPihole();
 
-  // Auto-poll at configured interval for live status updates
-  pollInterval = setInterval(() => refreshUptime(), pollMs);
-  if (pingMonEnabled) pingMonInterval = setInterval(() => refreshPingMonitor(), pollMs);
+  // Start fallback polling only if WS is not connected
+  if (!wsConnected) {
+    startFallbackPolling();
+  }
+
+  // Pi-hole always polls (no server-side push cycle)
   piholeInterval = setInterval(() => refreshPihole(), piholeMs);
 
   // Live-update when uptime is reset from settings
@@ -1224,10 +1260,13 @@ export function renderAnalysen(container) {
   return function cleanup() {
     destroyed = true;
     if (timerInterval) clearInterval(timerInterval);
-    if (pollInterval) clearInterval(pollInterval);
-    if (pingMonInterval) clearInterval(pingMonInterval);
+    stopFallbackPolling();
     if (piholeInterval) clearInterval(piholeInterval);
     window.removeEventListener('uptime-reset', onReset);
+    window.removeEventListener('ws:uptime', onWsUptime);
+    window.removeEventListener('ws:pingMonitor', onWsPingMonitor);
+    window.removeEventListener('ws:connected', onWsConnected);
+    window.removeEventListener('ws:disconnected', onWsDisconnected);
     // Restore parent .page max-width for other pages
     if (parentPage) parentPage.style.maxWidth = '';
   };

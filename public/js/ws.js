@@ -10,6 +10,9 @@ let heartbeatInterval = null;
 let reconnectTimeout = null;
 let reconnectDelay = 1000;
 
+export let wsConnected = false;
+const WS_DATA_TYPES = new Set(['uptime', 'pingMonitor']);
+
 export function connectSocket() {
   closeSocket();
   reconnectDelay = 1000;
@@ -29,9 +32,14 @@ export function connectSocket() {
   ws.addEventListener('message', e => {
     try {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'forceLogout' && typeof msg.deviceName === 'string') {
+      if (msg.type === 'auth' && msg.success) {
+        wsConnected = true;
+        window.dispatchEvent(new Event('ws:connected'));
+      } else if (msg.type === 'forceLogout' && typeof msg.deviceName === 'string') {
         const loginAt = typeof msg.loginAt === 'number' ? msg.loginAt : null;
         handleForceLogout(msg.deviceName, loginAt);
+      } else if (msg.type && msg.data !== undefined && WS_DATA_TYPES.has(msg.type)) {
+        window.dispatchEvent(new CustomEvent(`ws:${msg.type}`, { detail: msg.data }));
       }
     } catch {
       // ignore non-JSON messages
@@ -42,6 +50,11 @@ export function connectSocket() {
     ws = null;
     state.socket = null;
     clearInterval(heartbeatInterval);
+    const wasConnected = wsConnected;
+    wsConnected = false;
+    if (wasConnected) {
+      window.dispatchEvent(new Event('ws:disconnected'));
+    }
     // Reconnect if still logged in
     if (state.token) {
       reconnectTimeout = setTimeout(() => {
@@ -72,4 +85,5 @@ export function closeSocket() {
     ws = null;
     state.socket = null;
   }
+  wsConnected = false;
 }

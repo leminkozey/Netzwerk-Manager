@@ -142,6 +142,23 @@ const runtime = {
   sockets: new Map(), // token -> WebSocket
 };
 
+function broadcastToAll(type, data) {
+  if (!isSessionValid()) return;
+  const activeToken = runtime.activeSession.token;
+  const msg = JSON.stringify({ type, data });
+  for (const [token, socket] of runtime.sockets.entries()) {
+    if (token !== activeToken) {
+      // Evict stale socket from expired/replaced session
+      runtime.sockets.delete(token);
+      try { socket.close(4001, 'Session expired'); } catch {}
+      continue;
+    }
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      try { socket.send(msg); } catch {}
+    }
+  }
+}
+
 // Check if session is expired
 function isSessionValid() {
   if (!runtime.activeSession) return false;
@@ -2583,6 +2600,7 @@ app.get('/api/uptime', authRequired, (req, res) => {
 app.post('/api/uptime/reset', authRequired, async (req, res) => {
   saveUptimeData({ devices: {}, outages: [] });
   await runUptimePingCycle().catch(() => {});
+  broadcastToAll('uptime', buildUptimeResponse());
   res.json({ ok: true });
 });
 
@@ -2596,6 +2614,7 @@ app.post('/api/uptime/reset/:deviceId', authRequired, async (req, res) => {
     saveUptimeData(data);
   }
   await runUptimePingCycle().catch(() => {});
+  broadcastToAll('uptime', buildUptimeResponse());
   res.json({ ok: true });
 });
 
@@ -2719,16 +2738,16 @@ function startServer() {
   const uptimeMs = readUptimeIntervalMs();
   console.log(`Uptime monitoring interval: ${uptimeMs / 1000}s`);
   setTimeout(() => {
-    runUptimePingCycle().catch(() => {});
+    runUptimePingCycle().then(() => broadcastToAll('uptime', buildUptimeResponse())).catch(() => {});
     setInterval(() => {
-      runUptimePingCycle().catch(() => {});
+      runUptimePingCycle().then(() => broadcastToAll('uptime', buildUptimeResponse())).catch(() => {});
     }, uptimeMs);
   }, 5000);
 
   // Ping Monitor: first cycle after 7s, then recursive setTimeout (re-reads interval each cycle)
   console.log(`Ping monitor interval: ${readPingMonitorIntervalMs() / 1000}s`);
   async function schedulePingMonitor() {
-    try { await runPingMonitorCycle(); } catch (err) { console.error('[Ping Monitor] Cycle error:', err.message); }
+    try { await runPingMonitorCycle(); broadcastToAll('pingMonitor', buildPingMonitorResponse()); } catch (err) { console.error('[Ping Monitor] Cycle error:', err.message); }
     setTimeout(schedulePingMonitor, readPingMonitorIntervalMs());
   }
   setTimeout(schedulePingMonitor, 7000);
