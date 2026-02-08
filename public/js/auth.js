@@ -103,6 +103,7 @@ export async function tryAutoLogin() {
 // ── Logout ──
 export function handleLogout() {
   state.token = null;
+  localStorage.removeItem(STORAGE_KEYS.deviceToken);
   closeSocket();
   stopSessionTimer();
   emit('loggedOut');

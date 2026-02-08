@@ -46,7 +46,7 @@ function getEncryptionKey() {
     return Buffer.from(fs.readFileSync(ENCRYPTION_KEY_FILE, 'utf-8').trim(), 'hex');
   }
   const key = crypto.randomBytes(32);
-  fs.writeFileSync(ENCRYPTION_KEY_FILE, key.toString('hex'), 'utf-8');
+  fs.writeFileSync(ENCRYPTION_KEY_FILE, key.toString('hex'), { encoding: 'utf-8', mode: 0o600 });
   return key;
 }
 
@@ -77,6 +77,11 @@ function decryptValue(stored) {
   } catch {
     return '';
   }
+}
+
+// Hash device tokens with SHA-256 for secure storage
+function hashDeviceToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
 }
 
 // HTML escape to prevent XSS
@@ -225,18 +230,29 @@ app.use((req, res, next) => {
   next();
 });
 
-// CSRF protection: validate Origin header on state-mutating requests
+// CSRF protection: validate Origin/Referer on state-mutating requests
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     const origin = req.headers.origin;
-    if (origin) {
+    const referer = req.headers.referer;
+
+    // Require at least one of Origin or Referer
+    if (!origin && !referer) {
+      return res.status(403).json({ error: 'Missing origin' });
+    }
+
+    let checkValue = origin;
+    if (!checkValue && referer) {
+      try { checkValue = new URL(referer).origin; } catch { /* invalid referer */ }
+    }
+
+    if (checkValue) {
       const allowed = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
-      // Also allow the actual host the request came to
       const host = req.headers.host;
       if (host) {
         allowed.push(`http://${host}`, `https://${host}`);
       }
-      if (!allowed.includes(origin)) {
+      if (!allowed.includes(checkValue)) {
         return res.status(403).json({ error: 'Invalid origin' });
       }
     }
@@ -667,10 +683,15 @@ function checkPasswordRateLimit(ip) {
   return true;
 }
 
+// Sanitize log parameters to prevent log injection
+function sanitizeLogParam(str) {
+  return String(str).replace(/[\r\n\t\x00-\x1f]/g, '_');
+}
+
 // Audit logging for sensitive operations
 function logPCAction(action, ip, success, details = '') {
   const timestamp = new Date().toISOString();
-  console.log(`[PC-AUDIT] ${timestamp} | ${action} | IP: ${ip} | Success: ${success} | ${details}`);
+  console.log(`[PC-AUDIT] ${timestamp} | ${sanitizeLogParam(action)} | IP: ${sanitizeLogParam(ip)} | Success: ${success} | ${sanitizeLogParam(details)}`);
 }
 
 function sendWakeOnLan(macAddress) {
@@ -1079,7 +1100,7 @@ function readControlDevicesFromConfig() {
 
 function logControlAction(deviceId, action, ip, success, details = '') {
   const timestamp = new Date().toISOString();
-  console.log(`[CONTROL-AUDIT] ${timestamp} | ${deviceId} | ${action} | IP: ${ip} | Success: ${success} | ${details}`);
+  console.log(`[CONTROL-AUDIT] ${timestamp} | ${sanitizeLogParam(deviceId)} | ${sanitizeLogParam(action)} | IP: ${sanitizeLogParam(ip)} | Success: ${success} | ${sanitizeLogParam(details)}`);
 }
 
 function migrateWindowsPCToControlDevices() {
@@ -1137,10 +1158,25 @@ app.post('/api/login', (req, res) => {
   const fileTokenEntries = fileTokens.filter((t) => t.token);
   const fileTokenList = fileTokenEntries.map((t) => t.token);
 
-  const isWhitelisted = deviceToken && (
-    state.deviceTokens.some(t => timingSafeEqual(t, deviceToken)) ||
-    fileTokenList.some(t => timingSafeEqual(t, deviceToken))
-  );
+  // Compare device tokens: hash the input and compare against stored hashes
+  // Also support legacy plaintext tokens (UUID format) for migration
+  const hashedDeviceToken = deviceToken ? hashDeviceToken(deviceToken) : null;
+  let isWhitelisted = false;
+  let needsTokenMigration = false;
+  if (deviceToken) {
+    // Check hashed tokens first
+    isWhitelisted = state.deviceTokens.some(t =>
+      t.length === 64 ? timingSafeEqual(t, hashedDeviceToken) : timingSafeEqual(t, deviceToken)
+    );
+    // Check if any matched as plaintext (needs migration)
+    if (isWhitelisted) {
+      needsTokenMigration = state.deviceTokens.some(t => t.length !== 64 && timingSafeEqual(t, deviceToken));
+    }
+    // Also check file-based tokens
+    if (!isWhitelisted) {
+      isWhitelisted = fileTokenList.some(t => timingSafeEqual(t, deviceToken));
+    }
+  }
 
   // Use timing-safe comparison for credentials
   const storedPassword = state.credentials.password;
@@ -1191,12 +1227,18 @@ app.post('/api/login', (req, res) => {
     returnedDeviceToken = randomUUID();
   }
   if (!isWhitelisted) {
-    // Token not yet in whitelist — register it
-    state.deviceTokens.push(returnedDeviceToken);
+    // Token not yet in whitelist — store as SHA-256 hash
+    state.deviceTokens.push(hashDeviceToken(returnedDeviceToken));
     // Limit stored device tokens to prevent unbounded growth
     if (state.deviceTokens.length > 20) {
       state.deviceTokens = state.deviceTokens.slice(-20);
     }
+    saveState(state);
+  } else if (needsTokenMigration) {
+    // Migrate plaintext tokens to hashed format
+    state.deviceTokens = state.deviceTokens.map(t =>
+      t.length !== 64 ? hashDeviceToken(t) : t
+    );
     saveState(state);
   }
 
@@ -1741,6 +1783,16 @@ app.post('/api/import', authRequired, async (req, res) => {
     };
   }
 
+  function sanitizeStringFields(obj) {
+    if (!obj || typeof obj !== 'object') return {};
+    const result = {};
+    for (const [key, val] of Object.entries(obj)) {
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+      result[key] = typeof val === 'string' ? escapeHtml(val) : val;
+    }
+    return result;
+  }
+
   // #14 Array-Größen begrenzen um DoS zu verhindern
   const MAX_PORTS = 64;
   const MAX_VERSIONS = 200;
@@ -1753,8 +1805,8 @@ app.post('/api/import', authRequired, async (req, res) => {
       ...defaultState,
       // SECURITY: Never import credentials from external files!
       credentials: currentState.credentials, // Keep existing credentials
-      speedportInfo: { ...defaultState.speedportInfo, ...(data.speedportInfo || {}) },
-      raspberryInfo: { ...defaultState.raspberryInfo, ...(data.raspberryInfo || {}) },
+      speedportInfo: { ...defaultState.speedportInfo, ...sanitizeStringFields(data.speedportInfo) },
+      raspberryInfo: { ...defaultState.raspberryInfo, ...sanitizeStringFields(data.raspberryInfo) },
       // Sanitize port data (capped)
       switchPorts: (data.switchPorts || currentState.switchPorts).slice(0, MAX_PORTS).map(sanitizePort),
       routerPorts: (data.routerPorts || currentState.routerPorts).slice(0, MAX_PORTS).map(sanitizePort),
@@ -2457,6 +2509,11 @@ function startServer() {
     for (const [ip, data] of pcStatusLimits.entries()) {
       if (data.windowStart < oneHourAgo) {
         pcStatusLimits.delete(ip);
+      }
+    }
+    for (const [ip, data] of pcPasswordLimits.entries()) {
+      if (data.windowStart < oneHourAgo) {
+        pcPasswordLimits.delete(ip);
       }
     }
   }, 3600000); // Every hour

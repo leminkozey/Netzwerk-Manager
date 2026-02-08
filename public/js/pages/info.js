@@ -8,6 +8,9 @@ import { el, showToast, debounce, pickTextColor, copyToClipboard } from '../ui.j
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 
+// ── Cleanup tracking ─────────────────────────────────────────────
+let _unsubs = [];
+
 // ── Helpers ──────────────────────────────────────────────────────
 
 function copyBtn(textFn) {
@@ -158,7 +161,7 @@ function buildPortCard(title, colorIconName, ports, group) {
     ]),
   ]);
 
-  on('stateUpdated', () => renderRows());
+  _unsubs.push(on('stateUpdated', () => renderRows()));
   return card;
 }
 
@@ -201,9 +204,9 @@ function buildPiholeCard() {
   }
 
   renderFields();
-  on('stateUpdated', () => {
+  _unsubs.push(on('stateUpdated', () => {
     if (!document.activeElement || !fieldContainer.contains(document.activeElement)) renderFields();
-  });
+  }));
 
   return el('section', { className: 'card service-card' }, [
     el('div', { className: 'section-title' }, [
@@ -253,9 +256,9 @@ function buildSpeedportCard() {
   }
 
   renderFields();
-  on('stateUpdated', () => {
+  _unsubs.push(on('stateUpdated', () => {
     if (!document.activeElement || !fieldContainer.contains(document.activeElement)) renderFields();
-  });
+  }));
 
   return el('section', { className: 'card service-card' }, [
     el('div', { className: 'section-title' }, [
@@ -331,6 +334,9 @@ function buildWindowsPCCard() {
 // ═══════════════════════════════════════════════════════════════════
 
 export function renderInfo(container) {
+  _unsubs.forEach(fn => fn());
+  _unsubs = [];
+
   const parentPage = container.closest('.page');
   if (parentPage) parentPage.style.maxWidth = 'none';
 
@@ -357,6 +363,8 @@ export function renderInfo(container) {
   container.appendChild(page);
 
   return function cleanup() {
+    _unsubs.forEach(fn => fn());
+    _unsubs = [];
     if (parentPage) parentPage.style.maxWidth = '';
   };
 }

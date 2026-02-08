@@ -59,7 +59,8 @@ export function applyGlowStrength(value) {
 
 // ── Accent Color ──
 export function applyAccentColor(hex) {
-  state.accent = hex || defaults.accent;
+  const safe = /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : defaults.accent;
+  state.accent = safe;
   const rgb = hexToRgb(state.accent);
   const vars = {
     '--accent': state.accent,
