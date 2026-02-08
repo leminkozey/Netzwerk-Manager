@@ -691,7 +691,7 @@ function buildQueriesOverTimeChart(data) {
   const chartW = svgW - padL - padR;
   const chartH = svgH - padT - padB;
 
-  const maxVal = Math.max(...history.map(h => h.total ?? 0), 1);
+  const maxVal = history.reduce((m, h) => Math.max(m, h.total ?? 0), 1);
   const barW = chartW / history.length;
   const barInner = Math.max(barW * 0.7, 1);
 
@@ -926,7 +926,7 @@ function buildTopList(title, iconName, items, color) {
     ]);
   }
 
-  const maxCount = Math.max(...items.map(i => i.count), 1);
+  const maxCount = items.reduce((m, i) => Math.max(m, i.count), 1);
 
   const rows = items.slice(0, 10).map((item, idx) => {
     const pct = (item.count / maxCount) * 100;
@@ -975,6 +975,7 @@ export function renderAnalysen(container) {
   let timerInterval = null;
   let pollInterval = null;
   let piholeInterval = null;
+  let pingMonInterval = null;
   const timerRefs = []; // { el, ts } — updated every second
 
   // Read poll intervals from config
@@ -1020,9 +1021,10 @@ export function renderAnalysen(container) {
   topRow.appendChild(uptimeCol);
   page.appendChild(topRow);
 
-  // Ping Monitor section
+  // Ping Monitor section (only if enabled in config)
+  const pingMonEnabled = cfg?.pingMonitor?.enabled !== false;
   const pingMonContainer = el('div', { style: { marginTop: '16px' } });
-  page.appendChild(pingMonContainer);
+  if (pingMonEnabled) page.appendChild(pingMonContainer);
 
   // Pi-hole section
   const piholeContainer = el('div', { style: { marginTop: '28px' } });
@@ -1207,12 +1209,12 @@ export function renderAnalysen(container) {
 
   // Initial fetch
   refreshUptime();
-  refreshPingMonitor();
+  if (pingMonEnabled) refreshPingMonitor();
   refreshPihole();
 
   // Auto-poll at configured interval for live status updates
   pollInterval = setInterval(() => refreshUptime(), pollMs);
-  const pingMonInterval = setInterval(() => refreshPingMonitor(), pollMs);
+  if (pingMonEnabled) pingMonInterval = setInterval(() => refreshPingMonitor(), pollMs);
   piholeInterval = setInterval(() => refreshPihole(), piholeMs);
 
   // Live-update when uptime is reset from settings
@@ -1223,7 +1225,7 @@ export function renderAnalysen(container) {
     destroyed = true;
     if (timerInterval) clearInterval(timerInterval);
     if (pollInterval) clearInterval(pollInterval);
-    clearInterval(pingMonInterval);
+    if (pingMonInterval) clearInterval(pingMonInterval);
     if (piholeInterval) clearInterval(piholeInterval);
     window.removeEventListener('uptime-reset', onReset);
     // Restore parent .page max-width for other pages

@@ -5,6 +5,7 @@ node_modules/
 Data/state.json
 Data/UptimeData.json
 Data/uptime.json
+Data/ping-monitor.json
 
 # Sensible Daten
 Data/Nutzer

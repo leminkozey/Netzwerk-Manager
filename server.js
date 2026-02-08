@@ -973,7 +973,9 @@ function readPingMonitorData() {
     if (fs.existsSync(PING_MONITOR_FILE)) {
       return JSON.parse(fs.readFileSync(PING_MONITOR_FILE, 'utf-8'));
     }
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.error('[Ping Monitor] Failed to read data file:', err.message);
+  }
   return { hosts: {} };
 }
 
@@ -981,20 +983,27 @@ function savePingMonitorData(data) {
   fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(data, null, 2));
 }
 
+function isPingMonitorEnabled() {
+  const cfg = readSiteConfig();
+  return cfg?.pingMonitor?.enabled !== false;
+}
+
 function readPingMonitorHostsFromConfig() {
   const cfg = readSiteConfig();
-  const hosts = cfg?.pingMonitorHosts;
+  if (cfg?.pingMonitor?.enabled === false) return [];
+  const hosts = cfg?.pingMonitor?.hosts ?? cfg?.pingMonitorHosts;
   if (!Array.isArray(hosts)) return [];
   return hosts.filter(h =>
-    h && typeof h.id === 'string' && h.id.length > 0
+    h && typeof h.id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(h.id)
       && typeof h.name === 'string' && h.name.length > 0
       && typeof h.ip === 'string' && VALIDATION.ipAddress.test(h.ip)
+      && isAllowedProxyTarget(h.ip)
   );
 }
 
 function readPingMonitorIntervalMs() {
   const cfg = readSiteConfig();
-  const val = cfg?.pingMonitorInterval;
+  const val = cfg?.pingMonitor?.interval ?? cfg?.pingMonitorInterval;
   if (typeof val === 'number' && val >= 10) return val * 1000;
   return 60000;
 }
@@ -1066,6 +1075,12 @@ async function runPingMonitorCycle() {
     host.history = pruneHistory(host.history);
   }
 
+  // Remove orphaned hosts no longer in config
+  const configIds = new Set(configHosts.map(h => h.id));
+  for (const id of Object.keys(data.hosts)) {
+    if (!configIds.has(id)) delete data.hosts[id];
+  }
+
   savePingMonitorData(data);
 }
 
@@ -1088,8 +1103,13 @@ function buildPingMonitorResponse() {
     if (valid.length > 0) {
       const values = valid.map(e => e[1]);
       avg = Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10;
-      min = Math.round(Math.min(...values) * 10) / 10;
-      max = Math.round(Math.max(...values) * 10) / 10;
+      let lo = values[0], hi = values[0];
+      for (let i = 1; i < values.length; i++) {
+        if (values[i] < lo) lo = values[i];
+        if (values[i] > hi) hi = values[i];
+      }
+      min = Math.round(lo * 10) / 10;
+      max = Math.round(hi * 10) / 10;
     }
 
     const lossPercent = recent.length > 0
@@ -1107,6 +1127,9 @@ function buildPingMonitorResponse() {
         const idx = Math.floor(i * step);
         chart.push({ ts: recent[idx][0], ms: recent[idx][1] });
       }
+      // Ensure the most recent data point is always included
+      const last = recent[recent.length - 1];
+      chart[chart.length - 1] = { ts: last[0], ms: last[1] };
     }
 
     return {
@@ -2702,15 +2725,13 @@ function startServer() {
     }, uptimeMs);
   }, 5000);
 
-  // Ping Monitor: first cycle after 7s, then at configured interval
-  const pingMonMs = readPingMonitorIntervalMs();
-  console.log(`Ping monitor interval: ${pingMonMs / 1000}s`);
-  setTimeout(() => {
-    runPingMonitorCycle().catch(() => {});
-    setInterval(() => {
-      runPingMonitorCycle().catch(() => {});
-    }, pingMonMs);
-  }, 7000);
+  // Ping Monitor: first cycle after 7s, then recursive setTimeout (re-reads interval each cycle)
+  console.log(`Ping monitor interval: ${readPingMonitorIntervalMs() / 1000}s`);
+  async function schedulePingMonitor() {
+    try { await runPingMonitorCycle(); } catch (err) { console.error('[Ping Monitor] Cycle error:', err.message); }
+    setTimeout(schedulePingMonitor, readPingMonitorIntervalMs());
+  }
+  setTimeout(schedulePingMonitor, 7000);
 }
 
 // Server starten

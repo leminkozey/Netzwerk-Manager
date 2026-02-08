@@ -110,6 +110,23 @@ const siteConfig = {
     },
   },
 
+  // ══════════════════════════════════════════════
+  // PING MONITOR (Latenz-Messung)
+  // ══════════════════════════════════════════════
+  // Misst die Latenz (ms) zu externen Hosts per ICMP-Ping.
+  // Wird auf der Analysen-Seite als Chart dargestellt.
+  pingMonitor: {
+    enabled: true,              // false → Ping Monitor komplett deaktiviert
+    interval: 30,               // Ping-Intervall in Sekunden (Minimum: 10)
+    hosts: [
+      { id: 'google',     name: 'Google DNS',     ip: '8.8.8.8' },
+      { id: 'cloudflare', name: 'Cloudflare DNS', ip: '1.1.1.1' },
+      // Weitere Beispiele:
+      // { id: 'quad9',    name: 'Quad9 DNS',      ip: '9.9.9.9' },
+      // { id: 'opendns',  name: 'OpenDNS',        ip: '208.67.222.222' },
+    ],
+  },
+
   // Aktualisierungs-Intervall für Pi-hole (Sekunden, Minimum 30, Standard 60):
   piholeInterval: 60,
 
