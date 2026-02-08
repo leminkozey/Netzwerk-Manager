@@ -52,6 +52,7 @@ export async function handleLogin(username, password, tokenInput) {
     }
 
     state.token = body.token;
+    if (body.deviceToken) setStoredDeviceToken(body.deviceToken);
     applyPayload(body.state);
     connectSocket();
     startSessionTimer();
@@ -82,6 +83,7 @@ export async function tryAutoLogin() {
     if (!body.success) return false;
 
     state.token = body.token;
+    if (body.deviceToken) setStoredDeviceToken(body.deviceToken);
     applyPayload(body.state);
     connectSocket();
     startSessionTimer();

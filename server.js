@@ -1146,12 +1146,12 @@ app.post('/api/login', (req, res) => {
   const storedPassword = state.credentials.password;
   let passwordValid = false;
 
-  if (isHashedPassword(storedPassword)) {
-    // Compare against hashed password
-    passwordValid = verifyPassword(password, storedPassword);
-  } else {
-    // Legacy plaintext comparison (will be migrated on next password change)
-    passwordValid = timingSafeEqual(password || '', storedPassword || '');
+  if (typeof password === 'string' && password) {
+    if (isHashedPassword(storedPassword)) {
+      passwordValid = verifyPassword(password, storedPassword);
+    } else {
+      passwordValid = timingSafeEqual(password, storedPassword || '');
+    }
   }
 
   const usernameValid = timingSafeEqual(username || '', state.credentials.username || '');
@@ -1184,6 +1184,22 @@ app.post('/api/login', (req, res) => {
   const previousSession = runtime.activeSession;
   runtime.activeSession = { token, deviceName: effectiveDeviceName, loginAt, expiresAt };
 
+  // Register device token for auto-login on future visits
+  let returnedDeviceToken = deviceToken || null;
+  if (!returnedDeviceToken) {
+    // No device token provided — generate one
+    returnedDeviceToken = randomUUID();
+  }
+  if (!isWhitelisted) {
+    // Token not yet in whitelist — register it
+    state.deviceTokens.push(returnedDeviceToken);
+    // Limit stored device tokens to prevent unbounded growth
+    if (state.deviceTokens.length > 20) {
+      state.deviceTokens = state.deviceTokens.slice(-20);
+    }
+    saveState(state);
+  }
+
   if (previousSession && previousSession.token !== token) {
     const prevSocket = runtime.sockets.get(previousSession.token);
     if (prevSocket && prevSocket.readyState === WebSocket.OPEN) {
@@ -1200,6 +1216,7 @@ app.post('/api/login', (req, res) => {
   res.json({
     success: true,
     token,
+    deviceToken: returnedDeviceToken,
     state: maskStateForClient(state),
   });
 });
