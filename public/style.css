@@ -3294,6 +3294,23 @@ label {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Ping Monitor
+   ═══════════════════════════════════════════════════════════════════ */
+
+.analysen-pingmon-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .analysen-pingmon-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Pi-hole DNS Analytics
    ═══════════════════════════════════════════════════════════════════ */
 

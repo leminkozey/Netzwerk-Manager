@@ -127,6 +127,7 @@ const LOGIN_TOKEN_FILE = path.join(DATA_DIR, 'LoginToken.txt');
 const WINDOWS_PC_FILE = path.join(DATA_DIR, 'WindowsPC.json');
 const CONTROL_DEVICES_FILE = path.join(DATA_DIR, 'ControlDevices.json');
 const UPTIME_FILE = path.join(DATA_DIR, 'uptime.json');
+const PING_MONITOR_FILE = path.join(DATA_DIR, 'ping-monitor.json');
 const CONFIG_FILE = path.join(__dirname, 'public', 'config.js');
 const MAX_VERSIONS = 100;
 
@@ -961,6 +962,159 @@ function buildUptimeResponse() {
     }));
 
   return { devices, outages };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Ping Monitor (Latency)
+// ═══════════════════════════════════════════════════════════════════
+
+function readPingMonitorData() {
+  try {
+    if (fs.existsSync(PING_MONITOR_FILE)) {
+      return JSON.parse(fs.readFileSync(PING_MONITOR_FILE, 'utf-8'));
+    }
+  } catch { /* ignore */ }
+  return { hosts: {} };
+}
+
+function savePingMonitorData(data) {
+  fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(data, null, 2));
+}
+
+function readPingMonitorHostsFromConfig() {
+  const cfg = readSiteConfig();
+  const hosts = cfg?.pingMonitorHosts;
+  if (!Array.isArray(hosts)) return [];
+  return hosts.filter(h =>
+    h && typeof h.id === 'string' && h.id.length > 0
+      && typeof h.name === 'string' && h.name.length > 0
+      && typeof h.ip === 'string' && VALIDATION.ipAddress.test(h.ip)
+  );
+}
+
+function readPingMonitorIntervalMs() {
+  const cfg = readSiteConfig();
+  const val = cfg?.pingMonitorInterval;
+  if (typeof val === 'number' && val >= 10) return val * 1000;
+  return 60000;
+}
+
+function pingLatency(ipAddress) {
+  return new Promise((resolve) => {
+    if (!VALIDATION.ipAddress.test(ipAddress)) {
+      return resolve(null);
+    }
+
+    const isWindows = process.platform === 'win32';
+    const args = isWindows
+      ? ['-n', '1', '-w', '2000', ipAddress]
+      : ['-c', '1', '-W', '2', ipAddress];
+
+    const ping = spawn('ping', args, { timeout: 5000 });
+
+    let stdout = '';
+    ping.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    ping.on('close', (code) => {
+      if (code !== 0) return resolve(null);
+      const match = stdout.match(/(?:time|zeit)[=<](\d+(?:\.\d+)?)\s*ms/i);
+      if (match) {
+        resolve(parseFloat(match[1]));
+      } else {
+        resolve(null);
+      }
+    });
+
+    ping.on('error', () => {
+      resolve(null);
+    });
+  });
+}
+
+async function runPingMonitorCycle() {
+  const configHosts = readPingMonitorHostsFromConfig();
+  if (configHosts.length === 0) return;
+
+  const data = readPingMonitorData();
+  const now = Date.now();
+
+  for (const h of configHosts) {
+    if (!data.hosts[h.id]) {
+      data.hosts[h.id] = { history: [] };
+    }
+  }
+
+  const results = await Promise.all(
+    configHosts.map(h => pingLatency(h.ip))
+  );
+
+  for (let i = 0; i < configHosts.length; i++) {
+    const h = configHosts[i];
+    const ms = results[i];
+    const host = data.hosts[h.id];
+    host.history.push([now, ms]);
+    host.history = pruneHistory(host.history);
+  }
+
+  savePingMonitorData(data);
+}
+
+function buildPingMonitorResponse() {
+  const configHosts = readPingMonitorHostsFromConfig();
+  const data = readPingMonitorData();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - DAY_MS;
+
+  const hosts = configHosts.map(ch => {
+    const host = data.hosts[ch.id] || { history: [] };
+    const recent = host.history.filter(e => e[0] >= cutoff);
+    const valid = recent.filter(e => e[1] !== null);
+    const lost = recent.filter(e => e[1] === null).length;
+
+    const lastEntry = host.history.length > 0 ? host.history[host.history.length - 1] : null;
+    const currentPing = lastEntry ? lastEntry[1] : null;
+
+    let avg = null, min = null, max = null;
+    if (valid.length > 0) {
+      const values = valid.map(e => e[1]);
+      avg = Math.round((values.reduce((s, v) => s + v, 0) / values.length) * 10) / 10;
+      min = Math.round(Math.min(...values) * 10) / 10;
+      max = Math.round(Math.max(...values) * 10) / 10;
+    }
+
+    const lossPercent = recent.length > 0
+      ? Math.round((lost / recent.length) * 1000) / 10
+      : 0;
+
+    // Downsample chart to max 120 points
+    let chart;
+    if (recent.length <= 120) {
+      chart = recent.map(e => ({ ts: e[0], ms: e[1] }));
+    } else {
+      const step = recent.length / 120;
+      chart = [];
+      for (let i = 0; i < 120; i++) {
+        const idx = Math.floor(i * step);
+        chart.push({ ts: recent[idx][0], ms: recent[idx][1] });
+      }
+    }
+
+    return {
+      id: ch.id,
+      name: ch.name,
+      ip: ch.ip,
+      currentPing,
+      avg,
+      min,
+      max,
+      lossPercent,
+      chart,
+    };
+  });
+
+  return { hosts };
 }
 
 function sshCommand(config, command) {
@@ -2414,6 +2568,12 @@ app.post('/api/uptime/reset/:deviceId', authRequired, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Ping Monitor API ──
+
+app.get('/api/ping-monitor', authRequired, (req, res) => {
+  res.json(buildPingMonitorResponse());
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -2533,6 +2693,16 @@ function startServer() {
       runUptimePingCycle().catch(() => {});
     }, uptimeMs);
   }, 5000);
+
+  // Ping Monitor: first cycle after 7s, then at configured interval
+  const pingMonMs = readPingMonitorIntervalMs();
+  console.log(`Ping monitor interval: ${pingMonMs / 1000}s`);
+  setTimeout(() => {
+    runPingMonitorCycle().catch(() => {});
+    setInterval(() => {
+      runPingMonitorCycle().catch(() => {});
+    }, pingMonMs);
+  }, 7000);
 }
 
 // Server starten

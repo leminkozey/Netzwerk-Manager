@@ -238,6 +238,18 @@ export const icons = {
     <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
   </svg>`,
 
+  // ── Ping Monitor ──
+  pingMonitor: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="2 17 6 13 10 16 14 8 18 12 22 6"/>
+    <circle cx="22" cy="6" r="1.5" fill="currentColor"/>
+  </svg>`,
+
+  pingMonitorColor: `<svg viewBox="0 0 24 24" fill="none">
+    <polyline points="2 17 6 13 10 16 14 8 18 12 22 6" stroke="#00d4ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="22" cy="6" r="2" fill="#00d4ff" opacity="0.85"/>
+    <polyline points="2 17 6 13 10 16 14 8 18 12 22 6" stroke="#00d4ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.15"/>
+  </svg>`,
+
   // ── Pi-hole DNS ──
   piholeDns: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z"/>

@@ -27,6 +27,8 @@ const iconColors = {
   power: 'icon-purple',
   piholeDns: 'icon-red',
   piholeDnsColor: '',
+  pingMonitor: 'icon-cyan',
+  pingMonitorColor: '',
 };
 
 function sectionTitle(titleText, iconName, badge) {
@@ -420,6 +422,329 @@ function buildOutagesCardFromData(outages) {
     ]);
   });
   return el('div', { className: 'card' }, [sectionTitle(t('analysen.outages'), 'outage'), ...rows]);
+}
+
+// =================================================================
+// Ping Monitor Section
+// =================================================================
+
+function buildMiniLatencyChart(chartData) {
+  if (!chartData || chartData.length === 0) return el('div');
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const w = 300, h = 100;
+  const padL = 35, padR = 8, padT = 8, padB = 20;
+  const cW = w - padL - padR;
+  const cH = h - padT - padB;
+
+  const validPoints = chartData.filter(p => p.ms !== null);
+  if (validPoints.length < 2) return el('div');
+
+  const msValues = validPoints.map(p => p.ms);
+  const maxMs = Math.max(...msValues, 1);
+  const minMs = Math.min(...msValues, 0);
+  const range = maxMs - minMs || 1;
+
+  function toX(i) { return padL + (i / (chartData.length - 1)) * cW; }
+  function toY(ms) { return padT + cH - ((ms - minMs) / range) * cH; }
+
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.style.cssText = 'width:100%;height:auto;display:block';
+
+  // Y-axis labels (3 levels)
+  for (let i = 0; i <= 2; i++) {
+    const val = minMs + (range / 2) * i;
+    const y = toY(val);
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', padL); line.setAttribute('x2', w - padR);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '0.5');
+    svg.appendChild(line);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', padL - 4); label.setAttribute('y', y + 3);
+    label.setAttribute('text-anchor', 'end'); label.setAttribute('fill', 'var(--text-muted)');
+    label.setAttribute('font-size', '8');
+    label.textContent = Math.round(val) + '';
+    svg.appendChild(label);
+  }
+
+  // Build polyline points and area fill
+  let polyPoints = '';
+  let areaPoints = '';
+  let firstX = null, lastX = null;
+  for (let i = 0; i < chartData.length; i++) {
+    if (chartData[i].ms === null) continue;
+    const x = toX(i);
+    const y = toY(chartData[i].ms);
+    polyPoints += `${x},${y} `;
+    areaPoints += `${x},${y} `;
+    if (firstX === null) firstX = x;
+    lastX = x;
+  }
+
+  if (firstX !== null) {
+    // Area fill
+    const area = document.createElementNS(ns, 'polygon');
+    area.setAttribute('points', `${areaPoints}${lastX},${padT + cH} ${firstX},${padT + cH}`);
+    area.setAttribute('fill', 'var(--accent)');
+    area.setAttribute('opacity', '0.08');
+    svg.appendChild(area);
+
+    // Line
+    const polyline = document.createElementNS(ns, 'polyline');
+    polyline.setAttribute('points', polyPoints.trim());
+    polyline.setAttribute('fill', 'none');
+    polyline.setAttribute('stroke', 'var(--accent)');
+    polyline.setAttribute('stroke-width', '1.5');
+    polyline.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(polyline);
+  }
+
+  // X-axis time labels (3 labels)
+  const timeIndices = [0, Math.floor(chartData.length / 2), chartData.length - 1];
+  for (const idx of timeIndices) {
+    if (idx >= chartData.length) continue;
+    const ts = chartData[idx].ts;
+    const d = new Date(ts);
+    const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', toX(idx));
+    label.setAttribute('y', h - 4);
+    label.setAttribute('text-anchor', 'middle'); label.setAttribute('fill', 'var(--text-muted)');
+    label.setAttribute('font-size', '8');
+    label.textContent = timeStr;
+    svg.appendChild(label);
+  }
+
+  return svg;
+}
+
+function buildPingHostCard(host) {
+  const isReachable = host.currentPing !== null;
+  const statusColor = isReachable ? '#22c55e' : '#ef4444';
+  const pingDisplay = isReachable ? host.currentPing.toFixed(1) : '—';
+  const pingColor = isReachable ? 'var(--accent)' : '#ef4444';
+
+  function statItem(label, value, unit) {
+    return el('div', { style: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' } }, [
+      el('span', {
+        textContent: label,
+        style: { fontSize: '0.65rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' },
+      }),
+      el('span', {
+        textContent: value !== null ? value + (unit || '') : '—',
+        style: { fontSize: '0.82rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text)' },
+      }),
+    ]);
+  }
+
+  const statsRow = el('div', {
+    style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', padding: '10px 0 8px', borderTop: '1px solid var(--border)' },
+  }, [
+    statItem(t('pingMonitor.avg'), host.avg, ' ms'),
+    statItem(t('pingMonitor.min'), host.min, ' ms'),
+    statItem(t('pingMonitor.max'), host.max, ' ms'),
+    statItem(t('pingMonitor.loss'), host.lossPercent !== null ? host.lossPercent : null, '%'),
+  ]);
+
+  const chart = buildMiniLatencyChart(host.chart);
+
+  return el('div', { className: 'card', style: { marginBottom: '0' } }, [
+    // Header: dot + name + ip | status
+    el('div', {
+      style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' },
+    }, [
+      el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+        el('div', {
+          style: {
+            width: '8px', height: '8px', borderRadius: '50%',
+            background: statusColor, boxShadow: `0 0 6px ${statusColor}88`, flexShrink: '0',
+          },
+        }),
+        el('span', {
+          textContent: host.name,
+          style: { fontSize: '0.95rem', fontWeight: '600', color: 'var(--text)' },
+        }),
+      ]),
+      el('span', {
+        textContent: isReachable ? 'Online' : t('pingMonitor.unreachable'),
+        style: {
+          padding: '2px 10px', fontSize: '0.68rem', fontWeight: '700',
+          color: statusColor, borderRadius: '20px', textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          background: isReachable ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+          border: `1px solid ${isReachable ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)'}`,
+        },
+      }),
+    ]),
+    // IP
+    el('div', {
+      textContent: host.ip,
+      style: {
+        fontSize: '0.72rem', color: 'var(--text-muted)',
+        fontFamily: "'JetBrains Mono', monospace", marginBottom: '6px', paddingLeft: '16px',
+      },
+    }),
+    // Current ping (large)
+    el('div', {
+      style: { textAlign: 'center', padding: '8px 0 12px' },
+    }, [
+      el('span', {
+        textContent: pingDisplay,
+        style: {
+          fontSize: '2rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace",
+          color: pingColor, letterSpacing: '-0.02em',
+        },
+      }),
+      el('span', {
+        textContent: isReachable ? ' ms' : '',
+        style: { fontSize: '0.85rem', fontWeight: '500', color: 'var(--text-muted)' },
+      }),
+    ]),
+    // Stats row
+    statsRow,
+    // Mini chart
+    el('div', { style: { padding: '6px 0 0', overflow: 'hidden' } }, [chart]),
+  ]);
+}
+
+function buildLatencyComparisonChart(hosts) {
+  const hostColors = ['#00d4ff', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#ec4899'];
+  const allCharts = hosts.filter(h => h.chart && h.chart.length > 1);
+  if (allCharts.length === 0) return el('div');
+
+  const ns = 'http://www.w3.org/2000/svg';
+  const w = 700, h = 240;
+  const padL = 50, padR = 15, padT = 15, padB = 40;
+  const cW = w - padL - padR;
+  const cH = h - padT - padB;
+
+  // Find global max across all hosts
+  let globalMax = 1;
+  for (const host of allCharts) {
+    for (const p of host.chart) {
+      if (p.ms !== null && p.ms > globalMax) globalMax = p.ms;
+    }
+  }
+
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  svg.style.cssText = 'width:100%;height:auto;display:block';
+
+  function toY(ms) { return padT + cH - (ms / globalMax) * cH; }
+
+  // Y-axis grid
+  const ySteps = 4;
+  for (let i = 0; i <= ySteps; i++) {
+    const val = (globalMax / ySteps) * i;
+    const y = toY(val);
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', padL); line.setAttribute('x2', w - padR);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '0.5');
+    svg.appendChild(line);
+
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', padL - 8); label.setAttribute('y', y + 4);
+    label.setAttribute('text-anchor', 'end'); label.setAttribute('fill', 'var(--text-muted)');
+    label.setAttribute('font-size', '10');
+    label.textContent = Math.round(val) + ' ms';
+    svg.appendChild(label);
+  }
+
+  // Draw lines per host
+  for (let hi = 0; hi < allCharts.length; hi++) {
+    const host = allCharts[hi];
+    const color = hostColors[hi % hostColors.length];
+    const chart = host.chart;
+    let points = '';
+    for (let i = 0; i < chart.length; i++) {
+      if (chart[i].ms === null) continue;
+      const x = padL + (i / (chart.length - 1)) * cW;
+      const y = toY(chart[i].ms);
+      points += `${x},${y} `;
+    }
+    if (points) {
+      const polyline = document.createElementNS(ns, 'polyline');
+      polyline.setAttribute('points', points.trim());
+      polyline.setAttribute('fill', 'none');
+      polyline.setAttribute('stroke', color);
+      polyline.setAttribute('stroke-width', '2');
+      polyline.setAttribute('stroke-linejoin', 'round');
+      polyline.setAttribute('opacity', '0.85');
+      svg.appendChild(polyline);
+    }
+  }
+
+  // X-axis time labels
+  const refChart = allCharts[0].chart;
+  const labelCount = Math.min(6, refChart.length);
+  for (let i = 0; i < labelCount; i++) {
+    const idx = labelCount <= 1 ? 0 : Math.round((i / (labelCount - 1)) * (refChart.length - 1));
+    const ts = refChart[idx]?.ts;
+    if (!ts) continue;
+    const d = new Date(ts);
+    const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', padL + (idx / (refChart.length - 1)) * cW);
+    label.setAttribute('y', h - 8);
+    label.setAttribute('text-anchor', 'middle'); label.setAttribute('fill', 'var(--text-muted)');
+    label.setAttribute('font-size', '9');
+    label.textContent = timeStr;
+    svg.appendChild(label);
+  }
+
+  // Legend
+  const legendItems = allCharts.map((host, i) =>
+    el('div', { style: { display: 'flex', alignItems: 'center', gap: '6px' } }, [
+      el('div', { style: { width: '10px', height: '10px', borderRadius: '2px', background: hostColors[i % hostColors.length] } }),
+      el('span', { textContent: host.name, style: { fontSize: '0.75rem', color: 'var(--text-muted)' } }),
+    ])
+  );
+  const legend = el('div', { style: { display: 'flex', gap: '16px', justifyContent: 'center', paddingTop: '8px', flexWrap: 'wrap' } }, legendItems);
+
+  return el('div', { className: 'card' }, [
+    sectionTitle(t('pingMonitor.latency') + ' – ' + t('pingMonitor.last24h'), 'pingMonitor'),
+    el('div', { style: { padding: '8px 0', overflow: 'hidden' } }, [svg]),
+    legend,
+  ]);
+}
+
+function buildPingMonitorSection(data) {
+  const frag = document.createDocumentFragment();
+
+  // Section header
+  frag.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
+    el('div', { className: 'section-header' }, [
+      el('span', { className: 'icon-badge icon-cyan' }, [iconEl('pingMonitorColor', 22)]),
+      el('h3', { textContent: t('analysen.pingMonitor') }),
+    ]),
+  ]));
+
+  if (!data || !data.hosts || data.hosts.length === 0) {
+    frag.appendChild(el('div', {
+      className: 'card',
+      style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
+    }, [el('span', { textContent: t('pingMonitor.noData') })]));
+    return frag;
+  }
+
+  // Host cards grid
+  const grid = el('div', { className: 'analysen-pingmon-grid' });
+  for (const host of data.hosts) {
+    grid.appendChild(buildPingHostCard(host));
+  }
+  frag.appendChild(grid);
+
+  // Comparison chart (if more than 1 host with data)
+  const hostsWithData = data.hosts.filter(h => h.chart && h.chart.length > 1);
+  if (hostsWithData.length > 1) {
+    frag.appendChild(buildLatencyComparisonChart(data.hosts));
+  }
+
+  return frag;
 }
 
 // =================================================================
@@ -843,6 +1168,10 @@ export function renderAnalysen(container) {
   ]);
   page.appendChild(outagesPlaceholder);
 
+  // Ping Monitor section
+  const pingMonContainer = el('div', { style: { marginTop: '28px' } });
+  page.appendChild(pingMonContainer);
+
   // Pi-hole section
   const piholeContainer = el('div', { style: { marginTop: '28px' } });
   piholeContainer.appendChild(el('div', {
@@ -898,6 +1227,19 @@ export function renderAnalysen(container) {
       uptimeGrid.appendChild(el('div', {
         className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
       }, [el('span', { textContent: t('analysen.noData') })]));
+    });
+  }
+
+  function refreshPingMonitor() {
+    if (destroyed) return;
+    api.getPingMonitor().then(data => {
+      if (destroyed) return;
+      pingMonContainer.replaceChildren();
+      pingMonContainer.appendChild(buildPingMonitorSection(data));
+    }).catch(() => {
+      if (destroyed) return;
+      pingMonContainer.replaceChildren();
+      pingMonContainer.appendChild(buildPingMonitorSection(null));
     });
   }
 
@@ -1013,10 +1355,12 @@ export function renderAnalysen(container) {
 
   // Initial fetch
   refreshUptime();
+  refreshPingMonitor();
   refreshPihole();
 
   // Auto-poll at configured interval for live status updates
   pollInterval = setInterval(() => refreshUptime(), pollMs);
+  const pingMonInterval = setInterval(() => refreshPingMonitor(), pollMs);
   piholeInterval = setInterval(() => refreshPihole(), piholeMs);
 
   // Live-update when uptime is reset from settings
@@ -1027,6 +1371,7 @@ export function renderAnalysen(container) {
     destroyed = true;
     if (timerInterval) clearInterval(timerInterval);
     if (pollInterval) clearInterval(pollInterval);
+    clearInterval(pingMonInterval);
     if (piholeInterval) clearInterval(piholeInterval);
     window.removeEventListener('uptime-reset', onReset);
     // Restore parent .page max-width for other pages

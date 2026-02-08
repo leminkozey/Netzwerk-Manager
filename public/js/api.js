@@ -282,3 +282,11 @@ export async function resetDeviceUptime(deviceId) {
   return res.json();
 }
 
+// ── Ping Monitor ──
+
+export async function getPingMonitor() {
+  const res = await request('/api/ping-monitor');
+  if (!res.ok) throw new Error('Failed to get ping monitor');
+  return res.json();
+}
+
