@@ -122,7 +122,7 @@ const siteConfig = {
       { id: 'google',     name: 'Google DNS',     ip: '8.8.8.8' },
       { id: 'cloudflare', name: 'Cloudflare DNS', ip: '1.1.1.1' },
       // Weitere Beispiele:
-      // { id: 'quad9',    name: 'Quad9 DNS',      ip: '9.9.9.9' },
+     // { id: 'quad9',    name: 'Quad9 DNS',      ip: '9.9.9.9' },
       // { id: 'opendns',  name: 'OpenDNS',        ip: '208.67.222.222' },
     ],
   },
@@ -143,7 +143,7 @@ const siteConfig = {
   ],
 
   // ══════════════════════════════════════════════
-  // GERÄTESTEUERUNG (Control Center)
+  // GERÄTESTEUERUNG (Control Center) v4.0.0
   // ══════════════════════════════════════════════
   // Geräte die über das Control Center ferngesteuert werden können.
   // Unterstützt Wake-on-LAN, SSH-Shutdown und SSH-Restart.
