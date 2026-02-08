@@ -3270,9 +3270,15 @@ label {
 
 .analysen-top {
   display: grid;
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 16px;
   align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .analysen-top {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .analysen-uptime-grid {

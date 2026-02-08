@@ -989,13 +989,18 @@ export function renderAnalysen(container) {
   // Two-column top: speedtest left, uptime grid right (responsive via CSS)
   const topRow = el('div', { className: 'analysen-top' });
 
-  // Speedtest (compact, left column)
+  // Top row: Speedtest (left) | Outages (right) — side by side
   topRow.appendChild(buildSpeedtestSection());
 
-  // Right side: uptime section
-  const rightSide = el('div');
+  const outagesPlaceholder = el('div', { className: 'card' }, [
+    sectionTitle(t('analysen.outages'), 'outage'),
+    el('div', { textContent: '...', style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' } }),
+  ]);
+  topRow.appendChild(outagesPlaceholder);
 
-  rightSide.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
+  // Uptime (third column)
+  const uptimeCol = el('div');
+  uptimeCol.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
     el('div', { className: 'section-header' }, [
       el('span', { className: 'icon-badge icon-green' }, [iconEl('uptime', 22)]),
       el('h3', { textContent: t('analysen.uptime') }),
@@ -1007,16 +1012,8 @@ export function renderAnalysen(container) {
       el('span', { textContent: '...' }),
     ]),
   ]);
-  rightSide.appendChild(uptimeGrid);
-
-  // Outages — inside the right column, below uptime
-  const outagesPlaceholder = el('div', { className: 'card', style: { marginTop: '12px' } }, [
-    sectionTitle(t('analysen.outages'), 'outage'),
-    el('div', { textContent: '...', style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' } }),
-  ]);
-  rightSide.appendChild(outagesPlaceholder);
-
-  topRow.appendChild(rightSide);
+  uptimeCol.appendChild(uptimeGrid);
+  topRow.appendChild(uptimeCol);
   page.appendChild(topRow);
 
   // Ping Monitor section
