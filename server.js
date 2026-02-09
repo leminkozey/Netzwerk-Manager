@@ -772,14 +772,33 @@ function pingHost(ipAddress) {
       ? ['-n', '1', '-w', '2000', ipAddress]
       : ['-c', '1', '-W', '2', ipAddress];
 
-    const ping = spawn('ping', args, { timeout: 5000 });
+    const ping = spawn('ping', args);
+    let settled = false;
+
+    // Hard timeout: kill process if it hasn't exited after 5s
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        ping.kill();
+        resolve(false);
+      }
+    }, 5000);
 
     ping.on('close', (code) => {
-      resolve(code === 0);
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        resolve(code === 0);
+      }
     });
 
     ping.on('error', () => {
-      resolve(false);
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        ping.kill();
+        resolve(false);
+      }
     });
   });
 }
@@ -788,17 +807,36 @@ function pingHost(ipAddress) {
 // Uptime Monitoring
 // ═══════════════════════════════════════════════════════════════════
 
+// In-memory caches to avoid reading/writing JSON on every cycle (critical for Pi Zero 2 W)
+let _uptimeCache = null;
+let _uptimeDirty = false;
+
 function readUptimeData() {
+  if (_uptimeCache) return _uptimeCache;
   try {
     if (fs.existsSync(UPTIME_FILE)) {
-      return JSON.parse(fs.readFileSync(UPTIME_FILE, 'utf-8'));
+      _uptimeCache = JSON.parse(fs.readFileSync(UPTIME_FILE, 'utf-8'));
+      return _uptimeCache;
     }
   } catch { /* ignore */ }
-  return { devices: {}, outages: [] };
+  _uptimeCache = { devices: {}, outages: [] };
+  return _uptimeCache;
 }
 
 function saveUptimeData(data) {
-  fs.writeFileSync(UPTIME_FILE, JSON.stringify(data, null, 2));
+  _uptimeCache = data;
+  _uptimeDirty = true;
+}
+
+function flushUptimeToDisk() {
+  if (_uptimeDirty && _uptimeCache) {
+    try {
+      fs.writeFileSync(UPTIME_FILE, JSON.stringify(_uptimeCache, null, 2));
+    } catch (err) {
+      console.error('[Uptime] Flush to disk failed:', err.message);
+    }
+    _uptimeDirty = false;
+  }
 }
 
 function pruneHistory(history) {
@@ -985,19 +1023,37 @@ function buildUptimeResponse() {
 // Ping Monitor (Latency)
 // ═══════════════════════════════════════════════════════════════════
 
+let _pingMonCache = null;
+let _pingMonDirty = false;
+
 function readPingMonitorData() {
+  if (_pingMonCache) return _pingMonCache;
   try {
     if (fs.existsSync(PING_MONITOR_FILE)) {
-      return JSON.parse(fs.readFileSync(PING_MONITOR_FILE, 'utf-8'));
+      _pingMonCache = JSON.parse(fs.readFileSync(PING_MONITOR_FILE, 'utf-8'));
+      return _pingMonCache;
     }
   } catch (err) {
     console.error('[Ping Monitor] Failed to read data file:', err.message);
   }
-  return { hosts: {} };
+  _pingMonCache = { hosts: {} };
+  return _pingMonCache;
 }
 
 function savePingMonitorData(data) {
-  fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(data, null, 2));
+  _pingMonCache = data;
+  _pingMonDirty = true;
+}
+
+function flushPingMonToDisk() {
+  if (_pingMonDirty && _pingMonCache) {
+    try {
+      fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(_pingMonCache, null, 2));
+    } catch (err) {
+      console.error('[Ping Monitor] Flush to disk failed:', err.message);
+    }
+    _pingMonDirty = false;
+  }
 }
 
 function isPingMonitorEnabled() {
@@ -1039,14 +1095,27 @@ function pingLatency(ipAddress) {
         ? ['-c', '1', '-t', '3', ipAddress]
         : ['-c', '1', '-W', '2', ipAddress];
 
-    const ping = spawn('ping', args, { timeout: 5000 });
-
+    const ping = spawn('ping', args);
+    let settled = false;
     let stdout = '';
+
+    // Hard timeout: kill process if it hasn't exited after 5s
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        ping.kill();
+        resolve(null);
+      }
+    }, 5000);
+
     ping.stdout.on('data', (data) => {
       stdout += data.toString();
     });
 
     ping.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (code !== 0) return resolve(null);
       // Try per-packet line: "time=12.3 ms"
       const perPacket = stdout.match(/(?:time|zeit)[=<](\d+(?:\.\d+)?)\s*ms/i);
@@ -1062,7 +1131,12 @@ function pingLatency(ipAddress) {
     });
 
     ping.on('error', () => {
-      resolve(null);
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        ping.kill();
+        resolve(null);
+      }
     });
   });
 }
@@ -1203,17 +1277,28 @@ function sshCommand(config, command) {
     // -e flag reads password from SSHPASS environment variable
     // This keeps the password hidden from process listings (ps aux)
     const sshpass = spawn('sshpass', ['-e', 'ssh', ...sshArgs], {
-      timeout: 15000,
       env: { ...process.env, SSHPASS: sshPassword },
     });
-
+    let settled = false;
     let stderr = '';
+
+    // Hard timeout: kill SSH process after 15s
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        sshpass.kill();
+        reject(new Error('SSH timeout'));
+      }
+    }, 15000);
 
     sshpass.stderr.on('data', (data) => {
       stderr += data.toString();
     });
 
     sshpass.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       // Code 0 = success, code 255 with connection closed = likely successful shutdown
       if (code === 0 || stderr.includes('Connection') || stderr.includes('closed')) {
         resolve();
@@ -1223,6 +1308,10 @@ function sshCommand(config, command) {
     });
 
     sshpass.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sshpass.kill();
       if (err.code === 'ENOENT') {
         reject(new Error('sshpass not installed'));
       } else {
@@ -2599,6 +2688,7 @@ app.get('/api/uptime', authRequired, (req, res) => {
 // Reset all uptime data
 app.post('/api/uptime/reset', authRequired, async (req, res) => {
   saveUptimeData({ devices: {}, outages: [] });
+  flushUptimeToDisk();
   await runUptimePingCycle().catch(() => {});
   broadcastToAll('uptime', buildUptimeResponse());
   res.json({ ok: true });
@@ -2734,6 +2824,12 @@ function startServer() {
     }
   }, 3600000); // Every hour
 
+  // Flush monitoring caches to disk every 5 minutes (instead of every cycle)
+  setInterval(() => {
+    flushUptimeToDisk();
+    flushPingMonToDisk();
+  }, 5 * 60 * 1000);
+
   // Uptime monitoring: first ping after 5s, then at configured interval
   const uptimeMs = readUptimeIntervalMs();
   console.log(`Uptime monitoring interval: ${uptimeMs / 1000}s`);
@@ -2752,6 +2848,15 @@ function startServer() {
   }
   setTimeout(schedulePingMonitor, 7000);
 }
+
+// Flush caches to disk on shutdown so no data is lost
+function flushAllCaches() {
+  flushUptimeToDisk();
+  flushPingMonToDisk();
+}
+process.on('SIGINT', () => { flushAllCaches(); process.exit(0); });
+process.on('SIGTERM', () => { flushAllCaches(); process.exit(0); });
+process.on('exit', flushAllCaches);
 
 // Server starten
 ensureDataFile();
