@@ -832,10 +832,10 @@ function flushUptimeToDisk() {
   if (_uptimeDirty && _uptimeCache) {
     try {
       fs.writeFileSync(UPTIME_FILE, JSON.stringify(_uptimeCache, null, 2));
+      _uptimeDirty = false;
     } catch (err) {
       console.error('[Uptime] Flush to disk failed:', err.message);
     }
-    _uptimeDirty = false;
   }
 }
 
@@ -1049,10 +1049,10 @@ function flushPingMonToDisk() {
   if (_pingMonDirty && _pingMonCache) {
     try {
       fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(_pingMonCache, null, 2));
+      _pingMonDirty = false;
     } catch (err) {
       console.error('[Ping Monitor] Flush to disk failed:', err.message);
     }
-    _pingMonDirty = false;
   }
 }
 
@@ -2702,6 +2702,7 @@ app.post('/api/uptime/reset/:deviceId', authRequired, async (req, res) => {
     delete data.devices[id];
     data.outages = data.outages.filter(o => o.device !== id && o.deviceId !== id);
     saveUptimeData(data);
+    flushUptimeToDisk();
   }
   await runUptimePingCycle().catch(() => {});
   broadcastToAll('uptime', buildUptimeResponse());
