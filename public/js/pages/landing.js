@@ -35,11 +35,14 @@ export function renderLanding(container) {
   page.appendChild(el('p', { className: 'landing-greeting', textContent: randomGreeting() }));
 
   // ── Action buttons with icons ──
-  const actions = [
-    { icon: 'info', title: t('landing.info'), sub: t('landing.infoSub'), route: '/info' },
-    { icon: 'start', title: t('landing.start'), sub: t('landing.startSub'), route: '/start' },
-    { icon: 'analysen', title: t('landing.analysen'), sub: t('landing.analysenSub'), route: '/analysen' },
+  const cfg = getConfig();
+  const buttons = cfg?.buttons || {};
+  const allActions = [
+    { key: 'info',     icon: 'info',     title: t('landing.info'),     sub: t('landing.infoSub'),     route: '/info' },
+    { key: 'control',  icon: 'start',    title: t('landing.start'),    sub: t('landing.startSub'),    route: '/start' },
+    { key: 'analysen', icon: 'analysen', title: t('landing.analysen'), sub: t('landing.analysenSub'), route: '/analysen' },
   ];
+  const actions = allActions.filter(a => buttons[a.key] !== false);
 
   const btnRow = el('div', { className: 'landing-actions' });
   for (const action of actions) {
@@ -57,7 +60,6 @@ export function renderLanding(container) {
   page.appendChild(btnRow);
 
   // ── Link chips with website favicons ──
-  const cfg = getConfig();
   const links = (cfg && cfg.headerLinks) ? cfg.headerLinks : [];
 
   if (links.length > 0) {

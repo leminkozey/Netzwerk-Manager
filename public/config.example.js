@@ -9,7 +9,7 @@
 const siteConfig = {
 
   // ┌─────────────────────────────────────────────┐
-  // │             ALLGEMEIN                        │
+  // │             ALLGEMEIN                       │
   // └─────────────────────────────────────────────┘
 
   // ── Animationen ──
@@ -57,8 +57,16 @@ const siteConfig = {
   },
 
   // ┌─────────────────────────────────────────────┐
-  // │             LANDING PAGE                     │
+  // │             LANDING PAGE                    │
   // └─────────────────────────────────────────────┘
+
+  // ── Buttons ──
+  // Navigations-Buttons auf der Landing Page ein-/ausblenden.
+  buttons: {
+    info: true,                 // Info Center Button
+    control: true,              // Control Center Button
+    analysen: true,             // Analysen Center Button
+  },
 
   // ── Header Links ──
   // Links erscheinen als Chips unter den Buttons auf der Landing Page.
@@ -82,7 +90,7 @@ const siteConfig = {
   },
 
   // ┌─────────────────────────────────────────────┐
-  // │             INFO CENTER                      │
+  // │             INFO CENTER                     │
   // └─────────────────────────────────────────────┘
 
   // ── Cards Sichtbarkeit ──
@@ -97,7 +105,7 @@ const siteConfig = {
   },
 
   // ┌─────────────────────────────────────────────┐
-  // │             CONTROL CENTER                   │
+  // │             CONTROL CENTER                  │
   // └─────────────────────────────────────────────┘
 
   // ── Gerätesteuerung ──
@@ -134,7 +142,7 @@ const siteConfig = {
   ],
 
   // ┌─────────────────────────────────────────────┐
-  // │             ANALYSEN CENTER                  │
+  // │             ANALYSEN CENTER                 │
   // └─────────────────────────────────────────────┘
 
   // ── Sektionen ein-/ausblenden ──
