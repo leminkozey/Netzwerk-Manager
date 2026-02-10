@@ -951,7 +951,7 @@ async function runUptimePingCycle() {
   // Ensure each configured device has a data entry
   for (const cd of configDevices) {
     if (!data.devices[cd.id]) {
-      data.devices[cd.id] = { history: [], onlineSince: null, lastSeen: null };
+      data.devices[cd.id] = { history: [], onlineSince: null, pausedAt: null, lastSeen: null };
     }
   }
 
@@ -974,7 +974,14 @@ async function runUptimePingCycle() {
       dev.lastSeen = now;
       // Came online (was offline or first contact)
       if (wasOnline === false || wasOnline === null) {
-        dev.onlineSince = now;
+        if (dev.onlineSince && dev.pausedAt) {
+          // Resume: shift onlineSince forward by the offline gap
+          dev.onlineSince += (now - dev.pausedAt);
+          dev.pausedAt = null;
+        } else {
+          // First contact or no previous timer
+          dev.onlineSince = now;
+        }
         // Close any ongoing outage for this device
         for (const outage of data.outages) {
           if (outage.device === cd.id && !outage.end) {
@@ -986,7 +993,8 @@ async function runUptimePingCycle() {
     } else {
       // Went offline (was online)
       if (wasOnline === true) {
-        dev.onlineSince = null;
+        // Pause timer instead of resetting
+        dev.pausedAt = now;
         data.outages.push({ device: cd.id, start: now, end: null, durationMs: null });
       }
     }
@@ -1013,13 +1021,18 @@ function buildUptimeResponse() {
   }
 
   const devices = configDevices.map(cd => {
-    const dev = data.devices[cd.id] || { history: [], onlineSince: null, lastSeen: null };
+    const dev = data.devices[cd.id] || { history: [], onlineSince: null, pausedAt: null, lastSeen: null };
     const lastEntry = dev.history.length > 0 ? dev.history[dev.history.length - 1] : null;
     const online = lastEntry ? lastEntry[1] : false;
     const uptime24h = calculateUptimePercent(dev.history, DAY_MS);
     const uptime7d = calculateUptimePercent(dev.history, 7 * DAY_MS);
     const onlineSinceTs = dev.onlineSince || null;
-    const onlineSince = onlineSinceTs ? formatDuration(now - onlineSinceTs) : null;
+    const pausedAtTs = dev.pausedAt || null;
+    // If paused (offline), show frozen duration; if online, show live duration
+    const effectiveDuration = onlineSinceTs
+      ? (pausedAtTs ? pausedAtTs - onlineSinceTs : now - onlineSinceTs)
+      : 0;
+    const onlineSince = effectiveDuration > 0 ? formatDuration(effectiveDuration) : null;
 
     return {
       id: cd.id,
@@ -1030,6 +1043,7 @@ function buildUptimeResponse() {
       uptime7d,
       onlineSince,
       onlineSinceTs,
+      pausedAtTs,
     };
   });
 

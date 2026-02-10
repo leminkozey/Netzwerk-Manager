@@ -306,8 +306,14 @@ function buildDeviceUptimeCard(d, timerRefs) {
   });
 
   if (d.onlineSinceTs && isOnline) {
+    // Online: live counting timer
     timerEl.textContent = formatLiveTimer(d.onlineSinceTs);
     timerRefs.push({ el: timerEl, ts: d.onlineSinceTs });
+  } else if (d.onlineSinceTs && d.pausedAtTs && !isOnline) {
+    // Offline but has paused timer: show frozen value
+    const frozenMs = d.pausedAtTs - d.onlineSinceTs;
+    timerEl.textContent = formatLiveTimer(Date.now() - frozenMs);
+    timerEl.style.opacity = '0.5';
   } else {
     timerEl.textContent = '—';
   }
