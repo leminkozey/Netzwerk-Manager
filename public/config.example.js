@@ -107,6 +107,7 @@ const siteConfig = {
   // HINWEIS: config.js wird vom Server blockiert (403) und ist nicht
   // öffentlich abrufbar. Der Server liest die Datei nur intern.
   pihole: {
+    enabled: true,                           // false → DNS Analytics komplett deaktiviert
     url: 'http://192.168.1.100',           // Pi-hole Admin URL
     password: 'your-pihole-password',       // Pi-hole API Passwort
     blockingToggle: true,                    // Blocking-Toggle im Control Center anzeigen

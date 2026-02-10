@@ -1027,13 +1027,16 @@ export function renderAnalysen(container) {
   const pingMonContainer = el('div', { style: { marginTop: '16px' } });
   if (pingMonEnabled) page.appendChild(pingMonContainer);
 
-  // Pi-hole section
+  // Pi-hole section (only if enabled in config)
+  const piholeEnabled = cfg?.pihole?.enabled !== false;
   const piholeContainer = el('div', { style: { marginTop: '28px' } });
-  piholeContainer.appendChild(el('div', {
-    textContent: t('pihole.loading'),
-    style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
-  }));
-  page.appendChild(piholeContainer);
+  if (piholeEnabled) {
+    piholeContainer.appendChild(el('div', {
+      textContent: t('pihole.loading'),
+      style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
+    }));
+    page.appendChild(piholeContainer);
+  }
 
   container.appendChild(page);
 
@@ -1243,7 +1246,7 @@ export function renderAnalysen(container) {
 
   refreshUptime();
   if (pingMonEnabled) refreshPingMonitor();
-  refreshPihole();
+  if (piholeEnabled) refreshPihole();
 
   // Start fallback polling only if WS is not connected
   if (!wsConnected) {
@@ -1251,7 +1254,7 @@ export function renderAnalysen(container) {
   }
 
   // Pi-hole always polls (no server-side push cycle)
-  piholeInterval = setInterval(() => refreshPihole(), piholeMs);
+  if (piholeEnabled) piholeInterval = setInterval(() => refreshPihole(), piholeMs);
 
   // Live-update when uptime is reset from settings
   const onReset = () => refreshUptime();
