@@ -922,8 +922,14 @@ function readSiteConfig() {
 }
 
 // Read uptimeDevices from public/config.js
+function isUptimeEnabled() {
+  const cfg = readSiteConfig();
+  return cfg?.analysen?.uptime !== false;
+}
+
 function readUptimeDevicesFromConfig() {
   const cfg = readSiteConfig();
+  if (cfg?.analysen?.uptime === false) return [];
   const devices = cfg?.uptimeDevices;
   if (!Array.isArray(devices)) return [];
   return devices.filter(d =>
@@ -1102,12 +1108,12 @@ function flushPingMonToDisk() {
 
 function isPingMonitorEnabled() {
   const cfg = readSiteConfig();
-  return cfg?.pingMonitor?.enabled !== false;
+  return cfg?.analysen?.pingMonitor !== false;
 }
 
 function readPingMonitorHostsFromConfig() {
   const cfg = readSiteConfig();
-  if (cfg?.pingMonitor?.enabled === false) return [];
+  if (cfg?.analysen?.pingMonitor === false) return [];
   const hosts = cfg?.pingMonitor?.hosts ?? cfg?.pingMonitorHosts;
   if (!Array.isArray(hosts)) return [];
   return hosts.filter(h =>
@@ -2944,20 +2950,28 @@ function startServer() {
   }, 5 * 60 * 1000);
 
   // Uptime monitoring: first ping after 5s, then recursive setTimeout (re-reads interval each cycle)
-  console.log(`Uptime monitoring interval: ${readUptimeIntervalMs() / 1000}s`);
-  async function scheduleUptime() {
-    try { await runUptimePingCycle(); broadcastToAll('uptime', buildUptimeResponse()); } catch (err) { console.error('[Uptime] Cycle error:', err.message); }
-    setTimeout(scheduleUptime, readUptimeIntervalMs());
+  if (isUptimeEnabled()) {
+    console.log(`Uptime monitoring interval: ${readUptimeIntervalMs() / 1000}s`);
+    async function scheduleUptime() {
+      try { await runUptimePingCycle(); broadcastToAll('uptime', buildUptimeResponse()); } catch (err) { console.error('[Uptime] Cycle error:', err.message); }
+      setTimeout(scheduleUptime, readUptimeIntervalMs());
+    }
+    setTimeout(scheduleUptime, 5000);
+  } else {
+    console.log('Uptime monitoring disabled in config');
   }
-  setTimeout(scheduleUptime, 5000);
 
   // Ping Monitor: first cycle after 7s, then recursive setTimeout (re-reads interval each cycle)
-  console.log(`Ping monitor interval: ${readPingMonitorIntervalMs() / 1000}s`);
-  async function schedulePingMonitor() {
-    try { await runPingMonitorCycle(); broadcastToAll('pingMonitor', buildPingMonitorResponse()); } catch (err) { console.error('[Ping Monitor] Cycle error:', err.message); }
-    setTimeout(schedulePingMonitor, readPingMonitorIntervalMs());
+  if (isPingMonitorEnabled()) {
+    console.log(`Ping monitor interval: ${readPingMonitorIntervalMs() / 1000}s`);
+    async function schedulePingMonitor() {
+      try { await runPingMonitorCycle(); broadcastToAll('pingMonitor', buildPingMonitorResponse()); } catch (err) { console.error('[Ping Monitor] Cycle error:', err.message); }
+      setTimeout(schedulePingMonitor, readPingMonitorIntervalMs());
+    }
+    setTimeout(schedulePingMonitor, 7000);
+  } else {
+    console.log('Ping monitor disabled in config');
   }
-  setTimeout(schedulePingMonitor, 7000);
 }
 
 // Flush caches to disk on shutdown so no data is lost
