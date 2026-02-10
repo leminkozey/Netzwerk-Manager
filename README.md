@@ -16,6 +16,10 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Daten-Export/Import** – Vollständiges Backup als JSON
 - **Multi-Language** – Deutsch und Englisch
 - **Theming** – Dark, Light und System-Theme mit anpassbarer Akzentfarbe
+- **Eigene Willkommensnachrichten** – Begrüßungstexte auf der Landing Page konfigurierbar
+- **Landing Page Buttons** – Info-, Control- und Analysen-Button einzeln ein-/ausblendbar
+- **Analysen-Sektionen** – Speedtest, Uptime und Ausfälle einzeln ein-/ausblendbar
+- **Pi-hole Ein/Aus** – DNS Analytics komplett per Config deaktivierbar
 
 ## Voraussetzungen
 
@@ -160,9 +164,70 @@ settings: {
 },
 ```
 
-### Cards-Sichtbarkeit (`cards`)
+### Landing Page
 
-Einzelne Info-Cards auf der Startseite ein- oder ausblenden.
+#### Buttons (`buttons`)
+
+Navigations-Buttons auf der Landing Page einzeln ein- oder ausblenden. Die Buttons werden immer zentriert dargestellt, egal wie viele aktiv sind.
+
+| Button | Default | Beschreibung |
+|--------|---------|--------------|
+| `info` | `true` | Info Center Button. |
+| `control` | `true` | Control Center Button. |
+| `analysen` | `true` | Analysen Center Button. |
+
+```js
+buttons: {
+  info: true,
+  control: true,
+  analysen: true,
+},
+```
+
+#### Header Links (`headerLinks`)
+
+Links erscheinen als Chips unter den Buttons auf der Landing Page. Jeder Link zeigt automatisch das Favicon der Ziel-Website.
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `name` | `string` | Anzeigename des Links. |
+| `url` | `string` | Vollständige URL (muss mit `http://` oder `https://` beginnen). |
+
+```js
+headerLinks: [
+  { name: 'Github', url: 'https://github.com/dein-username' },
+  { name: 'KanBan', url: 'https://example.com/kanban' },
+],
+```
+
+#### Willkommensnachrichten (`greetings`)
+
+Eigene Begrüßungstexte auf der Landing Page. Bei jedem Seitenaufruf wird zufällig eine Nachricht angezeigt.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `customOnly` | `boolean` | `false` | `true` = nur eigene Nachrichten, `false` = eingebaute zufällige Nachrichten. |
+| `messages` | `array` | `[]` | Liste eigener Willkommensnachrichten. |
+
+- **`customOnly: false`** – Die eingebauten Nachrichten (z.B. "Was steht heute an?", "Bereit loszulegen?") werden verwendet. `messages` wird ignoriert.
+- **`customOnly: true`** – Nur die in `messages` eingetragenen Nachrichten werden angezeigt. Ist `messages` leer, wird auf die eingebauten zurückgegriffen.
+
+```js
+greetings: {
+  customOnly: true,
+  messages: [
+    'Willkommen im Netzwerk!',
+    'Hallo Admin!',
+    'Schön dass du da bist.',
+  ],
+},
+```
+
+### Info Center
+
+#### Cards-Sichtbarkeit (`cards`)
+
+Einzelne Info-Cards im Info Center ein- oder ausblenden.
 
 | Card | Default | Beschreibung |
 |------|---------|--------------|
@@ -183,6 +248,8 @@ cards: {
   windowsPc: true,
 },
 ```
+
+### Control Center
 
 ### Uptime Monitoring (`uptimeDevices`, `uptimeInterval`)
 
@@ -253,7 +320,27 @@ controlDevices: [
 ],
 ```
 
-### Pi-hole (`pihole`)
+### Analysen Center
+
+#### Sektionen ein-/ausblenden (`analysen`)
+
+Einzelne Sektionen auf der Analysen-Seite ein- oder ausblenden.
+
+| Sektion | Default | Beschreibung |
+|---------|---------|--------------|
+| `speedtest` | `true` | Internet-Geschwindigkeit (Speed-Test). |
+| `outages` | `true` | Ausfälle-Card. |
+| `uptime` | `true` | Uptime-Monitoring-Cards. |
+
+```js
+analysen: {
+  speedtest: true,
+  outages: true,
+  uptime: true,
+},
+```
+
+#### Pi-hole (`pihole`)
 
 Verbindet sich mit deinem Pi-hole v6 und zeigt DNS-Statistiken im Analysen Center. Zusätzlich kann das DNS-Blocking direkt im Control Center pausiert und fortgesetzt werden.
 
@@ -261,6 +348,7 @@ Der Server liest `url` und `password` aus der Config und kommuniziert serverseit
 
 | Option | Typ | Default | Beschreibung |
 |--------|-----|---------|--------------|
+| `enabled` | `boolean` | `true` | `false` → DNS Analytics komplett deaktiviert (keine API-Calls, keine Anzeige). |
 | `url` | `string` | — | Pi-hole Admin URL (z.B. `'http://192.168.1.100'`). |
 | `password` | `string` | — | Pi-hole API Passwort. |
 | `blockingToggle` | `boolean` | `true` | Blocking-Toggle im Control Center anzeigen. |
@@ -294,6 +382,7 @@ Einzelne Cards im Analysen Center ein- oder ausblenden. Deaktivierte Cards werde
 
 ```js
 pihole: {
+  enabled: true,
   url: 'http://192.168.1.100',
   password: 'dein-pihole-passwort',
   blockingToggle: true,
@@ -310,22 +399,6 @@ pihole: {
 
 // Auf Root-Ebene:
 piholeInterval: 60,
-```
-
-### Header Links (`headerLinks`)
-
-Links die oben rechts in der Topbar erscheinen. Jeder Link zeigt automatisch das Favicon der Ziel-Website.
-
-| Feld | Typ | Beschreibung |
-|------|-----|--------------|
-| `name` | `string` | Anzeigename des Links. |
-| `url` | `string` | Vollständige URL (muss mit `http://` oder `https://` beginnen). |
-
-```js
-headerLinks: [
-  { name: 'Github', url: 'https://github.com/dein-username' },
-  { name: 'KanBan', url: 'https://example.com/kanban' },
-],
 ```
 
 ---
