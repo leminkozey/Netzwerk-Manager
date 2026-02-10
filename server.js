@@ -323,6 +323,7 @@ const defaultState = {
     vpnIp: '',
     macAddress: '',
     sshUser: '',
+    sshPassword: '',
     piholeUrl: '',
     piholeRemoteUrl: '',
   },
@@ -570,6 +571,11 @@ function isDefaultPassword(state) {
 }
 
 function maskStateForClient(state) {
+  // Decrypt raspberry sshPassword for client display
+  const raspberryForClient = { ...state.raspberryInfo };
+  if (raspberryForClient.sshPassword) {
+    raspberryForClient.sshPassword = decryptValue(raspberryForClient.sshPassword);
+  }
   return {
     theme: state.theme,
     switchPorts: state.switchPorts,
@@ -577,7 +583,7 @@ function maskStateForClient(state) {
     versions: state.versions,
     speedportInfo: state.speedportInfo,
     speedportVersions: state.speedportVersions,
-    raspberryInfo: state.raspberryInfo,
+    raspberryInfo: raspberryForClient,
     raspberryVersions: state.raspberryVersions,
     username: state.credentials.username,
     // #20 Warn client if default credentials are still in use
@@ -1385,7 +1391,10 @@ function saveControlDevicesData(data) {
 
 function readControlDeviceCredentials(deviceId) {
   const data = readControlDevicesData();
-  const creds = data[deviceId] || { macAddress: '', sshUser: '', sshPassword: '', sshPort: 22 };
+  const creds = data[deviceId] || { hostname: '', ipAddress: '', macAddress: '', sshUser: '', sshPassword: '', sshPort: 22 };
+  // Ensure hostname and ipAddress fields exist (backward compat)
+  if (creds.hostname === undefined) creds.hostname = '';
+  if (creds.ipAddress === undefined) creds.ipAddress = '';
   if (creds.sshPassword) {
     creds._sshPasswordDecrypted = decryptValue(creds.sshPassword);
   }
@@ -1730,7 +1739,7 @@ app.post('/api/speedport', authRequired, async (req, res) => {
 });
 
 app.post('/api/raspberry', authRequired, async (req, res) => {
-  const { model, hostname, ipAddress, vpnIp, macAddress, sshUser, piholeUrl, piholeRemoteUrl } = req.body || {};
+  const { model, hostname, ipAddress, vpnIp, macAddress, sshUser, sshPassword, piholeUrl, piholeRemoteUrl } = req.body || {};
   // #13 Längen-Limit für alle Raspberry-Felder
   const MAX_FIELD_LEN = 256;
   const fields = { model, hostname, ipAddress, vpnIp, macAddress, sshUser, piholeUrl, piholeRemoteUrl };
@@ -1738,6 +1747,10 @@ app.post('/api/raspberry', authRequired, async (req, res) => {
     if (typeof val === 'string' && val.length > MAX_FIELD_LEN) {
       return res.status(400).json({ error: `Field ${key} too long (max ${MAX_FIELD_LEN} chars)` });
     }
+  }
+  // Validate sshPassword separately (max 128 chars, same as control devices)
+  if (sshPassword !== undefined && typeof sshPassword === 'string' && sshPassword.length > 128) {
+    return res.status(400).json({ error: 'Field sshPassword too long (max 128 chars)' });
   }
   await withStateLock(() => {
     const state = readState();
@@ -1751,18 +1764,33 @@ app.post('/api/raspberry', authRequired, async (req, res) => {
       piholeUrl: piholeUrl ?? '',
       piholeRemoteUrl: piholeRemoteUrl ?? '',
     };
+    // Handle sshPassword: encrypt for storage, preserve existing if not sent
+    if (sshPassword !== undefined) {
+      next.sshPassword = sshPassword ? encryptValue(sshPassword) : '';
+    } else {
+      // Preserve existing encrypted password if not provided in this request
+      next.sshPassword = (state.raspberryInfo || {}).sshPassword || '';
+    }
     const prev = state.raspberryInfo || {};
-    const changed = Object.keys(next).some((key) => `${prev[key] ?? ''}` !== `${next[key] ?? ''}`);
+    const changed = Object.keys(next).some((key) => {
+      if (key === 'sshPassword') return false; // compare password separately
+      return `${prev[key] ?? ''}` !== `${next[key] ?? ''}`;
+    });
+    const passwordChanged = sshPassword !== undefined &&
+      decryptValue(prev.sshPassword || '') !== (sshPassword || '');
     state.raspberryInfo = next;
-    if (changed) {
+    if (changed || passwordChanged) {
       addRaspberryVersion(state, 'Raspberry changed', {
         raspberryInfo: { ...state.raspberryInfo },
       });
     }
     saveState(state);
+    // Return decrypted sshPassword to client so UI stays in sync
+    const clientInfo = { ...state.raspberryInfo };
+    clientInfo.sshPassword = decryptValue(clientInfo.sshPassword);
     res.json({
       ok: true,
-      raspberryInfo: state.raspberryInfo,
+      raspberryInfo: clientInfo,
       raspberryVersions: state.raspberryVersions,
     });
   });
@@ -2071,6 +2099,10 @@ app.get('/api/export', authRequired, (req, res) => {
     delete safeState.speedportInfo.wifiPassword;
     delete safeState.speedportInfo.devicePassword;
   }
+  if (safeState.raspberryInfo) {
+    safeState.raspberryInfo = { ...safeState.raspberryInfo };
+    delete safeState.raspberryInfo.sshPassword;
+  }
   const exportData = {
     exportedAt: new Date().toISOString(),
     version: '1.5.0',
@@ -2150,22 +2182,40 @@ app.post('/api/import', authRequired, async (req, res) => {
 // Generic Control Device Endpoints
 // ═══════════════════════════════════════════════════════════════════
 
-// GET device config + credentials (no password)
+// GET device config + credentials
 app.get('/api/control/:deviceId', authRequired, (req, res) => {
   const deviceId = req.params.deviceId;
   const configDevices = readControlDevicesFromConfig();
   const device = configDevices.find(d => d.id === deviceId);
-  if (!device) return res.status(404).json({ error: 'Device not found' });
+
+  // Allow access to stored credentials even without a config entry
+  // (e.g. legacy Windows PC card that is always shown)
+  const storedData = readControlDevicesData();
+  if (!device && !storedData[deviceId]) {
+    // Return empty data for known legacy device IDs (windowspc)
+    // so the always-rendered card works even without a config entry
+    if (deviceId === 'windowspc') {
+      return res.json({
+        id: deviceId, name: '', type: '', ip: '', actions: [],
+        hostname: '', ipAddress: '', macAddress: '', sshUser: '',
+        sshPassword: '', hasPassword: false, sshPort: 22,
+      });
+    }
+    return res.status(404).json({ error: 'Device not found' });
+  }
 
   const creds = readControlDeviceCredentials(deviceId);
   res.json({
-    id: device.id,
-    name: device.name,
-    type: device.type,
-    ip: device.ip,
-    actions: device.actions,
+    id: device?.id || deviceId,
+    name: device?.name || creds.hostname || '',
+    type: device?.type || '',
+    ip: device?.ip || creds.ipAddress || '',
+    actions: device?.actions || [],
+    hostname: creds.hostname || '',
+    ipAddress: creds.ipAddress || '',
     macAddress: creds.macAddress || '',
     sshUser: creds.sshUser || '',
+    sshPassword: creds._sshPasswordDecrypted || '',
     hasPassword: Boolean(creds.sshPassword),
     sshPort: creds.sshPort || 22,
   });
@@ -2177,11 +2227,31 @@ app.post('/api/control/:deviceId', authRequired, (req, res) => {
   const clientIp = getClientIp(req);
   const configDevices = readControlDevicesFromConfig();
   const device = configDevices.find(d => d.id === deviceId);
-  if (!device) return res.status(404).json({ error: 'Device not found' });
 
-  const { macAddress, sshUser, sshPassword, sshPort } = req.body || {};
+  // Allow saving credentials even without a config entry
+  // (e.g. legacy Windows PC card that is always shown)
+  const storedData = readControlDevicesData();
+  if (!device && !storedData[deviceId]) {
+    if (deviceId === 'windowspc') {
+      // Auto-create entry for known legacy devices
+      storedData[deviceId] = { hostname: '', ipAddress: '', macAddress: '', sshUser: '', sshPassword: '', sshPort: 22 };
+      saveControlDevicesData(storedData);
+    } else {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+  }
+
+  const { hostname, ipAddress, macAddress, sshUser, sshPassword, sshPort } = req.body || {};
   const errors = [];
 
+  // Validate hostname (max 50 chars, alphanumeric + common chars)
+  if (hostname !== undefined && hostname !== '' && !validateWindowsPCInput('name', hostname)) {
+    errors.push('Invalid hostname (max 50 chars, alphanumeric)');
+  }
+  // Validate ipAddress
+  if (ipAddress !== undefined && ipAddress !== '' && !validateWindowsPCInput('ipAddress', ipAddress)) {
+    errors.push('Invalid IP address');
+  }
   if (macAddress !== undefined && macAddress !== '' && !validateWindowsPCInput('macAddress', macAddress)) {
     errors.push('Invalid MAC address (format: XX:XX:XX:XX:XX:XX)');
   }
@@ -2201,6 +2271,8 @@ app.post('/api/control/:deviceId', authRequired, (req, res) => {
   }
 
   const creds = readControlDeviceCredentials(deviceId);
+  if (hostname !== undefined) creds.hostname = hostname;
+  if (ipAddress !== undefined) creds.ipAddress = ipAddress;
   if (macAddress !== undefined) creds.macAddress = macAddress.toUpperCase();
   if (sshUser !== undefined) creds.sshUser = sshUser;
   if (sshPassword !== undefined) creds.sshPassword = sshPassword;
@@ -2212,6 +2284,8 @@ app.post('/api/control/:deviceId', authRequired, (req, res) => {
 
   res.json({
     ok: true,
+    hostname: creds.hostname || '',
+    ipAddress: creds.ipAddress || '',
     macAddress: creds.macAddress || '',
     sshUser: creds.sshUser || '',
     hasPassword: Boolean(creds.sshPassword),

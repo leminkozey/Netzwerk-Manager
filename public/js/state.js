@@ -105,11 +105,13 @@ export function applyPayload(payload) {
   }
   if (payload.versions) state.versions = payload.versions;
   if (payload.speedportInfo) {
-    state.speedportInfo = { ...payload.speedportInfo };
+    // Merge instead of replace to preserve any pending local edits
+    state.speedportInfo = { ...state.speedportInfo, ...payload.speedportInfo };
     setLiveState({ speedportInfo: payload.speedportInfo });
   }
   if (payload.raspberryInfo) {
-    state.raspberryInfo = { ...payload.raspberryInfo };
+    // Merge instead of replace to preserve any pending local edits
+    state.raspberryInfo = { ...state.raspberryInfo, ...payload.raspberryInfo };
     setLiveState({ raspberryInfo: payload.raspberryInfo });
   }
   if (payload.speedportVersions) state.speedportVersions = payload.speedportVersions;

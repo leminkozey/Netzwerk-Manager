@@ -276,6 +276,14 @@ function buildSpeedportCard() {
 function buildWindowsPCCard() {
   const fieldContainer = el('div', { className: 'service-fields' });
 
+  const fields = [
+    { key: 'hostname',    label: t('pi.hostname') },
+    { key: 'ipAddress',   label: t('pc.ip') },
+    { key: 'macAddress',  label: t('pc.mac') },
+    { key: 'sshUser',     label: t('pc.sshUser') },
+    { key: 'sshPassword', label: t('pc.sshPassword'), password: true },
+  ];
+
   const debouncedSave = debounce(async () => {
     try {
       await api.saveControlDevice('windowspc', state.windowsPCInfo || {});
@@ -285,21 +293,10 @@ function buildWindowsPCCard() {
     }
   }, 800);
 
-  function renderInfo(data) {
+  function renderFields() {
     fieldContainer.replaceChildren();
-    if (!state.windowsPCInfo) state.windowsPCInfo = {};
-    Object.assign(state.windowsPCInfo, data);
-
-    const fields = [
-      { key: 'hostname',    label: t('pi.hostname') },
-      { key: 'ipAddress',   label: t('pc.ip') },
-      { key: 'macAddress',  label: t('pc.mac') },
-      { key: 'sshUser',     label: t('pc.sshUser') },
-      { key: 'sshPassword', label: t('pc.sshPassword'), password: true },
-    ];
-
     for (const f of fields) {
-      const value = state.windowsPCInfo[f.key] || data[f.key] || '';
+      const value = state.windowsPCInfo[f.key] || '';
       const { row } = buildServiceField(f.label, value, (val) => {
         state.windowsPCInfo[f.key] = val;
         debouncedSave();
@@ -308,14 +305,27 @@ function buildWindowsPCCard() {
     }
   }
 
+  // Load initial data from server
   (async () => {
     try {
       const data = await api.getControlDevice('windowspc');
-      renderInfo(data);
+      if (!state.windowsPCInfo) state.windowsPCInfo = {};
+      // Only copy the fields we care about (not id, name, type, actions, etc.)
+      for (const f of fields) {
+        if (data[f.key] !== undefined && data[f.key] !== '') {
+          state.windowsPCInfo[f.key] = data[f.key];
+        }
+      }
     } catch {
-      renderInfo({});
+      if (!state.windowsPCInfo) state.windowsPCInfo = {};
     }
+    renderFields();
   })();
+
+  // Guard: don't re-render while user is editing fields in this card
+  _unsubs.push(on('stateUpdated', () => {
+    if (!document.activeElement || !fieldContainer.contains(document.activeElement)) renderFields();
+  }));
 
   return el('section', { className: 'card service-card' }, [
     el('div', { className: 'section-title' }, [
