@@ -215,6 +215,7 @@ function showAppChrome() {
 
 // ── Overlays ──
 function showForceLogoutOverlay(deviceName, timeMs) {
+  document.getElementById('logoutOverlay')?.remove();
   const time = timeMs ? new Date(timeMs).toLocaleTimeString() : '';
   const deviceText = deviceName || t('overlay.unknownDeviceName');
   const message = t('overlay.deviceLoggedAt').replace('{device}', deviceText).replace('{time}', time);
@@ -237,6 +238,7 @@ function showForceLogoutOverlay(deviceName, timeMs) {
 }
 
 function showTimeoutOverlay() {
+  document.getElementById('timeoutOverlay')?.remove();
   const overlay = el('div', { className: 'overlay active', id: 'timeoutOverlay' }, [
     el('div', { className: 'overlay-content' }, [
       el('h3', { textContent: t('overlay.sessionExpired') }),

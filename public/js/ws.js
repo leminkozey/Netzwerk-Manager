@@ -27,6 +27,14 @@ export function connectSocket() {
     // Authenticate via first message (not URL query) to avoid token in logs
     ws.send(JSON.stringify({ type: 'auth', token: state.token }));
     reconnectDelay = 1000; // Reset on successful connection
+
+    // Keep alive – start heartbeat only once connection is open
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(() => {
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send('ping');
+      }
+    }, 25000);
   });
 
   ws.addEventListener('message', e => {
@@ -67,13 +75,6 @@ export function connectSocket() {
   ws.addEventListener('error', () => {
     ws?.close();
   });
-
-  // Keep alive
-  heartbeatInterval = setInterval(() => {
-    if (ws?.readyState === WebSocket.OPEN) {
-      ws.send('ping');
-    }
-  }, 25000);
 }
 
 export function closeSocket() {

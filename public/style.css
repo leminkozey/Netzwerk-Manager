@@ -3,8 +3,6 @@
    A distinctive, refined interface with depth and luminosity
    ═══════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
 :root {
   --glow-strength: 1;
 
@@ -3419,5 +3417,21 @@ label {
 
   .pihole-stat-value {
     font-size: 1.2rem;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Reduced Motion – disable GPU-heavy effects for low-power devices
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .hero h1, .page-hero-title, .landing-title {
+    animation: none !important;
+  }
+
+  .top-bar, .card, .float-bar, .overlay, #settingsOverlay,
+  .action-btn, .link-chip, .back-btn {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }

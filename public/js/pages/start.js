@@ -322,6 +322,30 @@ export function renderStart(container) {
   pollStatus();
   pollInterval = setInterval(pollStatus, 5000);
 
+  // Pause polling when tab is hidden, resume when visible
+  const onVisibilityChange = () => {
+    if (destroyed) return;
+    if (document.hidden) {
+      if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+      if (piholePollInterval) { clearInterval(piholePollInterval); piholePollInterval = null; }
+    } else {
+      if (!pollInterval) { pollStatus(); pollInterval = setInterval(pollStatus, 5000); }
+      if (!piholePollInterval && piholeRefs) {
+        piholePollInterval = setInterval(() => {
+          if (destroyed) return;
+          api.getPiholeBlocking().then(data => {
+            if (destroyed || !data || typeof data.blocking !== 'boolean') return;
+            if (data.blocking !== piholeRefs.getCurrentBlocking()) {
+              piholeRefs.setCurrentBlocking(data.blocking);
+              piholeRefs.updateBlockingUI(data.blocking);
+            }
+          }).catch(() => {});
+        }, 15000);
+      }
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
   // ── Cleanup ──
   return function cleanup() {
     destroyed = true;
@@ -333,5 +357,6 @@ export function renderStart(container) {
       clearInterval(piholePollInterval);
       piholePollInterval = null;
     }
+    document.removeEventListener('visibilitychange', onVisibilityChange);
   };
 }

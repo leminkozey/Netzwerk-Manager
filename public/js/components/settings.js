@@ -11,13 +11,20 @@ import { handleLogout } from '../auth.js';
 
 let overlayEl = null;
 let activeTab = 'design';
+let settingsInitialized = false;
 
 export function initSettings() {
+  if (settingsInitialized) return;
+  settingsInitialized = true;
   // Listen for open-settings event
   window.addEventListener('open-settings', () => openSettings());
 }
 
 function openSettings() {
+  // If overlayEl reference exists but was removed from DOM (e.g. by hideAppChrome), reset it
+  if (overlayEl && !overlayEl.isConnected) {
+    overlayEl = null;
+  }
   if (overlayEl) {
     overlayEl.classList.add('active');
     requestAnimationFrame(() => initToggleSliders());

@@ -1274,6 +1274,29 @@ export function renderAnalysen(container) {
   const onReset = () => refreshUptime();
   window.addEventListener('uptime-reset', onReset);
 
+  // Pause timers and polling when tab is hidden, resume when visible
+  const onVisibilityChange = () => {
+    if (destroyed) return;
+    if (document.hidden) {
+      if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+      stopFallbackPolling();
+      if (piholeInterval) { clearInterval(piholeInterval); piholeInterval = null; }
+    } else {
+      // Restart live timer if there are refs
+      if (timerRefs.length > 0 && !timerInterval) {
+        timerInterval = setInterval(() => {
+          for (const ref of timerRefs) {
+            ref.el.textContent = formatLiveTimer(ref.ts);
+          }
+        }, 1000);
+      }
+      // Restart fallback polling if WS not connected
+      if (!wsConnected) startFallbackPolling();
+      if (piholeEnabled && !piholeInterval) piholeInterval = setInterval(() => refreshPihole(), piholeMs);
+    }
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
   return function cleanup() {
     destroyed = true;
     if (timerInterval) clearInterval(timerInterval);
@@ -1284,6 +1307,7 @@ export function renderAnalysen(container) {
     window.removeEventListener('ws:pingMonitor', onWsPingMonitor);
     window.removeEventListener('ws:connected', onWsConnected);
     window.removeEventListener('ws:disconnected', onWsDisconnected);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
     // Restore parent .page max-width for other pages
     if (parentPage) parentPage.style.maxWidth = '';
   };

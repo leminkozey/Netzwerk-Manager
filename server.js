@@ -1,3 +1,7 @@
+// Catch uncaught exceptions and unhandled rejections to prevent silent crashes
+process.on('uncaughtException', (err) => { console.error('Uncaught:', err); });
+process.on('unhandledRejection', (reason) => { console.error('Unhandled rejection:', reason); });
+
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -143,6 +147,7 @@ const runtime = {
 };
 
 function broadcastToAll(type, data) {
+  if (runtime.sockets.size === 0) return;
   if (!isSessionValid()) return;
   const activeToken = runtime.activeSession.token;
   const msg = JSON.stringify({ type, data });
@@ -383,10 +388,12 @@ let _stateLocked = false;
 const _stateWaiters = [];
 
 function acquireStateLock() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (!_stateLocked) {
       _stateLocked = true;
       resolve();
+    } else if (_stateWaiters.length > 50) {
+      reject(new Error('State lock queue full'));
     } else {
       _stateWaiters.push(resolve);
     }
@@ -411,7 +418,10 @@ async function withStateLock(fn) {
   }
 }
 
+let _stateCache = null;
+
 function readState() {
+  if (_stateCache) return _stateCache;
   const raw = fs.readFileSync(DATA_FILE, 'utf-8');
   const parsed = JSON.parse(raw);
   const versions = Array.isArray(parsed.versions) ? parsed.versions : [];
@@ -430,11 +440,13 @@ function readState() {
     deviceTokens: Array.isArray(parsed.deviceTokens) ? parsed.deviceTokens : [],
     speedTestHistory: Array.isArray(parsed.speedTestHistory) ? parsed.speedTestHistory : [],
   };
+  _stateCache = merged;
   return merged;
 }
 
 function saveState(nextState) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(nextState, null, 2));
+  _stateCache = nextState;
 }
 
 function buildVersionLabel() {
@@ -831,7 +843,7 @@ function saveUptimeData(data) {
 function flushUptimeToDisk() {
   if (_uptimeDirty && _uptimeCache) {
     try {
-      fs.writeFileSync(UPTIME_FILE, JSON.stringify(_uptimeCache, null, 2));
+      fs.writeFileSync(UPTIME_FILE, JSON.stringify(_uptimeCache));
       _uptimeDirty = false;
     } catch (err) {
       console.error('[Uptime] Flush to disk failed:', err.message);
@@ -875,18 +887,30 @@ function formatTimestamp(ts) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Parse public/config.js and return the siteConfig object
+// Parse public/config.js and return the siteConfig object (cached with 30s TTL)
+let _siteConfigCache = null;
+let _siteConfigCacheTime = 0;
+const SITE_CONFIG_TTL = 30000; // 30 seconds
+
 function readSiteConfig() {
+  const now = Date.now();
+  if (_siteConfigCache !== null && (now - _siteConfigCacheTime) < SITE_CONFIG_TTL) {
+    return _siteConfigCache;
+  }
   try {
-    if (!fs.existsSync(CONFIG_FILE)) return null;
+    if (!fs.existsSync(CONFIG_FILE)) { _siteConfigCache = null; _siteConfigCacheTime = now; return null; }
     const src = fs.readFileSync(CONFIG_FILE, 'utf-8');
     const vm = require('vm');
     // const → var so siteConfig lands on the sandbox global object
     const modified = src.replace(/\bconst siteConfig\b/, 'var siteConfig');
     // runInNewContext creates fresh built-in copies, preventing prototype pollution
     const sandbox = vm.runInNewContext(modified + '; siteConfig;', Object.create(null), { timeout: 1000 });
-    return sandbox || null;
+    _siteConfigCache = sandbox || null;
+    _siteConfigCacheTime = now;
+    return _siteConfigCache;
   } catch {
+    _siteConfigCache = null;
+    _siteConfigCacheTime = now;
     return null;
   }
 }
@@ -1048,7 +1072,7 @@ function savePingMonitorData(data) {
 function flushPingMonToDisk() {
   if (_pingMonDirty && _pingMonCache) {
     try {
-      fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(_pingMonCache, null, 2));
+      fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(_pingMonCache));
       _pingMonDirty = false;
     } catch (err) {
       console.error('[Ping Monitor] Flush to disk failed:', err.message);
@@ -2823,7 +2847,7 @@ function startServer() {
         pcPasswordLimits.delete(ip);
       }
     }
-  }, 3600000); // Every hour
+  }, 900000); // Every 15 minutes
 
   // Flush monitoring caches to disk every 5 minutes (instead of every cycle)
   setInterval(() => {
@@ -2831,15 +2855,13 @@ function startServer() {
     flushPingMonToDisk();
   }, 5 * 60 * 1000);
 
-  // Uptime monitoring: first ping after 5s, then at configured interval
-  const uptimeMs = readUptimeIntervalMs();
-  console.log(`Uptime monitoring interval: ${uptimeMs / 1000}s`);
-  setTimeout(() => {
-    runUptimePingCycle().then(() => broadcastToAll('uptime', buildUptimeResponse())).catch(() => {});
-    setInterval(() => {
-      runUptimePingCycle().then(() => broadcastToAll('uptime', buildUptimeResponse())).catch(() => {});
-    }, uptimeMs);
-  }, 5000);
+  // Uptime monitoring: first ping after 5s, then recursive setTimeout (re-reads interval each cycle)
+  console.log(`Uptime monitoring interval: ${readUptimeIntervalMs() / 1000}s`);
+  async function scheduleUptime() {
+    try { await runUptimePingCycle(); broadcastToAll('uptime', buildUptimeResponse()); } catch (err) { console.error('[Uptime] Cycle error:', err.message); }
+    setTimeout(scheduleUptime, readUptimeIntervalMs());
+  }
+  setTimeout(scheduleUptime, 5000);
 
   // Ping Monitor: first cycle after 7s, then recursive setTimeout (re-reads interval each cycle)
   console.log(`Ping monitor interval: ${readPingMonitorIntervalMs() / 1000}s`);
