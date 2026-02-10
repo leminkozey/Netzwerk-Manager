@@ -58,13 +58,21 @@ export function applyGlowStrength(value) {
 }
 
 // ── Accent Color ──
+function darkenHex(hex, amount = 0.15) {
+  const rgb = hexToRgb(hex);
+  const r = Math.max(0, Math.round(rgb.r * (1 - amount)));
+  const g = Math.max(0, Math.round(rgb.g * (1 - amount)));
+  const b = Math.max(0, Math.round(rgb.b * (1 - amount)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 export function applyAccentColor(hex) {
   const safe = /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex : defaults.accent;
   state.accent = safe;
   const rgb = hexToRgb(state.accent);
   const vars = {
     '--accent': state.accent,
-    '--accent-strong': state.accent,
+    '--accent-strong': darkenHex(state.accent, 0.15),
     '--accent-rgb': `${rgb.r} ${rgb.g} ${rgb.b}`,
   };
   for (const [key, value] of Object.entries(vars)) {
