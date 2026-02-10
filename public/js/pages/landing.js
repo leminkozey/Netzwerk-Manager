@@ -9,6 +9,15 @@ import { iconEl } from '../icons.js';
 import { getConfig } from '../state.js';
 
 function randomGreeting() {
+  const cfg = getConfig();
+  const greetingsCfg = cfg?.greetings;
+
+  // Custom-only: nur eigene Nachrichten verwenden
+  if (greetingsCfg?.customOnly && Array.isArray(greetingsCfg.messages) && greetingsCfg.messages.length > 0) {
+    return greetingsCfg.messages[Math.floor(Math.random() * greetingsCfg.messages.length)];
+  }
+
+  // Fallback: eingebaute zufällige Nachrichten aus i18n
   const greetings = t('landing.greetings');
   if (Array.isArray(greetings)) {
     return greetings[Math.floor(Math.random() * greetings.length)];

@@ -48,6 +48,22 @@ const siteConfig = {
   },
 
   // ══════════════════════════════════════════════
+  // WILLKOMMENSNACHRICHTEN
+  // ══════════════════════════════════════════════
+  // Eigene Begrüßungstexte auf der Landing Page.
+  // customOnly: true  → Nur die eigenen Nachrichten anzeigen
+  // customOnly: false → Die eingebauten zufälligen Nachrichten verwenden
+  greetings: {
+    customOnly: false,          // true = nur eigene, false = eingebaute zufällige
+    messages: [
+      // Eigene Willkommensnachrichten hier eintragen:
+      // 'Willkommen im Netzwerk!',
+      // 'Hallo Admin!',
+      // 'Schön dass du da bist.',
+    ],
+  },
+
+  // ══════════════════════════════════════════════
   // EINSTELLUNGEN-SICHTBARKEIT
   // ══════════════════════════════════════════════
   // Bestimmt, welche Bereiche der Einstellungen sichtbar sind.
