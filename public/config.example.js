@@ -95,6 +95,16 @@ const siteConfig = {
   },
 
   // ══════════════════════════════════════════════
+  // ANALYSEN-SEKTIONEN
+  // ══════════════════════════════════════════════
+  // Einzelne Sektionen auf der Analysen-Seite ein-/ausblenden.
+  analysen: {
+    speedtest: true,            // Internet-Geschwindigkeit (Speed-Test)
+    outages: true,              // Ausfälle-Card
+    uptime: true,               // Uptime-Monitoring-Cards
+  },
+
+  // ══════════════════════════════════════════════
   // UPTIME MONITORING
   // ══════════════════════════════════════════════
   // Ping-Intervall in Sekunden. Der Server pingt alle Geräte in

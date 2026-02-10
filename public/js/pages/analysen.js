@@ -992,35 +992,47 @@ export function renderAnalysen(container) {
 
   const page = el('div', { className: 'page-wide', style: { maxWidth: 'none' } });
 
+  // Analysen section toggles
+  const showSpeedtest = cfg?.analysen?.speedtest !== false;
+  const showOutages = cfg?.analysen?.outages !== false;
+  const showUptime = cfg?.analysen?.uptime !== false;
+
   // Two-column top: speedtest left, uptime grid right (responsive via CSS)
   const topRow = el('div', { className: 'analysen-top' });
 
   // Top row: Speedtest (left) | Outages (right) — side by side
-  topRow.appendChild(buildSpeedtestSection());
+  if (showSpeedtest) topRow.appendChild(buildSpeedtestSection());
 
-  const outagesPlaceholder = el('div', { className: 'card' }, [
-    sectionTitle(t('analysen.outages'), 'outage'),
-    el('div', { textContent: '...', style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' } }),
-  ]);
-  topRow.appendChild(outagesPlaceholder);
+  let outagesPlaceholder = null;
+  if (showOutages) {
+    outagesPlaceholder = el('div', { className: 'card' }, [
+      sectionTitle(t('analysen.outages'), 'outage'),
+      el('div', { textContent: '...', style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)' } }),
+    ]);
+    topRow.appendChild(outagesPlaceholder);
+  }
 
   // Uptime (third column)
-  const uptimeCol = el('div');
-  uptimeCol.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
-    el('div', { className: 'section-header' }, [
-      el('span', { className: 'icon-badge icon-green' }, [iconEl('uptime', 22)]),
-      el('h3', { textContent: t('analysen.uptime') }),
-    ]),
-  ]));
+  let uptimeGrid = null;
+  if (showUptime) {
+    const uptimeCol = el('div');
+    uptimeCol.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
+      el('div', { className: 'section-header' }, [
+        el('span', { className: 'icon-badge icon-green' }, [iconEl('uptime', 22)]),
+        el('h3', { textContent: t('analysen.uptime') }),
+      ]),
+    ]));
 
-  const uptimeGrid = el('div', { className: 'analysen-uptime-grid' }, [
-    el('div', { className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0' } }, [
-      el('span', { textContent: '...' }),
-    ]),
-  ]);
-  uptimeCol.appendChild(uptimeGrid);
-  topRow.appendChild(uptimeCol);
-  page.appendChild(topRow);
+    uptimeGrid = el('div', { className: 'analysen-uptime-grid' }, [
+      el('div', { className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0' } }, [
+        el('span', { textContent: '...' }),
+      ]),
+    ]);
+    uptimeCol.appendChild(uptimeGrid);
+    topRow.appendChild(uptimeCol);
+  }
+
+  if (topRow.children.length > 0) page.appendChild(topRow);
 
   // Ping Monitor section (only if enabled in config)
   const pingMonEnabled = cfg?.pingMonitor?.enabled !== false;
@@ -1041,7 +1053,7 @@ export function renderAnalysen(container) {
   container.appendChild(page);
 
   // Outages element ref (may be replaced)
-  let currentOutages = outagesPlaceholder;
+  let currentOutages = outagesPlaceholder || null;
 
   // ── Render helpers (shared by fetch + WS push) ──
 
@@ -1053,19 +1065,21 @@ export function renderAnalysen(container) {
     timerInterval = null;
     timerRefs.length = 0;
 
-    if (data && data.devices && data.devices.length > 0) {
-      uptimeGrid.replaceChildren();
-      for (const d of data.devices) {
-        uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
+    if (uptimeGrid) {
+      if (data && data.devices && data.devices.length > 0) {
+        uptimeGrid.replaceChildren();
+        for (const d of data.devices) {
+          uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
+        }
+      } else {
+        uptimeGrid.replaceChildren();
+        uptimeGrid.appendChild(el('div', {
+          className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
+        }, [el('span', { textContent: t('analysen.noData') })]));
       }
-    } else {
-      uptimeGrid.replaceChildren();
-      uptimeGrid.appendChild(el('div', {
-        className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)', marginBottom: '0', gridColumn: '1 / -1' },
-      }, [el('span', { textContent: t('analysen.noData') })]));
     }
 
-    if (data && data.outages !== undefined) {
+    if (currentOutages && data && data.outages !== undefined) {
       const newOutages = buildOutagesCardFromData(data.outages);
       currentOutages.replaceWith(newOutages);
       currentOutages = newOutages;
