@@ -1041,12 +1041,12 @@ export function renderAnalysen(container) {
   if (topRow.children.length > 0) page.appendChild(topRow);
 
   // Ping Monitor section (only if enabled in config)
-  const pingMonEnabled = cfg?.pingMonitor?.enabled !== false;
+  const pingMonEnabled = cfg?.analysen?.pingMonitor !== false;
   const pingMonContainer = el('div', { style: { marginTop: '16px' } });
   if (pingMonEnabled) page.appendChild(pingMonContainer);
 
   // Pi-hole section (only if enabled in config)
-  const piholeEnabled = cfg?.pihole?.enabled !== false;
+  const piholeEnabled = cfg?.analysen?.pihole !== false;
   const piholeContainer = el('div', { style: { marginTop: '28px' } });
   if (piholeEnabled) {
     piholeContainer.appendChild(el('div', {

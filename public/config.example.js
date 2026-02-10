@@ -150,6 +150,8 @@ const siteConfig = {
     speedtest: true,            // Internet-Geschwindigkeit (Speed-Test)
     outages: true,              // Ausfälle-Card
     uptime: true,               // Uptime-Monitoring-Cards
+    pingMonitor: true,          // Ping-Monitor (Latenz-Messung)
+    pihole: true,               // Pi-hole DNS Analytics
   },
 
   // ── Uptime Monitoring ──
