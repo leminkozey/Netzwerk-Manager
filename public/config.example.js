@@ -7,15 +7,16 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const siteConfig = {
-  // ══════════════════════════════════════════════
-  // ANIMATIONEN
-  // ══════════════════════════════════════════════
+
+  // ┌─────────────────────────────────────────────┐
+  // │             ALLGEMEIN                        │
+  // └─────────────────────────────────────────────┘
+
+  // ── Animationen ──
   // Steuert alle visuellen Animationen der Oberfläche.
   // Mit enabled: false werden sämtliche Animationen deaktiviert.
   animations: {
     enabled: true,              // Master-Schalter für alle Animationen
-
-    // Einzelne Animationen (nur wirksam wenn enabled: true)
     heroGradient: true,         // Titel-Farbverlauf-Animation auf der Startseite
     fadeIn: true,               // Einblend-Effekte beim Laden von Elementen
     modalSlide: true,           // Slide-Animation beim Öffnen von Modals/Overlays
@@ -23,9 +24,7 @@ const siteConfig = {
     themeSwitcher: true,        // Animations-Effekte der Theme-Buttons (Sonne/Mond/System)
   },
 
-  // ══════════════════════════════════════════════
-  // DESIGN DEFAULTS
-  // ══════════════════════════════════════════════
+  // ── Design Defaults ──
   // Standard-Werte für neue Benutzer. Benutzer können diese über
   // die Einstellungen überschreiben (wird in localStorage gespeichert).
   defaults: {
@@ -33,23 +32,42 @@ const siteConfig = {
     buttonStyle: 'default',     // 'default' | 'simple'
     language: 'de',             // 'de' | 'en'
     accentColor: '#00d4ff',     // Akzentfarbe als Hex-Wert
-
-    // Glow-Effekt (leuchtendes Glühen um aktive Elemente)
     glow: {
       enabled: true,            // Glow an/aus
       strength: 1,              // Intensität: 0 (aus) bis 2 (stark)
     },
-
-    // Session Timeout (automatisches Ausloggen bei Inaktivität)
     sessionTimeout: {
       enabled: false,           // Timeout an/aus
       minutes: 5,               // Minuten bis zum automatischen Logout (1–60)
     },
   },
 
-  // ══════════════════════════════════════════════
-  // WILLKOMMENSNACHRICHTEN
-  // ══════════════════════════════════════════════
+  // ── Einstellungen-Sichtbarkeit ──
+  // Bestimmt, welche Bereiche der Einstellungen sichtbar sind.
+  settings: {
+    showSettingsButton: true,   // Einstellungen-Button komplett anzeigen/verstecken
+    tabs: {
+      design: true,             // Design-Tab (Theme, Farben, Glow)
+      analysen: true,           // Analysen-Tab (Uptime Reset)
+      daten: true,              // Daten-Tab (Export/Import, Versionshistorie)
+      session: true,            // Session-Tab (Timeout-Einstellungen)
+      user: true,               // User-Tab (Benutzername/Passwort ändern, Logout)
+      // credits: immer sichtbar (kann nicht deaktiviert werden)
+    },
+  },
+
+  // ┌─────────────────────────────────────────────┐
+  // │             LANDING PAGE                     │
+  // └─────────────────────────────────────────────┘
+
+  // ── Header Links ──
+  // Links erscheinen als Chips unter den Buttons auf der Landing Page.
+  headerLinks: [
+    { name: 'Github', url: 'https://github.com/leminkozey' },
+    { name: 'KanBan', url: 'https://leminkanban.de' },
+  ],
+
+  // ── Willkommensnachrichten ──
   // Eigene Begrüßungstexte auf der Landing Page.
   // customOnly: true  → Nur die eigenen Nachrichten anzeigen
   // customOnly: false → Die eingebauten zufälligen Nachrichten verwenden
@@ -63,28 +81,12 @@ const siteConfig = {
     ],
   },
 
-  // ══════════════════════════════════════════════
-  // EINSTELLUNGEN-SICHTBARKEIT
-  // ══════════════════════════════════════════════
-  // Bestimmt, welche Bereiche der Einstellungen sichtbar sind.
-  settings: {
-    showSettingsButton: true,   // Einstellungen-Button komplett anzeigen/verstecken
+  // ┌─────────────────────────────────────────────┐
+  // │             INFO CENTER                      │
+  // └─────────────────────────────────────────────┘
 
-    // Einzelne Tabs ein-/ausblenden
-    tabs: {
-      design: true,             // Design-Tab (Theme, Farben, Glow)
-      analysen: true,           // Analysen-Tab (Uptime Reset)
-      daten: true,              // Daten-Tab (Export/Import, Versionshistorie)
-      session: true,            // Session-Tab (Timeout-Einstellungen)
-      user: true,               // User-Tab (Benutzername/Passwort ändern, Logout)
-      // credits: immer sichtbar (kann nicht deaktiviert werden)
-    },
-  },
-
-  // ══════════════════════════════════════════════
-  // CARDS SICHTBARKEIT
-  // ══════════════════════════════════════════════
-  // Einzelne Info-Cards auf der Startseite ein-/ausblenden.
+  // ── Cards Sichtbarkeit ──
+  // Einzelne Info-Cards ein-/ausblenden.
   cards: {
     switch: true,               // Switch (8 Ports) – Netzwerk-Switch-Dokumentation
     router: true,               // WLAN Router – Router-Port-Dokumentation
@@ -94,84 +96,11 @@ const siteConfig = {
     windowsPc: true,            // Windows PC – PC-Steuerung (Control Center)
   },
 
-  // ══════════════════════════════════════════════
-  // ANALYSEN-SEKTIONEN
-  // ══════════════════════════════════════════════
-  // Einzelne Sektionen auf der Analysen-Seite ein-/ausblenden.
-  analysen: {
-    speedtest: true,            // Internet-Geschwindigkeit (Speed-Test)
-    outages: true,              // Ausfälle-Card
-    uptime: true,               // Uptime-Monitoring-Cards
-  },
+  // ┌─────────────────────────────────────────────┐
+  // │             CONTROL CENTER                   │
+  // └─────────────────────────────────────────────┘
 
-  // ══════════════════════════════════════════════
-  // UPTIME MONITORING
-  // ══════════════════════════════════════════════
-  // Ping-Intervall in Sekunden. Der Server pingt alle Geräte in
-  // diesem Intervall und das Frontend aktualisiert die Anzeige.
-  // Minimum: 10 Sekunden
-  // ══════════════════════════════════════════════
-  // PI-HOLE v6 DNS ANALYTICS
-  // ══════════════════════════════════════════════
-  // URL und Passwort deines Pi-hole v6.
-  // HINWEIS: config.js wird vom Server blockiert (403) und ist nicht
-  // öffentlich abrufbar. Der Server liest die Datei nur intern.
-  pihole: {
-    enabled: true,                           // false → DNS Analytics komplett deaktiviert
-    url: 'http://192.168.1.100',           // Pi-hole Admin URL
-    password: 'your-pihole-password',       // Pi-hole API Passwort
-    blockingToggle: true,                    // Blocking-Toggle im Control Center anzeigen
-
-    // Einzelne Dashboard-Cards ein-/ausblenden.
-    // Deaktivierte Cards werden nicht gerendert und die zugehörigen
-    // API-Calls werden nicht ausgeführt (spart Bandbreite).
-    // Standard: alle true (wenn cards-Objekt fehlt)
-    cards: {
-      summary: true,          // 4 Summary-Stat-Cards (Queries, Blocked, %, Blocklist)
-      queriesOverTime: true,  // Stacked Bar Chart (Queries über Zeit)
-      queryTypes: true,       // Donut: Anfragetypen (A, AAAA, HTTPS, etc.)
-      upstreams: true,        // Donut: Upstream-Server
-      topDomains: true,       // Top Domains Liste
-      topBlocked: true,       // Top Blockierte Domains Liste
-      topClients: true,       // Top Clients Liste
-    },
-  },
-
-  // ══════════════════════════════════════════════
-  // PING MONITOR (Latenz-Messung)
-  // ══════════════════════════════════════════════
-  // Misst die Latenz (ms) zu externen Hosts per ICMP-Ping.
-  // Wird auf der Analysen-Seite als Chart dargestellt.
-  pingMonitor: {
-    enabled: true,              // false → Ping Monitor komplett deaktiviert
-    interval: 30,               // Ping-Intervall in Sekunden (Minimum: 10)
-    hosts: [
-      { id: 'google',     name: 'Google DNS',     ip: '8.8.8.8' },
-      { id: 'cloudflare', name: 'Cloudflare DNS', ip: '1.1.1.1' },
-      // Weitere Beispiele:
-     // { id: 'quad9',    name: 'Quad9 DNS',      ip: '9.9.9.9' },
-      // { id: 'opendns',  name: 'OpenDNS',        ip: '208.67.222.222' },
-    ],
-  },
-
-  // Aktualisierungs-Intervall für Pi-hole (Sekunden, Minimum 30, Standard 60):
-  piholeInterval: 60,
-
-  uptimeInterval: 10,
-
-  // Geräte die per Ping überwacht werden sollen
-  // id:   eindeutiger Schlüssel (lowercase, keine Leerzeichen)
-  // name: Anzeigename im Frontend
-  // ip:   IP-Adresse des Geräts im lokalen Netzwerk
-  uptimeDevices: [
-    { id: 'router',    name: 'Router',     ip: '192.168.1.1' },
-    { id: 'pihole',    name: 'PiHole',     ip: '192.168.1.100' },
-    { id: 'windowspc', name: 'Windows PC', ip: '192.168.1.50' },
-  ],
-
-  // ══════════════════════════════════════════════
-  // GERÄTESTEUERUNG (Control Center) v4.0.0
-  // ══════════════════════════════════════════════
+  // ── Gerätesteuerung ──
   // Geräte die über das Control Center ferngesteuert werden können.
   // Unterstützt Wake-on-LAN, SSH-Shutdown und SSH-Restart.
   //
@@ -204,14 +133,56 @@ const siteConfig = {
     // },
   ],
 
-  // ══════════════════════════════════════════════
-  // HEADER LINKS
-  // ══════════════════════════════════════════════
-  // Links erscheinen oben rechts in der Topbar mit automatischem Favicon.
-  // name: Anzeigename des Links
-  // url:  Vollständige URL (muss mit http:// oder https:// beginnen)
-  headerLinks: [
-    { name: 'Github', url: 'https://github.com/leminkozey' },
-    { name: 'KanBan', url: 'https://leminkanban.de' },
+  // ┌─────────────────────────────────────────────┐
+  // │             ANALYSEN CENTER                  │
+  // └─────────────────────────────────────────────┘
+
+  // ── Sektionen ein-/ausblenden ──
+  analysen: {
+    speedtest: true,            // Internet-Geschwindigkeit (Speed-Test)
+    outages: true,              // Ausfälle-Card
+    uptime: true,               // Uptime-Monitoring-Cards
+  },
+
+  // ── Uptime Monitoring ──
+  // Ping-Intervall und Geräte für die Uptime-Überwachung.
+  uptimeInterval: 10,           // Intervall in Sekunden (Minimum: 10)
+  uptimeDevices: [
+    { id: 'router',    name: 'Router',     ip: '192.168.1.1' },
+    { id: 'pihole',    name: 'PiHole',     ip: '192.168.1.100' },
+    { id: 'windowspc', name: 'Windows PC', ip: '192.168.1.50' },
   ],
+
+  // ── Pi-hole v6 DNS Analytics ──
+  // HINWEIS: config.js wird vom Server blockiert (403) und ist nicht
+  // öffentlich abrufbar. Der Server liest die Datei nur intern.
+  pihole: {
+    enabled: true,              // false → DNS Analytics komplett deaktiviert
+    url: 'http://192.168.1.100',
+    password: 'your-pihole-password',
+    blockingToggle: true,       // Blocking-Toggle im Control Center anzeigen
+    cards: {
+      summary: true,            // 4 Summary-Stat-Cards (Queries, Blocked, %, Blocklist)
+      queriesOverTime: true,    // Stacked Bar Chart (Queries über Zeit)
+      queryTypes: true,         // Donut: Anfragetypen (A, AAAA, HTTPS, etc.)
+      upstreams: true,          // Donut: Upstream-Server
+      topDomains: true,         // Top Domains Liste
+      topBlocked: true,         // Top Blockierte Domains Liste
+      topClients: true,         // Top Clients Liste
+    },
+  },
+  piholeInterval: 60,           // Aktualisierungs-Intervall in Sekunden (Minimum: 30)
+
+  // ── Ping Monitor (Latenz-Messung) ──
+  // Misst die Latenz (ms) zu externen Hosts per ICMP-Ping.
+  pingMonitor: {
+    enabled: true,              // false → Ping Monitor komplett deaktiviert
+    interval: 30,               // Ping-Intervall in Sekunden (Minimum: 10)
+    hosts: [
+      { id: 'google',     name: 'Google DNS',     ip: '8.8.8.8' },
+      { id: 'cloudflare', name: 'Cloudflare DNS', ip: '1.1.1.1' },
+      // { id: 'quad9',     name: 'Quad9 DNS',      ip: '9.9.9.9' },
+      // { id: 'opendns',   name: 'OpenDNS',        ip: '208.67.222.222' },
+    ],
+  },
 };
