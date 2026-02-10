@@ -1,18 +1,8 @@
 # Dependencies
 node_modules/
 
-# Laufzeit-Daten (wird automatisch erstellt)
-Data/state.json
-Data/UptimeData.json
-Data/uptime.json
-Data/ping-monitor.json
-
-# Sensible Daten
-Data/Nutzer
-Data/LoginToken.txt
-Data/WindowsPC.json
-Data/ControlDevices.json
-Data/.encryption-key
+# Laufzeit- und sensible Daten (wird automatisch erstellt)
+Data/
 public/config.js
 
 # macOS
