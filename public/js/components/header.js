@@ -26,10 +26,10 @@ export function renderHeader(container) {
   // Page context: back button + page title (hidden on landing/login)
   pageContextEl = el('div', { className: 'page-context', id: 'pageContext' });
 
-  headerEl = el('div', { className: 'top-bar', id: 'topBar' }, [
-    // Left group: settings + page context
-    el('div', { className: 'top-bar-left' }, [
-      el('button', {
+  // Settings-Button nur anzeigen wenn nicht explizit deaktiviert
+  const showSettings = cfg?.settings?.showSettingsButton !== false;
+  const settingsBtn = showSettings
+    ? el('button', {
         className: 'settings-btn',
         'aria-label': t('app.settings'),
         onClick: () => {
@@ -38,7 +38,13 @@ export function renderHeader(container) {
       }, [
         el('span', { className: 'settings-icon' }, [iconEl('settings', 18)]),
         el('span', { className: 'settings-text', textContent: t('app.settings'), 'data-i18n': 'app.settings' }),
-      ]),
+      ])
+    : null;
+
+  headerEl = el('div', { className: 'top-bar', id: 'topBar' }, [
+    // Left group: settings + page context
+    el('div', { className: 'top-bar-left' }, [
+      ...(settingsBtn ? [settingsBtn] : []),
       pageContextEl,
     ]),
 

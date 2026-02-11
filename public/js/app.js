@@ -198,14 +198,20 @@ function showAppChrome() {
   // Floating bar (top-left): [Settings] [← Back] [Page name]
   floatBarContext = el('div', { className: 'float-bar-context' });
 
-  const bar = el('div', { className: 'float-bar', id: 'floatBar' }, [
-    el('button', {
+  const cfg = getConfig();
+  const showSettings = cfg?.settings?.showSettingsButton !== false;
+
+  const barChildren = [];
+  if (showSettings) {
+    barChildren.push(el('button', {
       className: 'settings-float-btn',
       'aria-label': t('app.settings'),
       onClick: () => window.dispatchEvent(new CustomEvent('open-settings')),
-    }, [iconEl('settings', 20)]),
-    floatBarContext,
-  ]);
+    }, [iconEl('settings', 20)]));
+  }
+  barChildren.push(floatBarContext);
+
+  const bar = el('div', { className: 'float-bar', id: 'floatBar' }, barChildren);
 
   document.body.appendChild(bar);
   window.addEventListener('hashchange', updateFloatBar);
