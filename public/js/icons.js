@@ -27,6 +27,11 @@ export const icons = {
     <path d="M7 16l4-8 4 4 4-6"/>
   </svg>`,
 
+  schedule: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <path d="M12 6v6l4 2"/>
+  </svg>`,
+
   // ── Colorful Device Icons (filled, multi-color for badges) ──
   switchColor: `<svg viewBox="0 0 24 24" fill="none">
     <rect x="2" y="7" width="20" height="10" rx="2.5" fill="#1e293b" stroke="#334155" stroke-width="0.8"/>

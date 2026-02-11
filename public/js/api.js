@@ -290,3 +290,11 @@ export async function getPingMonitor() {
   return res.json();
 }
 
+// ── Zeitpläne ──
+
+export async function getSchedules() {
+  const res = await request('/api/schedules');
+  if (!res.ok) throw new Error('Failed to get schedules');
+  return res.json();
+}
+

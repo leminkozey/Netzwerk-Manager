@@ -121,6 +121,21 @@ const siteConfig = {
   //
   // SSH-Zugangsdaten werden pro Gerät in den Einstellungen konfiguriert
   // und verschlüsselt auf dem Server gespeichert.
+  //
+  // ── Zeitplan (Schedule) ──
+  // Automatisches Hochfahren (Wake-on-LAN) und Herunterfahren (SSH) zu
+  // festgelegten Zeiten. Der Server muss laufen, damit Zeitpläne ausgeführt werden.
+  //
+  // schedule.wake:     Benötigt eine konfigurierte MAC-Adresse (in den Einstellungen)
+  // schedule.shutdown: Benötigt konfigurierte SSH-Zugangsdaten (in den Einstellungen)
+  //
+  // Optionen:
+  //   enabled: true/false – Zeitplan aktivieren/deaktivieren
+  //   days:    Wochentage als Array: 'mon','tue','wed','thu','fri','sat','sun'
+  //   time:    Uhrzeit im 24h-Format, z.B. '07:30' oder '18:00'
+  //
+  // HINWEIS: Zeitpläne werden aktuell nur über diese Datei konfiguriert.
+  //          Eine UI-Bearbeitung ist für eine zukünftige Version geplant.
   controlDevices: [
     {
       id: 'windowspc',
@@ -129,6 +144,21 @@ const siteConfig = {
       type: 'ssh-windows',
       ip: '192.168.1.50',
       actions: ['wake', 'restart', 'shutdown'],
+
+      // Zeitplan: Automatisches Hoch-/Herunterfahren
+      // Entferne die Kommentare um den Zeitplan zu aktivieren.
+      // schedule: {
+      //   wake: {
+      //     enabled: true,
+      //     days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      //     time: '07:30',
+      //   },
+      //   shutdown: {
+      //     enabled: true,
+      //     days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+      //     time: '18:00',
+      //   },
+      // },
     },
     // Weiteres Beispiel: Linux-Server
     // {
@@ -138,6 +168,18 @@ const siteConfig = {
     //   type: 'ssh-linux',
     //   ip: '192.168.1.200',
     //   actions: ['wake', 'shutdown'],
+    //   schedule: {
+    //     wake: {
+    //       enabled: true,
+    //       days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+    //       time: '08:00',
+    //     },
+    //     shutdown: {
+    //       enabled: true,
+    //       days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+    //       time: '22:00',
+    //     },
+    //   },
     // },
   ],
 

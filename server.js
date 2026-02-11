@@ -10,6 +10,7 @@ const { randomUUID } = crypto;
 const WebSocket = require('ws');
 const dgram = require('dgram');
 const { spawn } = require('child_process');
+const cron = require('node-cron');
 
 // ═══════════════════════════════════════════════════════════════════
 // Security Utilities
@@ -1450,6 +1451,141 @@ function logControlAction(deviceId, action, ip, success, details = '') {
   console.log(`[CONTROL-AUDIT] ${timestamp} | ${sanitizeLogParam(deviceId)} | ${sanitizeLogParam(action)} | IP: ${sanitizeLogParam(ip)} | Success: ${success} | ${sanitizeLogParam(details)}`);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// WOL-Zeitplan (Schedule) – Automatisches Wake/Shutdown per Cron
+// ═══════════════════════════════════════════════════════════════════
+
+// Tages-Mapping: Kurzname → Cron-Wochentag (0 = Sonntag)
+const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
+
+// Aktive Cron-Jobs (werden bei Re-Init gestoppt)
+let schedulerJobs = [];
+
+// Führt eine Scheduler-Aktion (wake/shutdown) für ein Gerät aus
+async function executeScheduledAction(device, action) {
+  const creds = readControlDeviceCredentials(device.id);
+
+  if (action === 'wake') {
+    if (!creds.macAddress) {
+      console.log(`[Scheduler] Wake für ${device.name} übersprungen – keine MAC-Adresse konfiguriert`);
+      return;
+    }
+    try {
+      await sendWakeOnLan(creds.macAddress);
+      console.log(`[Scheduler] Wake-on-LAN für ${device.name} gesendet (MAC: ${creds.macAddress})`);
+    } catch (err) {
+      console.error(`[Scheduler] Wake für ${device.name} fehlgeschlagen:`, err.message);
+    }
+    return;
+  }
+
+  if (action === 'shutdown') {
+    const command = getDeviceCommand(device.type, 'shutdown');
+    if (!command) {
+      console.log(`[Scheduler] Shutdown für ${device.name} übersprungen – kein Befehl für Gerätetyp ${device.type}`);
+      return;
+    }
+    if (!device.ip || !creds.sshUser || !creds.sshPassword) {
+      console.log(`[Scheduler] Shutdown für ${device.name} übersprungen – unvollständige SSH-Zugangsdaten`);
+      return;
+    }
+    const sshConfig = {
+      ipAddress: device.ip,
+      sshUser: creds.sshUser,
+      sshPassword: creds.sshPassword,
+      sshPort: creds.sshPort || 22,
+    };
+    try {
+      await sshCommand(sshConfig, command);
+      console.log(`[Scheduler] Shutdown für ${device.name} gesendet (IP: ${device.ip})`);
+    } catch (err) {
+      console.error(`[Scheduler] Shutdown für ${device.name} fehlgeschlagen:`, err.message);
+    }
+    return;
+  }
+}
+
+// Erstellt Cron-Pattern aus Tagen und Uhrzeit
+function buildCronPattern(days, time) {
+  const [hour, minute] = time.split(':').map(Number);
+  const cronDays = days
+    .map(d => DAY_MAP[d.toLowerCase()])
+    .filter(d => d !== undefined)
+    .join(',');
+  if (!cronDays) return null;
+  return `${minute} ${hour} * * ${cronDays}`;
+}
+
+// Berechnet den nächsten Ausführungszeitpunkt für einen Zeitplan
+function getNextExecution(days, time) {
+  const [hour, minute] = time.split(':').map(Number);
+  if (isNaN(hour) || isNaN(minute)) return null;
+
+  const now = new Date();
+  const cronDays = days
+    .map(d => DAY_MAP[d.toLowerCase()])
+    .filter(d => d !== undefined);
+
+  if (cronDays.length === 0) return null;
+
+  // Prüfe die nächsten 8 Tage (maximal eine Woche + 1)
+  for (let offset = 0; offset <= 7; offset++) {
+    const candidate = new Date(now);
+    candidate.setDate(candidate.getDate() + offset);
+    candidate.setHours(hour, minute, 0, 0);
+
+    const dayOfWeek = candidate.getDay();
+    if (!cronDays.includes(dayOfWeek)) continue;
+
+    // Wenn heute aber Zeitpunkt schon vorbei → nächsten Tag prüfen
+    if (candidate > now) {
+      return candidate.toISOString();
+    }
+  }
+  return null;
+}
+
+// Initialisiert alle Scheduler-Jobs aus der Config
+function initScheduler() {
+  // Alte Jobs stoppen
+  for (const job of schedulerJobs) {
+    job.stop();
+  }
+  schedulerJobs = [];
+
+  const configDevices = readControlDevicesFromConfig();
+  let jobCount = 0;
+
+  for (const device of configDevices) {
+    if (!device.schedule) continue;
+
+    for (const action of ['wake', 'shutdown']) {
+      const scheduleEntry = device.schedule[action];
+      if (!scheduleEntry || !scheduleEntry.enabled) continue;
+      if (!Array.isArray(scheduleEntry.days) || !scheduleEntry.time) continue;
+
+      const pattern = buildCronPattern(scheduleEntry.days, scheduleEntry.time);
+      if (!pattern) continue;
+
+      try {
+        const job = cron.schedule(pattern, () => {
+          console.log(`[Scheduler] ${action} für ${device.name} wird ausgeführt (${scheduleEntry.time})`);
+          executeScheduledAction(device, action);
+        });
+        schedulerJobs.push(job);
+        jobCount++;
+        console.log(`[Scheduler] Job erstellt: ${device.name} → ${action} um ${scheduleEntry.time} (${scheduleEntry.days.join(',')})`);
+      } catch (err) {
+        console.error(`[Scheduler] Fehler beim Erstellen des Jobs für ${device.name}/${action}:`, err.message);
+      }
+    }
+  }
+
+  if (jobCount > 0) {
+    console.log(`[Scheduler] ${jobCount} Zeitplan-Job(s) aktiv`);
+  }
+}
+
 function migrateWindowsPCToControlDevices() {
   // Only migrate if ControlDevices.json does not exist yet
   if (fs.existsSync(CONTROL_DEVICES_FILE)) return;
@@ -2196,6 +2332,34 @@ app.post('/api/import', authRequired, async (req, res) => {
 
     res.json({ ok: true, message: 'Data imported successfully (credentials unchanged)' });
   });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Zeitplan-Endpoint
+// ═══════════════════════════════════════════════════════════════════
+
+// GET /api/schedules – Gibt die nächsten geplanten Aktionen pro Gerät zurück
+app.get('/api/schedules', authRequired, (req, res) => {
+  const configDevices = readControlDevicesFromConfig();
+  const result = {};
+
+  for (const device of configDevices) {
+    if (!device.schedule) continue;
+
+    const entry = {};
+    if (device.schedule.wake?.enabled && Array.isArray(device.schedule.wake.days) && device.schedule.wake.time) {
+      entry.nextWake = getNextExecution(device.schedule.wake.days, device.schedule.wake.time);
+    }
+    if (device.schedule.shutdown?.enabled && Array.isArray(device.schedule.shutdown.days) && device.schedule.shutdown.time) {
+      entry.nextShutdown = getNextExecution(device.schedule.shutdown.days, device.schedule.shutdown.time);
+    }
+
+    if (entry.nextWake || entry.nextShutdown) {
+      result[device.id] = entry;
+    }
+  }
+
+  res.json(result);
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -2948,6 +3112,12 @@ function startServer() {
     flushUptimeToDisk();
     flushPingMonToDisk();
   }, 5 * 60 * 1000);
+
+  // Zeitplan-Scheduler initialisieren und alle 60s auf Config-Änderungen prüfen
+  initScheduler();
+  setInterval(() => {
+    initScheduler();
+  }, 60000);
 
   // Uptime monitoring: first ping after 5s, then recursive setTimeout (re-reads interval each cycle)
   if (isUptimeEnabled()) {

@@ -3228,6 +3228,38 @@ label {
   padding: 20px 0;
 }
 
+/* ── Zeitplan-Anzeige in Device-Tiles ── */
+.device-schedule-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.schedule-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.schedule-row .icon {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.schedule-label {
+  opacity: 0.7;
+}
+
+.schedule-time {
+  margin-left: auto;
+  font-weight: 500;
+  color: var(--text);
+}
+
 .action-circle {
   display: flex;
   flex-direction: column;

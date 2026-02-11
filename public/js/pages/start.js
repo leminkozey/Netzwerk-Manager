@@ -28,6 +28,36 @@ function statusIconNode(status) {
   return iconEl('unknown', 14);
 }
 
+// ── Zeitplan-Formatierung ──
+
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+function formatNextExecution(isoString) {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return null;
+
+  const now = new Date();
+  const todayStr = now.toDateString();
+  const tomorrowDate = new Date(now);
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowStr = tomorrowDate.toDateString();
+
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const time = `${hours}:${minutes}`;
+
+  if (date.toDateString() === todayStr) {
+    return `${t('schedule.today')} ${time}`;
+  }
+  if (date.toDateString() === tomorrowStr) {
+    return `${t('schedule.tomorrow')} ${time}`;
+  }
+
+  const dayKey = WEEKDAY_KEYS[date.getDay()];
+  return `${t(`schedule.days.${dayKey}`)} ${time}`;
+}
+
 // ── Success message mapping ──
 
 const ACTION_SUCCESS_KEYS = {
@@ -73,6 +103,12 @@ function buildDeviceTile(device) {
 
   const actionsRow = el('div', { className: 'device-tile-actions' }, actionButtons);
 
+  // Zeitplan-Anzeige (wird dynamisch befüllt)
+  const scheduleContainer = el('div', {
+    className: 'device-schedule-info',
+    style: { display: 'none' },
+  });
+
   // Header with icon and status
   const tileHeader = el('div', {
     className: 'device-tile-header section-title',
@@ -89,6 +125,7 @@ function buildDeviceTile(device) {
   const tile = el('div', { className: 'device-tile card' }, [
     tileHeader,
     actionsRow,
+    scheduleContainer,
   ]);
 
   // Update status UI
@@ -99,7 +136,42 @@ function buildDeviceTile(device) {
     statusIconSpan.replaceChildren(statusIconNode(status));
   }
 
-  return { tile, updateStatus, deviceId: device.id };
+  // Zeitplan-Anzeige aktualisieren
+  function updateSchedule(data) {
+    scheduleContainer.replaceChildren();
+    if (!data) { scheduleContainer.style.display = 'none'; return; }
+
+    const rows = [];
+    if (data.nextWake) {
+      const formatted = formatNextExecution(data.nextWake);
+      if (formatted) {
+        rows.push(el('div', { className: 'schedule-row' }, [
+          iconEl('schedule', 14),
+          el('span', { className: 'schedule-label', textContent: t('schedule.nextWake') }),
+          el('span', { className: 'schedule-time', textContent: formatted }),
+        ]));
+      }
+    }
+    if (data.nextShutdown) {
+      const formatted = formatNextExecution(data.nextShutdown);
+      if (formatted) {
+        rows.push(el('div', { className: 'schedule-row' }, [
+          iconEl('schedule', 14),
+          el('span', { className: 'schedule-label', textContent: t('schedule.nextShutdown') }),
+          el('span', { className: 'schedule-time', textContent: formatted }),
+        ]));
+      }
+    }
+
+    if (rows.length > 0) {
+      scheduleContainer.style.display = '';
+      rows.forEach(r => scheduleContainer.appendChild(r));
+    } else {
+      scheduleContainer.style.display = 'none';
+    }
+  }
+
+  return { tile, updateStatus, updateSchedule, deviceId: device.id };
 }
 
 // ── Placeholder Section ──
@@ -166,8 +238,8 @@ export function renderStart(container) {
     }));
   } else {
     for (const device of devices) {
-      const { tile, updateStatus, deviceId } = buildDeviceTile(device);
-      tiles.push({ updateStatus, deviceId });
+      const { tile, updateStatus, updateSchedule, deviceId } = buildDeviceTile(device);
+      tiles.push({ updateStatus, updateSchedule, deviceId });
       page.appendChild(tile);
     }
   }
@@ -322,14 +394,32 @@ export function renderStart(container) {
   pollStatus();
   pollInterval = setInterval(pollStatus, 5000);
 
+  // ── Zeitplan-Polling ──
+  let scheduleInterval = null;
+
+  async function pollSchedules() {
+    if (destroyed || tiles.length === 0) return;
+    try {
+      const schedules = await api.getSchedules();
+      for (const tile of tiles) {
+        tile.updateSchedule(schedules[tile.deviceId] || null);
+      }
+    } catch { /* Zeitplan-Fehler still ignorieren */ }
+  }
+
+  pollSchedules();
+  scheduleInterval = setInterval(pollSchedules, 60000);
+
   // Pause polling when tab is hidden, resume when visible
   const onVisibilityChange = () => {
     if (destroyed) return;
     if (document.hidden) {
       if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
       if (piholePollInterval) { clearInterval(piholePollInterval); piholePollInterval = null; }
+      if (scheduleInterval) { clearInterval(scheduleInterval); scheduleInterval = null; }
     } else {
       if (!pollInterval) { pollStatus(); pollInterval = setInterval(pollStatus, 5000); }
+      if (!scheduleInterval) { pollSchedules(); scheduleInterval = setInterval(pollSchedules, 60000); }
       if (!piholePollInterval && piholeRefs) {
         piholePollInterval = setInterval(() => {
           if (destroyed) return;
@@ -356,6 +446,10 @@ export function renderStart(container) {
     if (piholePollInterval) {
       clearInterval(piholePollInterval);
       piholePollInterval = null;
+    }
+    if (scheduleInterval) {
+      clearInterval(scheduleInterval);
+      scheduleInterval = null;
     }
     document.removeEventListener('visibilitychange', onVisibilityChange);
   };
