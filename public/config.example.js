@@ -147,18 +147,18 @@ const siteConfig = {
 
       // Zeitplan: Automatisches Hoch-/Herunterfahren
       // Entferne die Kommentare um den Zeitplan zu aktivieren.
-      // schedule: {
-      //   wake: {
-      //     enabled: true,
-      //     days: ['mon', 'tue', 'wed', 'thu', 'fri'],
-      //     time: '07:30',
-      //   },
-      //   shutdown: {
-      //     enabled: true,
-      //     days: ['mon', 'tue', 'wed', 'thu', 'fri'],
-      //     time: '18:00',
-      //   },
-      // },
+      schedule: {
+        wake: {
+          enabled: true,
+          days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+          time: '07:30',
+        },
+        shutdown: {
+          enabled: true,
+          days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+          time: '18:00',
+        },
+      },
     },
     // Weiteres Beispiel: Linux-Server
     // {

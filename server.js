@@ -1460,6 +1460,7 @@ const DAY_MAP = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };
 
 // Aktive Cron-Jobs (werden bei Re-Init gestoppt)
 let schedulerJobs = [];
+let _lastScheduleHash = '';
 
 // Führt eine Scheduler-Aktion (wake/shutdown) für ein Gerät aus
 async function executeScheduledAction(device, action) {
@@ -1545,15 +1546,35 @@ function getNextExecution(days, time) {
   return null;
 }
 
-// Initialisiert alle Scheduler-Jobs aus der Config
+// Baut einen Hash-String aus den Schedule-Konfigurationen (erkennt Änderungen)
+function buildScheduleHash(configDevices) {
+  const parts = [];
+  for (const device of configDevices) {
+    if (!device.schedule) continue;
+    for (const action of ['wake', 'shutdown']) {
+      const s = device.schedule[action];
+      if (!s || !s.enabled) continue;
+      parts.push(`${device.id}:${action}:${s.time}:${(s.days || []).join(',')}`);
+    }
+  }
+  return parts.join('|');
+}
+
+// Initialisiert alle Scheduler-Jobs aus der Config (nur bei Änderung)
 function initScheduler() {
+  const configDevices = readControlDevicesFromConfig();
+  const newHash = buildScheduleHash(configDevices);
+
+  // Nichts tun wenn sich die Config nicht geändert hat
+  if (newHash === _lastScheduleHash) return;
+  _lastScheduleHash = newHash;
+
   // Alte Jobs stoppen
   for (const job of schedulerJobs) {
     job.stop();
   }
   schedulerJobs = [];
 
-  const configDevices = readControlDevicesFromConfig();
   let jobCount = 0;
 
   for (const device of configDevices) {
@@ -1583,6 +1604,8 @@ function initScheduler() {
 
   if (jobCount > 0) {
     console.log(`[Scheduler] ${jobCount} Zeitplan-Job(s) aktiv`);
+  } else {
+    console.log('[Scheduler] Keine Zeitpläne konfiguriert');
   }
 }
 
