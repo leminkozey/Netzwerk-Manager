@@ -209,6 +209,7 @@ const translations = {
     'credits.updateDone': 'Update abgeschlossen – Seite wird neu geladen',
     'credits.updateFailed': 'Update fehlgeschlagen',
     'credits.checking': 'Prüfe…',
+    'credits.checkFailed': 'Prüfung fehlgeschlagen',
 
     // Landing
     'landing.subtitle': 'Womit möchtest du starten?',
@@ -487,6 +488,7 @@ const translations = {
     'credits.updateDone': 'Update complete – reloading page',
     'credits.updateFailed': 'Update failed',
     'credits.checking': 'Checking…',
+    'credits.checkFailed': 'Check failed',
 
     'landing.subtitle': 'What would you like to do?',
     'landing.info': 'Info Center',

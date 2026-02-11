@@ -297,6 +297,10 @@ app.get('/config.js', (req, res) => {
     delete safe.pihole.url;
     delete safe.pihole.password;
   }
+  // Strip update commands – only expose the enabled flag
+  if (safe.settings?.update) {
+    delete safe.settings.update.commands;
+  }
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
   res.send(`const siteConfig = ${JSON.stringify(safe, null, 2)};\n`);
@@ -1508,9 +1512,12 @@ async function executeScheduledAction(device, action) {
 
 // Erstellt Cron-Pattern aus Tagen und Uhrzeit
 function buildCronPattern(days, time) {
+  if (typeof time !== 'string' || !time.includes(':')) return null;
+  if (!Array.isArray(days)) return null;
   const [hour, minute] = time.split(':').map(Number);
+  if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
   const cronDays = days
-    .map(d => DAY_MAP[d.toLowerCase()])
+    .map(d => typeof d === 'string' ? DAY_MAP[d.toLowerCase()] : undefined)
     .filter(d => d !== undefined)
     .join(',');
   if (!cronDays) return null;
@@ -1519,12 +1526,14 @@ function buildCronPattern(days, time) {
 
 // Berechnet den nächsten Ausführungszeitpunkt für einen Zeitplan
 function getNextExecution(days, time) {
+  if (typeof time !== 'string' || !time.includes(':')) return null;
+  if (!Array.isArray(days)) return null;
   const [hour, minute] = time.split(':').map(Number);
-  if (isNaN(hour) || isNaN(minute)) return null;
+  if (isNaN(hour) || isNaN(minute) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
 
   const now = new Date();
   const cronDays = days
-    .map(d => DAY_MAP[d.toLowerCase()])
+    .map(d => typeof d === 'string' ? DAY_MAP[d.toLowerCase()] : undefined)
     .filter(d => d !== undefined);
 
   if (cronDays.length === 0) return null;
@@ -2389,22 +2398,25 @@ app.get('/api/schedules', authRequired, (req, res) => {
 // Remote Update
 // ═══════════════════════════════════════════════════════════════════
 
+const { exec: execCb } = require('child_process');
+const { promisify } = require('util');
+const execAsync = promisify(execCb);
+let _updateRunning = false;
+
 // GET /api/update/check – prüft ob Updates via git verfügbar sind
-app.get('/api/update/check', authRequired, (req, res) => {
+app.get('/api/update/check', authRequired, async (req, res) => {
   const cfg = readSiteConfig();
   if (!cfg?.settings?.update?.enabled) {
     return res.status(403).json({ error: 'Update feature disabled' });
   }
-  // git fetch and compare HEAD with upstream
-  const { execSync } = require('child_process');
   try {
-    execSync('git fetch', { cwd: __dirname, timeout: 15000, stdio: 'pipe' });
-    const local = execSync('git rev-parse HEAD', { cwd: __dirname, timeout: 5000, stdio: 'pipe' }).toString().trim();
-    const remote = execSync('git rev-parse @{u}', { cwd: __dirname, timeout: 5000, stdio: 'pipe' }).toString().trim();
-    res.json({ upToDate: local === remote, local, remote });
+    await execAsync('git fetch', { cwd: __dirname, timeout: 15000 });
+    const { stdout: localHash } = await execAsync('git rev-parse HEAD', { cwd: __dirname, timeout: 5000 });
+    const { stdout: remoteHash } = await execAsync('git rev-parse @{u}', { cwd: __dirname, timeout: 5000 });
+    res.json({ upToDate: localHash.trim() === remoteHash.trim() });
   } catch (err) {
     console.error('[Update] Check failed:', err.message);
-    res.json({ upToDate: true, error: err.message });
+    res.status(500).json({ error: 'Check failed' });
   }
 });
 
@@ -2414,28 +2426,33 @@ app.post('/api/update/run', authRequired, async (req, res) => {
   if (!cfg?.settings?.update?.enabled) {
     return res.status(403).json({ error: 'Update feature disabled' });
   }
+  if (_updateRunning) {
+    return res.status(409).json({ error: 'Update already in progress' });
+  }
   const commands = cfg.settings.update.commands;
   if (!Array.isArray(commands) || commands.length === 0) {
     return res.status(400).json({ error: 'No commands configured' });
   }
 
-  const { execSync } = require('child_process');
+  _updateRunning = true;
   const results = [];
-  for (const cmd of commands) {
-    if (typeof cmd !== 'string' || !cmd.trim()) continue;
-    try {
-      const output = execSync(cmd, { cwd: __dirname, timeout: 30000, stdio: 'pipe' }).toString().trim();
-      results.push({ cmd, ok: true, output });
-      console.log(`[Update] ${cmd} → OK`);
-    } catch (err) {
-      const stderr = err.stderr ? err.stderr.toString().trim() : err.message;
-      results.push({ cmd, ok: false, output: stderr });
-      console.error(`[Update] ${cmd} → FAILED:`, stderr);
-      // stop on first error
-      return res.json({ ok: false, results });
+  try {
+    for (const cmd of commands) {
+      if (typeof cmd !== 'string' || !cmd.trim()) continue;
+      try {
+        await execAsync(cmd, { cwd: __dirname, timeout: 30000 });
+        results.push({ cmd, ok: true });
+        console.log(`[Update] ${cmd} → OK`);
+      } catch (err) {
+        results.push({ cmd, ok: false });
+        console.error(`[Update] ${cmd} → FAILED:`, err.stderr || err.message);
+        return res.json({ ok: false, results });
+      }
     }
+    res.json({ ok: true, results });
+  } finally {
+    _updateRunning = false;
   }
-  res.json({ ok: true, results });
 });
 
 // ═══════════════════════════════════════════════════════════════════

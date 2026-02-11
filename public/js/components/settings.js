@@ -652,8 +652,8 @@ function createCreditsPanel() {
         });
       }
     }).catch(() => {
-      statusEl.textContent = t('credits.upToDate');
-      statusEl.className = 'credits-update up-to-date';
+      statusEl.textContent = t('credits.checkFailed');
+      statusEl.className = 'credits-update check-failed';
     });
   }
 

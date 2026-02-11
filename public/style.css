@@ -1951,6 +1951,11 @@ label {
   color: #22c55e;
 }
 
+.credits-update.check-failed {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .credits-update.needs-update {
   color: #ef4444;
   background: rgba(239, 68, 68, 0.1);
