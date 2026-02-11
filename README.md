@@ -40,7 +40,9 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
    ```
 4. `public/config.js` anpassen (siehe [Konfiguration](#konfiguration))
 
-> **Hinweis bei Updates:** Beim Pullen neuer Versionen wird `config.js` auf die leere Standard-Konfiguration zurückgesetzt. Sichere deine `config.js` vorher und übertrage deine Einstellungen danach zurück.
+> **Empfehlung:** Kopiere immer die `config.example.js` als Ausgangspunkt. Sie enthält alle verfügbaren Optionen mit ausführlichen deutschen Kommentaren und sinnvollen Beispielwerten. Passe anschließend IPs, Passwörter und Geräte an dein Netzwerk an.
+
+> **Hinweis bei Updates:** Beim Pullen neuer Versionen kann sich `config.example.js` ändern (neue Features, neue Optionen). Vergleiche nach einem Update deine `config.js` mit der aktuellen `config.example.js` und übernimm neue Abschnitte bei Bedarf. Deine `config.js` wird durch Updates nicht überschrieben, solange sie in `.gitignore` steht.
 5. Server starten:
    ```bash
    node server.js
