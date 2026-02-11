@@ -436,6 +436,46 @@ function buildOutagesCardFromData(outages) {
 }
 
 // =================================================================
+// Outages – Mobile Layout
+// =================================================================
+
+const mobileQuery = window.matchMedia('(max-width: 900px)');
+
+function buildOutagesMobileCard(outages) {
+  if (outages.length === 0) {
+    return el('div', { className: 'card outages-mobile' }, [
+      sectionTitle(t('analysen.outages'), 'outage'),
+      el('div', {
+        textContent: t('analysen.noOutages'),
+        style: { padding: '20px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.88rem' },
+      }),
+    ]);
+  }
+
+  const rows = outages.map(d => {
+    const isOngoing = d.ongoing;
+    return el('div', { className: `outage-m-row${isOngoing ? ' ongoing' : ''}` }, [
+      el('div', { className: 'outage-m-left' }, [
+        el('div', { className: 'outage-m-icon', style: { color: isOngoing ? '#ef4444' : 'var(--accent-warm)' } }, [iconEl('outage', 16)]),
+        el('div', { className: 'outage-m-info' }, [
+          el('span', { className: 'outage-m-device', textContent: d.device }),
+          el('span', { className: 'outage-m-time', textContent: d.timestamp }),
+        ]),
+      ]),
+      el('span', {
+        className: `outage-m-badge${isOngoing ? ' ongoing' : ''}`,
+        textContent: isOngoing ? t('analysen.ongoing') : d.duration,
+      }),
+    ]);
+  });
+
+  return el('div', { className: 'card outages-mobile' }, [
+    sectionTitle(t('analysen.outages'), 'outage'),
+    el('div', { className: 'outage-m-list' }, rows),
+  ]);
+}
+
+// =================================================================
 // Ping Monitor Section
 // =================================================================
 
@@ -1060,6 +1100,18 @@ export function renderAnalysen(container) {
 
   // Outages element ref (may be replaced)
   let currentOutages = outagesPlaceholder || null;
+  let lastOutagesData = null;
+
+  // Rebuild outages card when viewport crosses the mobile breakpoint
+  const onBreakpointChange = () => {
+    if (!currentOutages || !lastOutagesData) return;
+    const newOutages = mobileQuery.matches
+      ? buildOutagesMobileCard(lastOutagesData)
+      : buildOutagesCardFromData(lastOutagesData);
+    currentOutages.replaceWith(newOutages);
+    currentOutages = newOutages;
+  };
+  mobileQuery.addEventListener('change', onBreakpointChange);
 
   // ── Render helpers (shared by fetch + WS push) ──
 
@@ -1086,7 +1138,10 @@ export function renderAnalysen(container) {
     }
 
     if (currentOutages && data && data.outages !== undefined) {
-      const newOutages = buildOutagesCardFromData(data.outages);
+      lastOutagesData = data.outages;
+      const newOutages = mobileQuery.matches
+        ? buildOutagesMobileCard(data.outages)
+        : buildOutagesCardFromData(data.outages);
       currentOutages.replaceWith(newOutages);
       currentOutages = newOutages;
     }
@@ -1314,6 +1369,7 @@ export function renderAnalysen(container) {
     window.removeEventListener('ws:connected', onWsConnected);
     window.removeEventListener('ws:disconnected', onWsDisconnected);
     document.removeEventListener('visibilitychange', onVisibilityChange);
+    mobileQuery.removeEventListener('change', onBreakpointChange);
     // Restore parent .page max-width for other pages
     if (parentPage) parentPage.style.maxWidth = '';
   };

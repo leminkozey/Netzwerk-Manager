@@ -3337,6 +3337,93 @@ label {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Outages – Mobile
+   ═══════════════════════════════════════════════════════════════════ */
+
+.outages-mobile {
+  display: flex;
+  flex-direction: column;
+}
+
+.outage-m-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.outage-m-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, rgba(255,255,255,0.03));
+  transition: background 0.15s;
+}
+
+.outage-m-row.ongoing {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.outage-m-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.outage-m-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.outage-m-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.outage-m-device {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outage-m-time {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.outage-m-badge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+  color: var(--accent-warm);
+  background: rgba(255, 107, 74, 0.1);
+  border: 1px solid rgba(255, 107, 74, 0.2);
+}
+
+.outage-m-badge.ongoing {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Ping Monitor
    ═══════════════════════════════════════════════════════════════════ */
 
