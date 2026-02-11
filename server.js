@@ -2450,6 +2450,11 @@ app.post('/api/update/run', authRequired, async (req, res) => {
       }
     }
     res.json({ ok: true, results });
+
+    // Verzögerter Neustart – gibt dem Browser Zeit die Antwort zu empfangen
+    // systemd/pm2 startet den Prozess automatisch neu
+    console.log('[Update] Alle Befehle erfolgreich. Server wird in 3s neu gestartet…');
+    setTimeout(() => process.exit(0), 3000);
   } finally {
     _updateRunning = false;
   }

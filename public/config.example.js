@@ -63,6 +63,8 @@ const siteConfig = {
     //
     // ACHTUNG: Die Befehle werden mit den Rechten des Server-Prozesses
     // ausgeführt. Nur vertrauenswürdige Befehle eintragen!
+    // Nach erfolgreichem Update startet der Server sich automatisch neu
+    // (systemd/pm2 startet den Prozess). Kein manueller Restart nötig.
     update: {
       enabled: false,           // true = Update-Funktion im Credits-Tab anzeigen
       commands: [               // Befehle die nacheinander ausgeführt werden
