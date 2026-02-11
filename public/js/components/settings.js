@@ -605,21 +605,60 @@ function createUserPanel() {
 
 // ── Credits Panel ──
 function createCreditsPanel() {
+  const cfg = getConfig();
+  const updateEnabled = cfg?.settings?.update?.enabled === true;
+
+  const children = [
+    el('img', { className: 'credits-avatar', src: 'https://github.com/leminkozey.png', alt: 'leminkozey' }),
+    el('span', { className: 'credits-label', textContent: 'made by' }),
+    el('a', { className: 'credits-name', href: 'https://github.com/leminkozey', target: '_blank', rel: 'noopener', textContent: 'leminkozey' }),
+    el('span', { className: 'credits-version', textContent: 'v3.0.0' }),
+  ];
+
+  if (updateEnabled) {
+    const statusEl = el('span', {
+      className: 'credits-update checking',
+      textContent: t('credits.checking'),
+    });
+    children.push(statusEl);
+
+    // Check for updates
+    api.checkUpdate().then(data => {
+      if (data.upToDate) {
+        statusEl.textContent = t('credits.upToDate');
+        statusEl.className = 'credits-update up-to-date';
+      } else {
+        statusEl.textContent = t('credits.getUpToDate');
+        statusEl.className = 'credits-update needs-update';
+        statusEl.style.cursor = 'pointer';
+        statusEl.addEventListener('click', async () => {
+          if (statusEl.classList.contains('running')) return;
+          statusEl.classList.add('running');
+          statusEl.textContent = t('credits.updating');
+          try {
+            const result = await api.runUpdate();
+            if (result.ok) {
+              statusEl.textContent = t('credits.updateDone');
+              statusEl.className = 'credits-update up-to-date';
+              setTimeout(() => location.reload(), 2000);
+            } else {
+              statusEl.textContent = t('credits.updateFailed');
+              statusEl.className = 'credits-update needs-update';
+            }
+          } catch {
+            statusEl.textContent = t('credits.updateFailed');
+            statusEl.className = 'credits-update needs-update';
+          }
+        });
+      }
+    }).catch(() => {
+      statusEl.textContent = t('credits.upToDate');
+      statusEl.className = 'credits-update up-to-date';
+    });
+  }
+
   return el('div', { className: 'settings-panel', id: 'panel-credits' }, [
-    el('div', { className: 'credits-content' }, [
-      el('img', { className: 'credits-avatar', src: 'https://github.com/leminkozey.png', alt: 'leminkozey' }),
-      el('span', { className: 'credits-label', textContent: 'made by' }),
-      el('a', { className: 'credits-name', href: 'https://github.com/leminkozey', target: '_blank', rel: 'noopener', textContent: 'leminkozey' }),
-      el('span', { className: 'credits-version', textContent: 'v3.0.0' }),
-      el('a', {
-        className: 'credits-repo',
-        href: 'https://github.com/leminkozey/netzwerk-manager',
-        target: '_blank',
-        rel: 'noopener',
-        textContent: t('credits.stayUpdated'),
-        'data-i18n': 'credits.stayUpdated',
-      }),
-    ]),
+    el('div', { className: 'credits-content' }, children),
   ]);
 }
 

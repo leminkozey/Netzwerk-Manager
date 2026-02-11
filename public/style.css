@@ -1934,6 +1934,39 @@ label {
   text-decoration: underline;
 }
 
+.credits-update {
+  display: inline-block;
+  padding: 6px 16px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 20px;
+  transition: all 0.2s;
+}
+
+.credits-update.checking {
+  color: var(--text-muted);
+}
+
+.credits-update.up-to-date {
+  color: #22c55e;
+}
+
+.credits-update.needs-update {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  cursor: pointer;
+}
+
+.credits-update.needs-update:hover {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.credits-update.running {
+  color: var(--accent);
+  cursor: wait;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Overlays
    ═══════════════════════════════════════════════════════════════════ */

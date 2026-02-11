@@ -2386,6 +2386,59 @@ app.get('/api/schedules', authRequired, (req, res) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
+// Remote Update
+// ═══════════════════════════════════════════════════════════════════
+
+// GET /api/update/check – prüft ob Updates via git verfügbar sind
+app.get('/api/update/check', authRequired, (req, res) => {
+  const cfg = readSiteConfig();
+  if (!cfg?.settings?.update?.enabled) {
+    return res.status(403).json({ error: 'Update feature disabled' });
+  }
+  // git fetch and compare HEAD with upstream
+  const { execSync } = require('child_process');
+  try {
+    execSync('git fetch', { cwd: __dirname, timeout: 15000, stdio: 'pipe' });
+    const local = execSync('git rev-parse HEAD', { cwd: __dirname, timeout: 5000, stdio: 'pipe' }).toString().trim();
+    const remote = execSync('git rev-parse @{u}', { cwd: __dirname, timeout: 5000, stdio: 'pipe' }).toString().trim();
+    res.json({ upToDate: local === remote, local, remote });
+  } catch (err) {
+    console.error('[Update] Check failed:', err.message);
+    res.json({ upToDate: true, error: err.message });
+  }
+});
+
+// POST /api/update/run – führt die konfigurierten Update-Befehle aus
+app.post('/api/update/run', authRequired, async (req, res) => {
+  const cfg = readSiteConfig();
+  if (!cfg?.settings?.update?.enabled) {
+    return res.status(403).json({ error: 'Update feature disabled' });
+  }
+  const commands = cfg.settings.update.commands;
+  if (!Array.isArray(commands) || commands.length === 0) {
+    return res.status(400).json({ error: 'No commands configured' });
+  }
+
+  const { execSync } = require('child_process');
+  const results = [];
+  for (const cmd of commands) {
+    if (typeof cmd !== 'string' || !cmd.trim()) continue;
+    try {
+      const output = execSync(cmd, { cwd: __dirname, timeout: 30000, stdio: 'pipe' }).toString().trim();
+      results.push({ cmd, ok: true, output });
+      console.log(`[Update] ${cmd} → OK`);
+    } catch (err) {
+      const stderr = err.stderr ? err.stderr.toString().trim() : err.message;
+      results.push({ cmd, ok: false, output: stderr });
+      console.error(`[Update] ${cmd} → FAILED:`, stderr);
+      // stop on first error
+      return res.json({ ok: false, results });
+    }
+  }
+  res.json({ ok: true, results });
+});
+
+// ═══════════════════════════════════════════════════════════════════
 // Generic Control Device Endpoints
 // ═══════════════════════════════════════════════════════════════════
 

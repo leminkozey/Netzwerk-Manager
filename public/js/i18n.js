@@ -203,6 +203,12 @@ const translations = {
     'link.website': 'Zur Website',
     'link.websiteVpn': 'Zur Website (VPN)',
     'credits.stayUpdated': 'Bleibe immer aktuell',
+    'credits.upToDate': 'Up to date',
+    'credits.getUpToDate': 'Get up to date',
+    'credits.updating': 'Wird aktualisiert…',
+    'credits.updateDone': 'Update abgeschlossen – Seite wird neu geladen',
+    'credits.updateFailed': 'Update fehlgeschlagen',
+    'credits.checking': 'Prüfe…',
 
     // Landing
     'landing.subtitle': 'Womit möchtest du starten?',
@@ -475,6 +481,12 @@ const translations = {
     'link.website': 'Go to website',
     'link.websiteVpn': 'Go to website (VPN)',
     'credits.stayUpdated': 'Stay up to date',
+    'credits.upToDate': 'Up to date',
+    'credits.getUpToDate': 'Get up to date',
+    'credits.updating': 'Updating…',
+    'credits.updateDone': 'Update complete – reloading page',
+    'credits.updateFailed': 'Update failed',
+    'credits.checking': 'Checking…',
 
     'landing.subtitle': 'What would you like to do?',
     'landing.info': 'Info Center',

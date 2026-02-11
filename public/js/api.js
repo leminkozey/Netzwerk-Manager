@@ -298,3 +298,15 @@ export async function getSchedules() {
   return res.json();
 }
 
+export async function checkUpdate() {
+  const res = await request('/api/update/check');
+  if (!res.ok) throw new Error('Failed to check update');
+  return res.json();
+}
+
+export async function runUpdate() {
+  const res = await request('/api/update/run', { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to run update');
+  return res.json();
+}
+

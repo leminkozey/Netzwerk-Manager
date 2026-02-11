@@ -54,6 +54,23 @@ const siteConfig = {
       user: true,               // User-Tab (Benutzername/Passwort ändern, Logout)
       // credits: immer sichtbar (kann nicht deaktiviert werden)
     },
+
+    // ── Remote Update ──
+    // Ermöglicht das Aktualisieren der Website direkt über die Einstellungen
+    // (Credits-Tab). Zeigt den Status "Up to date" oder "Get up to date" an.
+    // Bei Klick auf "Get up to date" werden die konfigurierten Befehle
+    // nacheinander auf dem Server ausgeführt.
+    //
+    // ACHTUNG: Die Befehle werden mit den Rechten des Server-Prozesses
+    // ausgeführt. Nur vertrauenswürdige Befehle eintragen!
+    update: {
+      enabled: false,           // true = Update-Funktion im Credits-Tab anzeigen
+      commands: [               // Befehle die nacheinander ausgeführt werden
+        'git stash',
+        'git pull',
+        'git stash pop',
+      ],
+    },
   },
 
   // ┌─────────────────────────────────────────────┐
