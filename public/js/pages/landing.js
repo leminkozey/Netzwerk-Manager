@@ -28,6 +28,22 @@ function randomGreeting() {
 export function renderLanding(container) {
   const page = el('div', { className: 'landing-page' });
 
+  // ── Animated GIF above title (accent-colored via CSS mask) ──
+  const cfg0 = getConfig();
+  const gifSrc = cfg0?.landingGif;
+  if (gifSrc) {
+    const gifSize = (cfg0?.landingGifSize ?? 200) + 'px';
+    page.appendChild(el('div', {
+      className: 'landing-gif',
+      style: {
+        width: gifSize,
+        height: gifSize,
+        WebkitMaskImage: `url(${gifSrc})`,
+        maskImage: `url(${gifSrc})`,
+      },
+    }));
+  }
+
   // ── "Lokales Netzwerk" title ──
   page.appendChild(el('h1', { className: 'landing-title', textContent: t('app.title') }));
 

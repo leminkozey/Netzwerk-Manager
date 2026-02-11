@@ -2642,6 +2642,30 @@ label {
   padding: 80px 32px 40px;
 }
 
+/* Animated GIF above landing title – accent-colored via CSS mask */
+.landing-gif {
+  display: block;
+  width: 200px;
+  height: 200px;
+  margin: 0 auto 8px;
+  background: var(--accent);
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  animation: gifFadeIn 1s var(--ease-out-expo) both;
+}
+
+@keyframes gifFadeIn {
+  from { opacity: 0; transform: scale(0.8) translateY(20px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 /* "Lokales Netzwerk" big gradient title */
 .landing-title {
   margin: 0 0 16px;

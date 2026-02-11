@@ -18,6 +18,7 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Multi-Language** – Deutsch und Englisch
 - **Theming** – Dark, Light und System-Theme mit anpassbarer Akzentfarbe
 - **Eigene Willkommensnachrichten** – Begrüßungstexte auf der Landing Page konfigurierbar
+- **Landing GIF** – Animiertes Bild über dem Titel, automatisch in der Akzentfarbe eingefärbt (eigene GIFs möglich)
 - **Landing Page Buttons** – Info-, Control- und Analysen-Button einzeln ein-/ausblendbar
 - **Analysen-Sektionen** – Speedtest, Uptime, Ausfälle, Ping Monitor und Pi-hole einzeln ein-/ausblendbar
 - **Pi-hole Ein/Aus** – DNS Analytics komplett per Config deaktivierbar
@@ -195,6 +196,135 @@ settings: {
 ```
 
 ### Landing Page
+
+#### Landing GIF (`landingGif`, `landingGifSize`)
+
+Zeigt ein animiertes Bild über dem Seitentitel an. Das Bild wird automatisch in der aktuellen Akzentfarbe eingefärbt – egal ob Dark Mode, Light Mode oder eine eigene Farbe.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `landingGif` | `string \| false` | `'landing-gif.png'` | Pfad zum animierten Bild (relativ zu `public/`). `false` = kein GIF. |
+| `landingGifSize` | `number` | `200` | Breite und Höhe in Pixel. |
+
+```js
+landingGif: 'landing-gif.png',
+landingGifSize: 200,
+```
+
+##### Eigenes Landing-GIF erstellen
+
+Das GIF wird auf der Seite nicht direkt angezeigt, sondern als CSS-Maske benutzt.
+Das bedeutet: die hellen Pixel im GIF bestimmen, wo die Akzentfarbe sichtbar wird.
+Dafür muss das GIF zuerst mit einem Script vorbereitet werden.
+
+**1. Ein passendes GIF finden**
+
+Du brauchst ein animiertes GIF mit **hellem/weißem Inhalt auf schwarzem Hintergrund**.
+
+So findest du eins:
+- Suche auf Seiten wie [Tenor](https://tenor.com), [GIPHY](https://giphy.com) oder [Pinterest](https://pinterest.com)
+  nach z.B. `globe animation black background`, `network animation dark`, `loading animation black`
+- Achte darauf, dass das Motiv **weiß/hell** ist und der **Hintergrund schwarz**
+- Das Motiv kann alles sein: ein Globus, ein Netzwerk, ein Logo, Partikel, Text, etc.
+
+Beispiel – so sollte das Original-GIF aussehen:
+```
+┌──────────────────────┐
+│ ██████████████████   │  ← Schwarzer Hintergrund
+│ ████░░⬜⬜░░████   │
+│ ██░░⬜⬜⬜⬜░░██   │  ← Weißes Motiv (z.B. Globus)
+│ ████░░⬜⬜░░████   │
+│ ██████████████████   │
+└──────────────────────┘
+```
+
+> **Wichtig:** Bunte GIFs oder GIFs mit hellem/weißem Hintergrund funktionieren **nicht**.
+> Der Hintergrund muss schwarz (oder sehr dunkel) sein, das Motiv weiß (oder hell).
+
+**2. Python und Pillow installieren (einmalig)**
+
+Das Vorbereitungs-Script braucht Python 3 und die Bibliothek Pillow:
+
+```bash
+pip install Pillow
+```
+
+**3. GIF mit dem Script vorbereiten**
+
+Im Projektordner (dort wo auch `server.js` und `package.json` liegen) befindet sich
+`prepare-gif.py`. **Wichtig:** Starte das Script aus diesem Ordner heraus, sonst
+kann es die fertige Datei nicht in `public/` ablegen.
+
+Das Script macht automatisch folgendes:
+- Schwarze Pixel → werden transparent
+- Weiße/helle Pixel → bleiben als Maske erhalten
+- Das GIF wird auf die gewünschte Größe skaliert
+- Das Ergebnis wird als APNG (animiertes PNG mit Transparenz) in `public/` gespeichert
+
+Das GIF kann irgendwo auf deinem Computer liegen (Desktop, Downloads, etc.) –
+du gibst einfach den Pfad als Argument mit. Das Script muss aber aus dem
+Projektordner heraus gestartet werden, damit die fertige Datei in `public/` landet.
+
+```bash
+cd /pfad/zum/Netzwerk-Manager
+
+# GIF vom Desktop vorbereiten (Standard 200px):
+python3 prepare-gif.py ~/Desktop/mein-gif.gif
+
+# GIF aus Downloads mit eigener Größe (300px):
+python3 prepare-gif.py ~/Downloads/animation.gif 300
+```
+
+Am Ende gibt das Script aus, was in `config.js` eingetragen werden muss:
+```
+Fertig: public/mein-gif-prepared.png (1520 KB)
+
+Jetzt in config.js eintragen:
+  landingGif: 'mein-gif-prepared.png',
+  landingGifSize: 200,
+```
+
+**4. In config.js eintragen**
+
+Das Script legt die fertige Datei automatisch in `public/` ab – also dort wo auch
+`index.html`, `style.css` und die anderen Website-Dateien liegen. Du musst die
+Datei nicht manuell verschieben.
+
+Öffne `public/config.js` und trage den Dateinamen und die Größe ein:
+
+```js
+landingGif: 'mein-gif-prepared.png',
+landingGifSize: 200,
+```
+
+Fertig – beim nächsten Laden der Seite wird das GIF über dem Titel in der aktuellen Akzentfarbe angezeigt.
+
+> **Tipp:** Das Script funktioniert mit jedem Schwarz-Weiß-GIF – egal welches Motiv.
+> Es erkennt automatisch helle und dunkle Pixel. Du kannst jederzeit ein anderes GIF
+> vorbereiten und den Pfad in `config.js` ändern.
+
+##### Wie funktioniert die Einfärbung?
+
+Das Bild wird nicht direkt angezeigt, sondern als [CSS-Maske](https://developer.mozilla.org/en-US/docs/Web/CSS/mask-image) verwendet:
+
+```
+┌────────────────────────┐
+│ Hintergrund: Akzent-   │  ← Div mit var(--accent)
+│ farbe (z.B. #ff6b9d) │
+└────────────────────────┘
+          ×
+┌────────────────────────┐
+│ Maske: Dein APNG       │  ← Weiß = sichtbar
+│   ░░░⬜⬜⬜░░░          │     Transparent = versteckt
+└────────────────────────┘
+          =
+┌────────────────────────┐
+│ Ergebnis:              │  ← Akzentfarbe nur wo
+│   ░░░🟪🟪🟪░░░          │     die Maske weiß ist
+└────────────────────────┘
+```
+
+Dadurch passt sich die Farbe automatisch an, wenn du die Akzentfarbe in den Einstellungen änderst.
 
 #### Buttons (`buttons`)
 

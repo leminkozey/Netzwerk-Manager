@@ -79,6 +79,14 @@ const siteConfig = {
   // │             LANDING PAGE                    │
   // └─────────────────────────────────────────────┘
 
+  // ── Landing GIF ──
+  // Animiertes Bild über dem Titel. Wird automatisch in der Akzentfarbe eingefärbt.
+  // Das Bild muss vorbereitet sein: weißer/heller Inhalt auf transparentem Hintergrund
+  // (wird als CSS-Maske genutzt, siehe README → "Eigenes Landing-GIF").
+  // Unterstützt GIF, APNG, WebP. false = kein GIF anzeigen.
+  landingGif: 'landing-gif.png',    // Pfad zum animierten Bild (relativ zu /public)
+  landingGifSize: 200,              // Größe in Pixel (Breite und Höhe)
+
   // ── Buttons ──
   // Navigations-Buttons auf der Landing Page ein-/ausblenden.
   buttons: {

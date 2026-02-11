@@ -5,6 +5,10 @@ node_modules/
 Data/
 public/config.js
 
+# Landing GIF (jeder erstellt sein eigenes, siehe README)
+public/landing-gif.png
+public/*-prepared.png
+
 # macOS
 .DS_Store
 
