@@ -10,6 +10,7 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Speed-Test** – Download, Upload und Ping im lokalen Netzwerk messen
 - **Uptime Monitoring** – Geräte per Ping überwachen mit Live-Status
 - **Control Center** – Geräte per Wake-on-LAN, SSH-Shutdown und SSH-Restart steuern
+- **WOL-Zeitplan** – Automatisches Hochfahren und Herunterfahren von Geräten nach konfigurierbarem Zeitplan (Cron-basiert)
 - **Pi-hole DNS Analytics** – Statistiken, Top-Domains und Query-Verlauf direkt im Dashboard
 - **Pi-hole Blocking Toggle** – DNS-Blocking per Knopfdruck pausieren und fortsetzen
 - **Versionshistorie** – Alle Änderungen automatisch versioniert und nachvollziehbar
@@ -319,6 +320,103 @@ controlDevices: [
   },
 ],
 ```
+
+### WOL-Zeitplan (`schedule`)
+
+Automatisches Hochfahren (Wake-on-LAN) und Herunterfahren (SSH-Shutdown) von Geräten zu festgelegten Zeiten. Der Zeitplan wird direkt im `controlDevices`-Eintrag als optionaler `schedule`-Block konfiguriert.
+
+> **Wichtig:** Der Server muss laufen, damit Zeitpläne ausgeführt werden. Die Konfiguration erfolgt ausschließlich über `config.js` – eine UI-Bearbeitung ist für eine zukünftige Version geplant.
+
+#### Aufbau
+
+Der `schedule`-Block wird innerhalb eines `controlDevices`-Eintrags platziert:
+
+```js
+controlDevices: [
+  {
+    id: 'windowspc',
+    name: 'Windows PC',
+    icon: 'windowsColor',
+    type: 'ssh-windows',
+    ip: '192.168.1.50',
+    actions: ['wake', 'restart', 'shutdown'],
+    schedule: {
+      wake: {
+        enabled: true,
+        days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        time: '07:30',
+      },
+      shutdown: {
+        enabled: true,
+        days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        time: '18:00',
+      },
+    },
+  },
+],
+```
+
+#### Optionen
+
+Jeder Schedule-Eintrag (`wake` und/oder `shutdown`) hat folgende Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `enabled` | `boolean` | Zeitplan aktivieren (`true`) oder deaktivieren (`false`). |
+| `days` | `array` | Wochentage als Kurzform: `'mon'`, `'tue'`, `'wed'`, `'thu'`, `'fri'`, `'sat'`, `'sun'`. |
+| `time` | `string` | Uhrzeit im 24-Stunden-Format, z.B. `'07:30'` oder `'18:00'`. |
+
+#### Voraussetzungen
+
+| Aktion | Voraussetzung |
+|--------|--------------|
+| `wake` | Eine **MAC-Adresse** muss für das Gerät in den Einstellungen konfiguriert sein. Der Server sendet ein Wake-on-LAN Magic Packet an die Broadcast-Adresse. |
+| `shutdown` | **SSH-Zugangsdaten** (Benutzer, Passwort, Port) müssen in den Einstellungen konfiguriert sein. Der Server verbindet sich per SSH und führt den Shutdown-Befehl aus. |
+
+#### Funktionsweise
+
+1. **Server-Start:** Der Server liest die `config.js` und erstellt für jeden aktiven Zeitplan einen Cron-Job (basierend auf [`node-cron`](https://www.npmjs.com/package/node-cron)).
+2. **Automatische Ausführung:** Zum konfigurierten Zeitpunkt wird die entsprechende Aktion ausgeführt – Wake-on-LAN Paket senden oder SSH-Shutdown-Befehl.
+3. **Config-Reload:** Alle 60 Sekunden prüft der Server ob sich die Schedule-Konfiguration geändert hat. Nur bei tatsächlichen Änderungen werden die Cron-Jobs neu erstellt – kein Server-Neustart nötig.
+4. **Logging:** Jede Ausführung wird in der Server-Konsole protokolliert:
+   ```
+   [Scheduler] wake für Windows PC wird ausgeführt (07:30)
+   [Scheduler] Wake-on-LAN für Windows PC gesendet (MAC: AA:BB:CC:DD:EE:FF)
+   ```
+
+#### Frontend-Anzeige
+
+Im Control Center wird unter jedem Gerät mit aktivem Zeitplan die nächste geplante Aktion angezeigt:
+
+- **Heute 07:30** – wenn die nächste Ausführung heute ist
+- **Morgen 18:00** – wenn die nächste Ausführung morgen ist
+- **Mi 07:30** – Wochentag bei weiter entfernten Terminen
+
+Die Anzeige aktualisiert sich automatisch alle 60 Sekunden. Geräte ohne Zeitplan zeigen keine zusätzliche Info.
+
+#### API-Endpoint
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|--------------|
+| `GET` | `/api/schedules` | Ja | Gibt die nächsten geplanten Aktionen pro Gerät zurück. |
+
+**Response-Format:**
+```json
+{
+  "windowspc": {
+    "nextWake": "2026-02-12T07:30:00.000Z",
+    "nextShutdown": "2026-02-11T18:00:00.000Z"
+  }
+}
+```
+
+Geräte ohne Zeitplan erscheinen nicht in der Response.
+
+#### Rückwärtskompatibilität
+
+Der `schedule`-Block ist **komplett optional**. Bestehende Konfigurationen ohne `schedule` funktionieren weiterhin ohne Änderung.
+
+---
 
 ### Analysen Center
 
