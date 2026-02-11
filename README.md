@@ -19,8 +19,11 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Theming** – Dark, Light und System-Theme mit anpassbarer Akzentfarbe
 - **Eigene Willkommensnachrichten** – Begrüßungstexte auf der Landing Page konfigurierbar
 - **Landing Page Buttons** – Info-, Control- und Analysen-Button einzeln ein-/ausblendbar
-- **Analysen-Sektionen** – Speedtest, Uptime und Ausfälle einzeln ein-/ausblendbar
+- **Analysen-Sektionen** – Speedtest, Uptime, Ausfälle, Ping Monitor und Pi-hole einzeln ein-/ausblendbar
 - **Pi-hole Ein/Aus** – DNS Analytics komplett per Config deaktivierbar
+- **Ping Monitor** – Latenz-Messung zu externen Hosts (z.B. Google DNS, Cloudflare) mit Live-Chart und Statistiken
+- **Remote Update** – Automatisches Aktualisieren direkt über die Einstellungen (Credits-Tab) mit konfigurierbaren Befehlen
+- **Responsive Outages** – Ausfälle-Card passt sich automatisch an mobile Bildschirme an
 
 ## Voraussetzungen
 
@@ -163,6 +166,30 @@ settings: {
     daten: true,
     session: true,
     user: true,
+  },
+},
+```
+
+#### Remote Update (`settings.update`)
+
+Ermöglicht das Aktualisieren der Website direkt über die Einstellungen (Credits-Tab). Zeigt den Status "Up to date" oder "Get up to date" an. Bei Klick werden die konfigurierten Befehle nacheinander auf dem Server ausgeführt.
+
+> **Achtung:** Die Befehle werden mit den Rechten des Server-Prozesses ausgeführt. Nur vertrauenswürdige Befehle eintragen! Nach erfolgreichem Update startet der Server sich automatisch neu (systemd/pm2).
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `enabled` | `boolean` | `false` | Update-Funktion im Credits-Tab anzeigen. |
+| `commands` | `array` | `[]` | Befehle die nacheinander ausgeführt werden. |
+
+```js
+settings: {
+  update: {
+    enabled: false,
+    commands: [
+      'git stash',
+      'git pull',
+      'git stash pop',
+    ],
   },
 },
 ```
@@ -429,14 +456,18 @@ Einzelne Sektionen auf der Analysen-Seite ein- oder ausblenden.
 | Sektion | Default | Beschreibung |
 |---------|---------|--------------|
 | `speedtest` | `true` | Internet-Geschwindigkeit (Speed-Test). |
-| `outages` | `true` | Ausfälle-Card. |
+| `outages` | `true` | Ausfälle-Card (responsiv auf Mobil). |
 | `uptime` | `true` | Uptime-Monitoring-Cards. |
+| `pingMonitor` | `true` | Ping-Monitor (Latenz-Messung). |
+| `pihole` | `true` | Pi-hole DNS Analytics. |
 
 ```js
 analysen: {
   speedtest: true,
   outages: true,
   uptime: true,
+  pingMonitor: true,
+  pihole: true,
 },
 ```
 
@@ -499,6 +530,35 @@ pihole: {
 
 // Auf Root-Ebene:
 piholeInterval: 60,
+```
+
+#### Ping Monitor (`pingMonitor`)
+
+Misst die Latenz (ms) zu externen Hosts per ICMP-Ping. Im Analysen Center werden pro Host der aktuelle Ping, Durchschnitt, Min, Max und Paketverlust angezeigt, zusammen mit einem kombinierten Latenz-Chart.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `enabled` | `boolean` | `true` | `false` → Ping Monitor komplett deaktiviert. |
+| `interval` | `number` | `30` | Ping-Intervall in Sekunden (Minimum: 10). |
+| `hosts` | `array` | `[]` | Liste der zu pingenden Hosts. |
+
+Jeder Host hat folgende Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | `string` | Eindeutiger Schlüssel (lowercase, keine Leerzeichen). |
+| `name` | `string` | Anzeigename im Frontend. |
+| `ip` | `string` | IP-Adresse des Hosts. |
+
+```js
+pingMonitor: {
+  enabled: true,
+  interval: 30,
+  hosts: [
+    { id: 'google',     name: 'Google DNS',     ip: '8.8.8.8' },
+    { id: 'cloudflare', name: 'Cloudflare DNS', ip: '1.1.1.1' },
+  ],
+},
 ```
 
 ---
