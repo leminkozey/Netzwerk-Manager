@@ -2102,16 +2102,21 @@ app.post('/api/settings/credentials', authRequired, async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
+  if (typeof username !== 'string' || typeof password !== 'string') {
+    return res.status(400).json({ error: 'Username and password must be strings' });
+  }
+  if (username.length > 64 || password.length > 256) {
+    return res.status(400).json({ error: 'Username or password too long' });
+  }
   if (password.length < 4) {
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
 
   const clientIp = getClientIp(req);
-  let oldUsername;
 
-  await withStateLock(() => {
+  const oldUsername = await withStateLock(() => {
     const state = readState();
-    oldUsername = state.credentials.username;
+    const prevUsername = state.credentials.username;
     state.credentials.username = username;
     // Hash the password for secure storage
     state.credentials.password = hashPassword(password);
@@ -2122,11 +2127,14 @@ app.post('/api/settings/credentials', authRequired, async (req, res) => {
     });
     // Invalidate active session to force re-login with new credentials
     runtime.activeSession = null;
-    res.json({ ok: true, username, sessionInvalidated: true });
+    return prevUsername;
   });
 
+  res.json({ ok: true, username, sessionInvalidated: true });
+
   // Send notification email (fire-and-forget, after response)
-  sendCredentialsChangedEmail(oldUsername, username, clientIp).catch(() => {});
+  sendCredentialsChangedEmail(oldUsername, username, clientIp)
+    .catch(err => console.error('[Notification] Unexpected credentials-mail error:', err.message));
 });
 
 app.post('/api/speedport', authRequired, async (req, res) => {
