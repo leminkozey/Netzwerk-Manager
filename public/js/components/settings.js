@@ -85,7 +85,7 @@ function createSidebar() {
     ...(hasControlDevices ? [{ id: 'control', icon: 'start', label: t('settings.controlDevices') }] : []),
     { id: 'daten', icon: 'copy', label: t('settings.data') },
     { id: 'session', icon: 'uptime', label: t('settings.session') },
-    { id: 'user', icon: 'settings', label: t('settings.user') },
+    { id: 'user', icon: 'user', label: t('settings.user') },
     { id: 'credits', icon: 'info', label: t('settings.credits') },
   ];
 
