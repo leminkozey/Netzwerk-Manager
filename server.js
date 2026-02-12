@@ -303,16 +303,8 @@ app.get('/config.js', (req, res) => {
   if (safe.settings?.update) {
     delete safe.settings.update.commands;
   }
-  if (safe.notifications?.smtp) {
-    delete safe.notifications.smtp.user;
-    delete safe.notifications.smtp.pass;
-    delete safe.notifications.smtp.host;
-    delete safe.notifications.smtp.port;
-    delete safe.notifications.smtp.secure;
-  }
   if (safe.notifications) {
-    delete safe.notifications.from;
-    delete safe.notifications.to;
+    safe.notifications = { enabled: !!safe.notifications.enabled };
   }
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
@@ -940,8 +932,8 @@ function createMailTransporter(smtp) {
   if (!nodemailer) return null;
   return nodemailer.createTransport({
     host: smtp.host,
-    port: smtp.port || 587,
-    secure: smtp.secure ?? false,
+    port: Number(smtp.port) || 587,
+    secure: smtp.secure === true,
     auth: { user: smtp.user, pass: smtp.pass },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
@@ -952,7 +944,7 @@ function createMailTransporter(smtp) {
 function buildOfflineEmailHtml(deviceName, deviceIp, timestamp) {
   const name = escapeHtml(deviceName);
   const ip = escapeHtml(deviceIp);
-  const time = formatTimestamp(timestamp);
+  const time = escapeHtml(formatTimestamp(timestamp));
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#06080f;font-family:Arial,Helvetica,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#06080f;padding:32px 0;">
 <tr><td align="center">
@@ -983,7 +975,7 @@ function buildOfflineEmailHtml(deviceName, deviceIp, timestamp) {
 function buildOnlineEmailHtml(deviceName, deviceIp, timestamp, outageDurationMs) {
   const name = escapeHtml(deviceName);
   const ip = escapeHtml(deviceIp);
-  const time = formatTimestamp(timestamp);
+  const time = escapeHtml(formatTimestamp(timestamp));
   const duration = escapeHtml(outageDurationMs ? formatDuration(outageDurationMs) : '–');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#06080f;font-family:Arial,Helvetica,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#06080f;padding:32px 0;">
@@ -1021,16 +1013,20 @@ async function sendNotificationEmail(eventType, deviceName, deviceIp, timestamp,
   // Check event filter
   if (config.events && config.events[eventType] === false) return;
 
-  // Check cooldown
-  const cooldownMs = (config.cooldownMinutes || 5) * 60000;
+  // Check cooldown (use ?? so cooldownMinutes: 0 disables cooldown intentionally)
+  const cooldownMs = (config.cooldownMinutes ?? 5) * 60000;
   const deviceKey = `${deviceName}:${deviceIp}`;
   if (isNotificationCooldownActive(deviceKey, eventType, cooldownMs)) {
     console.log(`[Notification] Cooldown aktiv, E-Mail übersprungen (${deviceName} ${eventType})`);
     return;
   }
 
-  // Build email (strip control chars from name to prevent SMTP header injection)
-  const safeName = deviceName.replace(/[\r\n\0]/g, '');
+  // Set cooldown optimistically before sending to prevent duplicates on flapping
+  setNotificationCooldown(deviceKey, eventType);
+
+  // Build email (strip control chars to prevent SMTP header injection)
+  const stripCRLF = s => String(s).replace(/[\r\n\0]/g, '');
+  const safeName = stripCRLF(deviceName);
   const subject = eventType === 'offline'
     ? `\u26A0\uFE0F ${safeName} ist offline`
     : `\u2705 ${safeName} ist wieder online`;
@@ -1042,19 +1038,22 @@ async function sendNotificationEmail(eventType, deviceName, deviceIp, timestamp,
   const transporter = createMailTransporter(config.smtp);
   if (!transporter) {
     console.error('[Notification] nodemailer nicht installiert');
+    _notificationCooldowns.delete(`${deviceKey}:${eventType}`);
     return;
   }
 
   try {
+    const safeFrom = stripCRLF(config.from || `"Netzwerk Manager" <${config.smtp.user}>`);
+    const safeTo = stripCRLF(config.to);
     await transporter.sendMail({
-      from: config.from || `"Netzwerk Manager" <${config.smtp.user}>`,
-      to: config.to,
+      from: safeFrom,
+      to: safeTo,
       subject,
       html,
     });
-    setNotificationCooldown(deviceKey, eventType);
     console.log(`[Notification] E-Mail gesendet: ${deviceName} ${eventType}`);
   } catch (err) {
+    _notificationCooldowns.delete(`${deviceKey}:${eventType}`);
     console.error(`[Notification] E-Mail-Fehler (${deviceName} ${eventType}):`, err.message);
   }
 }
@@ -1179,9 +1178,11 @@ async function runUptimePingCycle() {
     }
   }
 
-  // Keep only last 50 outages
-  if (data.outages.length > 50) {
-    data.outages = data.outages.slice(data.outages.length - 50);
+  // Keep only last 50 closed outages (preserve open ones)
+  const openOutages = data.outages.filter(o => !o.end);
+  const closedOutages = data.outages.filter(o => o.end);
+  if (closedOutages.length > 50) {
+    data.outages = [...closedOutages.slice(closedOutages.length - 50), ...openOutages];
   }
 
   saveUptimeData(data);
