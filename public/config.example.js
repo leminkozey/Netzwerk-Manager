@@ -264,4 +264,38 @@ const siteConfig = {
       // { id: 'opendns',   name: 'OpenDNS',        ip: '208.67.222.222' },
     ],
   },
+
+  // ┌─────────────────────────────────────────────┐
+  // │             E-MAIL BENACHRICHTIGUNGEN       │
+  // └─────────────────────────────────────────────┘
+
+  // ── Benachrichtigungen bei Geräte-Ausfällen ──
+  // Sendet automatisch E-Mails wenn ein überwachtes Gerät offline geht
+  // oder wieder online kommt. Nutzt SMTP (z.B. Gmail, Outlook).
+  //
+  // Für Gmail: App-Passwort unter https://myaccount.google.com/apppasswords erstellen
+  // und als 'pass' eintragen (nicht das normale Gmail-Passwort).
+  notifications: {
+    enabled: false,                 // true = E-Mail-Benachrichtigungen aktivieren
+    cooldownMinutes: 5,             // Mindestabstand zwischen E-Mails pro Gerät/Event
+
+    // SMTP-Server Konfiguration
+    smtp: {
+      host: 'smtp.gmail.com',      // SMTP-Server (Gmail, Outlook, eigener Server)
+      port: 587,                    // Port (587 = STARTTLS, 465 = SSL)
+      secure: false,                // true für Port 465 (SSL), false für Port 587 (STARTTLS)
+      user: 'deine.email@gmail.com',// SMTP-Benutzername
+      pass: 'xxxx xxxx xxxx xxxx',  // SMTP-Passwort (bei Gmail: App-Passwort)
+    },
+
+    // Absender und Empfänger
+    from: '"Netzwerk Manager" <deine.email@gmail.com>',
+    to: 'empfaenger@example.com',   // Empfänger-Adresse
+
+    // Welche Events eine E-Mail auslösen
+    events: {
+      offline: true,                // E-Mail wenn Gerät offline geht
+      online: true,                 // E-Mail wenn Gerät wieder online kommt
+    },
+  },
 };

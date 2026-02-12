@@ -11,6 +11,8 @@ const WebSocket = require('ws');
 const dgram = require('dgram');
 const { spawn } = require('child_process');
 const cron = require('node-cron');
+let nodemailer;
+try { nodemailer = require('nodemailer'); } catch { nodemailer = null; }
 
 // ═══════════════════════════════════════════════════════════════════
 // Security Utilities
@@ -300,6 +302,17 @@ app.get('/config.js', (req, res) => {
   // Strip update commands – only expose the enabled flag
   if (safe.settings?.update) {
     delete safe.settings.update.commands;
+  }
+  if (safe.notifications?.smtp) {
+    delete safe.notifications.smtp.user;
+    delete safe.notifications.smtp.pass;
+    delete safe.notifications.smtp.host;
+    delete safe.notifications.smtp.port;
+    delete safe.notifications.smtp.secure;
+  }
+  if (safe.notifications) {
+    delete safe.notifications.from;
+    delete safe.notifications.to;
   }
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
@@ -898,6 +911,154 @@ function formatTimestamp(ts) {
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}, ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// E-Mail Notifications
+// ═══════════════════════════════════════════════════════════════════
+
+function readNotificationConfig() {
+  const cfg = readSiteConfig();
+  const n = cfg?.notifications;
+  if (!n || !n.enabled) return null;
+  if (!n.smtp?.host || !n.smtp?.user || !n.smtp?.pass || !n.to) return null;
+  return n;
+}
+
+const _notificationCooldowns = new Map();
+
+function isNotificationCooldownActive(deviceId, eventType, cooldownMs) {
+  const key = `${deviceId}:${eventType}`;
+  const last = _notificationCooldowns.get(key);
+  if (!last) return false;
+  return (Date.now() - last) < cooldownMs;
+}
+
+function setNotificationCooldown(deviceId, eventType) {
+  _notificationCooldowns.set(`${deviceId}:${eventType}`, Date.now());
+}
+
+function createMailTransporter(smtp) {
+  if (!nodemailer) return null;
+  return nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port || 587,
+    secure: smtp.secure ?? false,
+    auth: { user: smtp.user, pass: smtp.pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
+}
+
+function buildOfflineEmailHtml(deviceName, deviceIp, timestamp) {
+  const name = escapeHtml(deviceName);
+  const ip = escapeHtml(deviceIp);
+  const time = formatTimestamp(timestamp);
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#06080f;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#06080f;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;overflow:hidden;">
+<tr><td style="padding:24px 32px 16px;border-bottom:1px solid #1e2a3a;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td><span style="display:inline-block;background:#ef4444;color:#fff;font-size:13px;font-weight:600;padding:4px 12px;border-radius:6px;">OFFLINE</span></td>
+    <td align="right" style="color:#8b949e;font-size:13px;">${time}</td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+  <h2 style="margin:0 0 16px;color:#f0f6fc;font-size:20px;">&#9888;&#65039; ${name} ist offline</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161b22;border:1px solid #1e2a3a;border-radius:8px;">
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;border-bottom:1px solid #1e2a3a;">Gerät</td>
+        <td style="padding:12px 16px;color:#f0f6fc;font-size:14px;border-bottom:1px solid #1e2a3a;text-align:right;">${name}</td></tr>
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;">IP-Adresse</td>
+        <td style="padding:12px 16px;color:#f0f6fc;font-size:14px;text-align:right;">${ip}</td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #1e2a3a;">
+  <p style="margin:0;color:#484f58;font-size:12px;text-align:center;">Diese Nachricht wurde automatisch vom Netzwerk Manager gesendet.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+function buildOnlineEmailHtml(deviceName, deviceIp, timestamp, outageDurationMs) {
+  const name = escapeHtml(deviceName);
+  const ip = escapeHtml(deviceIp);
+  const time = formatTimestamp(timestamp);
+  const duration = escapeHtml(outageDurationMs ? formatDuration(outageDurationMs) : '–');
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#06080f;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#06080f;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;overflow:hidden;">
+<tr><td style="padding:24px 32px 16px;border-bottom:1px solid #1e2a3a;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td><span style="display:inline-block;background:#22c55e;color:#fff;font-size:13px;font-weight:600;padding:4px 12px;border-radius:6px;">ONLINE</span></td>
+    <td align="right" style="color:#8b949e;font-size:13px;">${time}</td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+  <h2 style="margin:0 0 16px;color:#f0f6fc;font-size:20px;">&#9989; ${name} ist wieder online</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161b22;border:1px solid #1e2a3a;border-radius:8px;">
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;border-bottom:1px solid #1e2a3a;">Gerät</td>
+        <td style="padding:12px 16px;color:#f0f6fc;font-size:14px;border-bottom:1px solid #1e2a3a;text-align:right;">${name}</td></tr>
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;border-bottom:1px solid #1e2a3a;">IP-Adresse</td>
+        <td style="padding:12px 16px;color:#f0f6fc;font-size:14px;border-bottom:1px solid #1e2a3a;text-align:right;">${ip}</td></tr>
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;">Ausfallzeit</td>
+        <td style="padding:12px 16px;color:#f59e0b;font-size:14px;font-weight:600;text-align:right;">${duration}</td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #1e2a3a;">
+  <p style="margin:0;color:#484f58;font-size:12px;text-align:center;">Diese Nachricht wurde automatisch vom Netzwerk Manager gesendet.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+async function sendNotificationEmail(eventType, deviceName, deviceIp, timestamp, outageDurationMs) {
+  const config = readNotificationConfig();
+  if (!config) return;
+
+  // Check event filter
+  if (config.events && config.events[eventType] === false) return;
+
+  // Check cooldown
+  const cooldownMs = (config.cooldownMinutes || 5) * 60000;
+  const deviceKey = `${deviceName}:${deviceIp}`;
+  if (isNotificationCooldownActive(deviceKey, eventType, cooldownMs)) {
+    console.log(`[Notification] Cooldown aktiv, E-Mail übersprungen (${deviceName} ${eventType})`);
+    return;
+  }
+
+  // Build email (strip control chars from name to prevent SMTP header injection)
+  const safeName = deviceName.replace(/[\r\n\0]/g, '');
+  const subject = eventType === 'offline'
+    ? `\u26A0\uFE0F ${safeName} ist offline`
+    : `\u2705 ${safeName} ist wieder online`;
+
+  const html = eventType === 'offline'
+    ? buildOfflineEmailHtml(deviceName, deviceIp, timestamp)
+    : buildOnlineEmailHtml(deviceName, deviceIp, timestamp, outageDurationMs);
+
+  const transporter = createMailTransporter(config.smtp);
+  if (!transporter) {
+    console.error('[Notification] nodemailer nicht installiert');
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: config.from || `"Netzwerk Manager" <${config.smtp.user}>`,
+      to: config.to,
+      subject,
+      html,
+    });
+    setNotificationCooldown(deviceKey, eventType);
+    console.log(`[Notification] E-Mail gesendet: ${deviceName} ${eventType}`);
+  } catch (err) {
+    console.error(`[Notification] E-Mail-Fehler (${deviceName} ${eventType}):`, err.message);
+  }
+}
+
 // Parse public/config.js and return the siteConfig object (cached with 30s TTL)
 let _siteConfigCache = null;
 let _siteConfigCacheTime = 0;
@@ -994,11 +1155,17 @@ async function runUptimePingCycle() {
           dev.onlineSince = now;
         }
         // Close any ongoing outage for this device
+        let closedOutageDuration = null;
         for (const outage of data.outages) {
           if (outage.device === cd.id && !outage.end) {
             outage.end = now;
             outage.durationMs = now - outage.start;
+            closedOutageDuration = outage.durationMs;
           }
+        }
+        // Notify only on real recovery (not first start)
+        if (wasOnline === false) {
+          sendNotificationEmail('online', cd.name, cd.ip, now, closedOutageDuration).catch(() => {});
         }
       }
     } else {
@@ -1007,6 +1174,7 @@ async function runUptimePingCycle() {
         // Pause timer instead of resetting
         dev.pausedAt = now;
         data.outages.push({ device: cd.id, start: now, end: null, durationMs: null });
+        sendNotificationEmail('offline', cd.name, cd.ip, now, null).catch(() => {});
       }
     }
   }

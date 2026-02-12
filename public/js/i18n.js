@@ -282,6 +282,14 @@ const translations = {
     'pihole.blockingInactive': 'Inaktiv',
     'pihole.pause': 'Pause',
     'pihole.resume': 'Aktivieren',
+
+    // Notifications
+    'notifications.title': 'E-Mail Benachrichtigungen',
+    'notifications.desc': 'Automatische E-Mails bei Geräte-Ausfällen.',
+    'notifications.enabled': 'Benachrichtigungen aktiviert',
+    'notifications.offline': 'Bei Offline-Event benachrichtigen',
+    'notifications.online': 'Bei Online-Event benachrichtigen',
+    'notifications.cooldown': 'Cooldown (Minuten)',
   },
 
   en: {
@@ -558,6 +566,14 @@ const translations = {
     'pihole.blockingInactive': 'Inactive',
     'pihole.pause': 'Pause',
     'pihole.resume': 'Resume',
+
+    // Notifications
+    'notifications.title': 'Email Notifications',
+    'notifications.desc': 'Automatic emails on device outages.',
+    'notifications.enabled': 'Notifications enabled',
+    'notifications.offline': 'Notify on offline event',
+    'notifications.online': 'Notify on online event',
+    'notifications.cooldown': 'Cooldown (minutes)',
   },
 };
 

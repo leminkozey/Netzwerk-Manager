@@ -25,6 +25,7 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Ping Monitor** – Latenz-Messung zu externen Hosts (z.B. Google DNS, Cloudflare) mit Live-Chart und Statistiken
 - **Remote Update** – Automatisches Aktualisieren direkt über die Einstellungen (Credits-Tab) mit konfigurierbaren Befehlen
 - **Responsive Outages** – Ausfälle-Card passt sich automatisch an mobile Bildschirme an
+- **E-Mail Benachrichtigungen** – Automatische E-Mails bei Geräte-Ausfällen (Offline/Online) via SMTP
 
 ## Voraussetzungen
 
@@ -690,6 +691,58 @@ pingMonitor: {
   ],
 },
 ```
+
+### E-Mail Benachrichtigungen (`notifications`)
+
+Sendet automatisch E-Mails wenn ein überwachtes Gerät (aus `uptimeDevices`) offline geht oder wieder online kommt. Nutzt SMTP – funktioniert mit Gmail, Outlook oder jedem anderen SMTP-Server.
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `enabled` | `boolean` | `false` | `true` → E-Mail-Benachrichtigungen aktivieren. |
+| `cooldownMinutes` | `number` | `5` | Mindestabstand in Minuten zwischen E-Mails pro Gerät und Event-Typ. Verhindert Spam bei instabilen Verbindungen. |
+| `from` | `string` | — | Absender-Adresse (z.B. `'"Netzwerk Manager" <email@gmail.com>'`). |
+| `to` | `string` | — | Empfänger-Adresse. |
+
+#### SMTP-Konfiguration (`notifications.smtp`)
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `host` | `string` | — | SMTP-Server (z.B. `'smtp.gmail.com'`, `'smtp.office365.com'`). |
+| `port` | `number` | `587` | SMTP-Port. `587` für STARTTLS, `465` für SSL. |
+| `secure` | `boolean` | `false` | `true` für Port 465 (SSL), `false` für Port 587 (STARTTLS). |
+| `user` | `string` | — | SMTP-Benutzername (E-Mail-Adresse). |
+| `pass` | `string` | — | SMTP-Passwort (bei Gmail: App-Passwort). |
+
+#### Event-Filter (`notifications.events`)
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `offline` | `boolean` | `true` | E-Mail senden wenn ein Gerät offline geht. |
+| `online` | `boolean` | `true` | E-Mail senden wenn ein Gerät wieder online kommt (inkl. Ausfallzeit). |
+
+```js
+notifications: {
+  enabled: true,
+  cooldownMinutes: 5,
+  smtp: {
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    user: 'deine.email@gmail.com',
+    pass: 'xxxx xxxx xxxx xxxx',   // Gmail App-Passwort
+  },
+  from: '"Netzwerk Manager" <deine.email@gmail.com>',
+  to: 'empfaenger@example.com',
+  events: {
+    offline: true,
+    online: true,
+  },
+},
+```
+
+> **Sicherheit:** SMTP-Zugangsdaten (`host`, `port`, `user`, `pass`, `secure`) werden vom Server automatisch aus der öffentlichen `/config.js`-Route entfernt und sind im Frontend nicht sichtbar.
+
+> **Gmail:** Erstelle ein [App-Passwort](https://myaccount.google.com/apppasswords) unter Google-Konto → Sicherheit → App-Passwörter. Das normale Gmail-Passwort funktioniert nicht mit SMTP.
 
 ---
 
