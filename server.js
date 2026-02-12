@@ -27,23 +27,56 @@ function timingSafeEqual(a, b) {
   return crypto.timingSafeEqual(hmacA, hmacB);
 }
 
-// Simple password hashing (for local network use)
+// Password hashing with PBKDF2
+const PBKDF2_ITERATIONS = 600000;
+
 function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
-  return `${salt}:${hash}`;
+  const hash = crypto.pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, 64, 'sha512').toString('hex');
+  return `pbkdf2:${salt}:${PBKDF2_ITERATIONS}:${hash}`;
 }
 
 function verifyPassword(password, stored) {
   if (!stored || !stored.includes(':')) return false;
-  const [salt, hash] = stored.split(':');
-  const testHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  let salt, iterations, hash;
+  if (stored.startsWith('pbkdf2:')) {
+    // New format: pbkdf2:salt:iterations:hash
+    const parts = stored.split(':');
+    salt = parts[1];
+    iterations = parseInt(parts[2], 10);
+    hash = parts[3];
+  } else {
+    // Legacy format: salt:hash (assumed 10000 iterations)
+    const parts = stored.split(':');
+    if (parts.length === 2) {
+      salt = parts[0];
+      iterations = 10000;
+      hash = parts[1];
+    } else {
+      return false;
+    }
+  }
+  if (!salt || !hash || !iterations) return false;
+  const testHash = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
   return timingSafeEqual(hash, testHash);
+}
+
+// Check if stored hash needs re-hashing with stronger iterations (auto-migration)
+function needsRehash(stored) {
+  if (!stored || typeof stored !== 'string') return false;
+  if (!isHashedPassword(stored)) return false;
+  if (!stored.startsWith('pbkdf2:')) return true;
+  const parts = stored.split(':');
+  const iterations = parseInt(parts[2], 10);
+  return iterations < PBKDF2_ITERATIONS;
 }
 
 // Check if stored password is hashed or plaintext (for migration)
 function isHashedPassword(stored) {
-  return typeof stored === 'string' && stored.includes(':') && stored.length > 100;
+  if (typeof stored !== 'string') return false;
+  if (stored.startsWith('pbkdf2:')) return true;
+  // Legacy format: salt:hash (long hex string with colon)
+  return stored.includes(':') && stored.length > 100;
 }
 
 // Symmetric encryption for sensitive data at rest (SSH passwords etc.)
@@ -124,6 +157,8 @@ function isAllowedProxyTarget(ip) {
 
 // Session token expiration (24 hours)
 const SESSION_EXPIRY_MS = 24 * 60 * 60 * 1000;
+// Absolute session timeout (7 days) - session cannot be extended beyond this
+const MAX_ABSOLUTE_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const app = express();
 const PORT = process.env.PORT || 5055;
@@ -171,6 +206,11 @@ function broadcastToAll(type, data) {
 function isSessionValid() {
   if (!runtime.activeSession) return false;
   if (Date.now() > runtime.activeSession.expiresAt) {
+    runtime.activeSession = null;
+    return false;
+  }
+  // Absolute session timeout - cannot be extended beyond MAX_ABSOLUTE_SESSION_MS
+  if (Date.now() - runtime.activeSession.loginAt > MAX_ABSOLUTE_SESSION_MS) {
     runtime.activeSession = null;
     return false;
   }
@@ -311,6 +351,13 @@ app.get('/config.js', (req, res) => {
   res.send(`const siteConfig = ${JSON.stringify(safe, null, 2)};\n`);
 });
 
+// Block direct static access to config.js (served sanitized via custom route above)
+app.use((req, res, next) => {
+  if (req.path.toLowerCase().endsWith('config.js')) {
+    return res.status(403).end();
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 const defaultState = {
@@ -371,7 +418,7 @@ function ensureDataFile() {
     // Hash default password on first run
     const initial = { ...defaultState, versions: [] };
     initial.credentials.password = hashPassword(initial.credentials.password);
-    fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2));
+    fs.writeFileSync(DATA_FILE, JSON.stringify(initial, null, 2), { mode: 0o600 });
     writeCredentialsFile({
       username: initial.credentials.username,
       password: initial.credentials.password,
@@ -456,8 +503,50 @@ function readState() {
 }
 
 function saveState(nextState) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(nextState, null, 2));
+  atomicWriteFileSync(DATA_FILE, JSON.stringify(nextState, null, 2), { mode: 0o600 });
   _stateCache = nextState;
+}
+
+// Atomic file write: write to .tmp then rename to prevent corruption
+function atomicWriteFileSync(filePath, data, options = {}) {
+  const tmpPath = filePath + '.tmp';
+  fs.writeFileSync(tmpPath, data, options);
+  try {
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    // On Windows, rename can fail with EPERM/EBUSY if target is locked.
+    // Fall back to direct write.
+    try { fs.unlinkSync(tmpPath); } catch { /* ignore cleanup */ }
+    fs.writeFileSync(filePath, data, options);
+  }
+}
+
+// Validate deviceId against prototype pollution
+function isValidDeviceId(id) {
+  return typeof id === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(id);
+}
+
+// Sanitize version entry for import (whitelist properties, truncate strings, strip secrets)
+function sanitizeVersionEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const sanitized = {};
+  if (entry.timestamp !== undefined) sanitized.timestamp = typeof entry.timestamp === 'number' ? entry.timestamp : 0;
+  if (entry.label !== undefined) sanitized.label = escapeHtml(String(entry.label || '')).slice(0, 256);
+  if (entry.summary !== undefined) sanitized.summary = escapeHtml(String(entry.summary || '')).slice(0, 512);
+  if (entry.id !== undefined) sanitized.id = String(entry.id || '').slice(0, 64);
+  if (entry.snapshot && typeof entry.snapshot === 'object') {
+    sanitized.snapshot = { ...entry.snapshot };
+    if (sanitized.snapshot.speedportInfo) {
+      sanitized.snapshot.speedportInfo = { ...sanitized.snapshot.speedportInfo };
+      delete sanitized.snapshot.speedportInfo.wifiPassword;
+      delete sanitized.snapshot.speedportInfo.devicePassword;
+    }
+    if (sanitized.snapshot.raspberryInfo) {
+      sanitized.snapshot.raspberryInfo = { ...sanitized.snapshot.raspberryInfo };
+      delete sanitized.snapshot.raspberryInfo.sshPassword;
+    }
+  }
+  return sanitized;
 }
 
 function buildVersionLabel() {
@@ -531,7 +620,7 @@ function writeCredentialsFile(credentials) {
   const username = credentials.username ?? '';
   const password = credentials.password ?? '';
   const content = `${username}\n${password}\n`;
-  fs.writeFileSync(USER_FILE, content, 'utf-8');
+  fs.writeFileSync(USER_FILE, content, { encoding: 'utf-8', mode: 0o600 });
 }
 
 function readCredentialsFile() {
@@ -552,7 +641,7 @@ function ensureLoginTokenFile() {
     '# 123456789|MacBook von Max',
     '',
   ].join('\n');
-  fs.writeFileSync(LOGIN_TOKEN_FILE, sample, 'utf-8');
+  fs.writeFileSync(LOGIN_TOKEN_FILE, sample, { encoding: 'utf-8', mode: 0o600 });
 }
 
 function readLoginTokens() {
@@ -859,7 +948,7 @@ function saveUptimeData(data) {
 function flushUptimeToDisk() {
   if (_uptimeDirty && _uptimeCache) {
     try {
-      fs.writeFileSync(UPTIME_FILE, JSON.stringify(_uptimeCache));
+      atomicWriteFileSync(UPTIME_FILE, JSON.stringify(_uptimeCache), { mode: 0o600 });
       _uptimeDirty = false;
     } catch (err) {
       console.error('[Uptime] Flush to disk failed:', err.message);
@@ -1337,7 +1426,7 @@ function savePingMonitorData(data) {
 function flushPingMonToDisk() {
   if (_pingMonDirty && _pingMonCache) {
     try {
-      fs.writeFileSync(PING_MONITOR_FILE, JSON.stringify(_pingMonCache));
+      atomicWriteFileSync(PING_MONITOR_FILE, JSON.stringify(_pingMonCache), { mode: 0o600 });
       _pingMonDirty = false;
     } catch (err) {
       console.error('[Ping Monitor] Flush to disk failed:', err.message);
@@ -1645,7 +1734,7 @@ function readControlDevicesData() {
 }
 
 function saveControlDevicesData(data) {
-  fs.writeFileSync(CONTROL_DEVICES_FILE, JSON.stringify(data, null, 2));
+  atomicWriteFileSync(CONTROL_DEVICES_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
 }
 
 function readControlDeviceCredentials(deviceId) {
@@ -1959,6 +2048,16 @@ app.post('/api/login', (req, res) => {
     });
   }
 
+  // Auto-migrate password hash to stronger iterations on successful login
+  if (passwordValid && needsRehash(storedPassword)) {
+    const newHash = hashPassword(password);
+    state.credentials.password = newHash;
+    saveState(state);
+    writeCredentialsFile({ username: state.credentials.username, password: newHash });
+    _defaultPwCache = { hash: null, result: false };
+    console.log('[Security] Password hash migrated to stronger iterations');
+  }
+
   // Erfolgreicher Login - Reset
   resetAttempts(clientIp);
   const token = randomUUID();
@@ -2010,6 +2109,15 @@ app.post('/api/login', (req, res) => {
     deviceToken: returnedDeviceToken,
     state: maskStateForClient(state),
   });
+});
+
+app.post('/api/logout', authRequired, (req, res) => {
+  runtime.activeSession = null;
+  for (const [, ws] of runtime.sockets) {
+    try { ws.close(4000, 'Logged out'); } catch { /* already closed */ }
+  }
+  runtime.sockets = new Map();
+  res.json({ ok: true });
 });
 
 app.get('/api/state', authRequired, (req, res) => {
@@ -2098,7 +2206,7 @@ app.post('/api/ports/update', authRequired, async (req, res) => {
 });
 
 app.post('/api/settings/credentials', authRequired, async (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, currentPassword } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required' });
   }
@@ -2112,28 +2220,51 @@ app.post('/api/settings/credentials', authRequired, async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
 
+  // Require current password for verification
+  if (!currentPassword || typeof currentPassword !== 'string') {
+    return res.status(400).json({ error: 'Current password is required' });
+  }
+
   const clientIp = getClientIp(req);
 
-  const oldUsername = await withStateLock(() => {
+  // Verify current password and update credentials inside state lock to prevent TOCTOU race
+  const result = await withStateLock(() => {
     const state = readState();
+    const fileCredentials = readCredentialsFile();
+    if (fileCredentials) {
+      state.credentials = { ...state.credentials, ...fileCredentials };
+    }
+    const storedPw = state.credentials.password;
+    let currentPwValid = false;
+    if (isHashedPassword(storedPw)) {
+      currentPwValid = verifyPassword(currentPassword, storedPw);
+    } else {
+      currentPwValid = timingSafeEqual(currentPassword, storedPw || '');
+    }
+    if (!currentPwValid) {
+      return { error: true };
+    }
+
     const prevUsername = state.credentials.username;
     state.credentials.username = username;
-    // Hash the password for secure storage
     state.credentials.password = hashPassword(password);
     saveState(state);
     writeCredentialsFile({
       username,
       password: state.credentials.password,
     });
-    // Invalidate active session to force re-login with new credentials
     runtime.activeSession = null;
-    return prevUsername;
+    return { error: false, oldUsername: prevUsername };
   });
+
+  if (result.error) {
+    return res.status(403).json({ error: 'Current password is incorrect' });
+  }
 
   res.json({ ok: true, username, sessionInvalidated: true });
 
   // Send notification email (fire-and-forget, after response)
-  sendCredentialsChangedEmail(oldUsername, username, clientIp)
+  sendCredentialsChangedEmail(result.oldUsername, username, clientIp)
     .catch(err => console.error('[Notification] Unexpected credentials-mail error:', err.message));
 });
 
@@ -2540,6 +2671,27 @@ app.get('/api/export', authRequired, (req, res) => {
     safeState.raspberryInfo = { ...safeState.raspberryInfo };
     delete safeState.raspberryInfo.sshPassword;
   }
+  // Strip sensitive fields from version snapshots
+  function stripSnapshotSecrets(versions) {
+    if (!Array.isArray(versions)) return versions;
+    return versions.map(v => {
+      if (!v || !v.snapshot) return v;
+      const s = { ...v, snapshot: { ...v.snapshot } };
+      if (s.snapshot.speedportInfo) {
+        s.snapshot.speedportInfo = { ...s.snapshot.speedportInfo };
+        delete s.snapshot.speedportInfo.wifiPassword;
+        delete s.snapshot.speedportInfo.devicePassword;
+      }
+      if (s.snapshot.raspberryInfo) {
+        s.snapshot.raspberryInfo = { ...s.snapshot.raspberryInfo };
+        delete s.snapshot.raspberryInfo.sshPassword;
+      }
+      return s;
+    });
+  }
+  if (safeState.speedportVersions) safeState.speedportVersions = stripSnapshotSecrets(safeState.speedportVersions);
+  if (safeState.raspberryVersions) safeState.raspberryVersions = stripSnapshotSecrets(safeState.raspberryVersions);
+  if (safeState.versions) safeState.versions = stripSnapshotSecrets(safeState.versions);
   const exportData = {
     exportedAt: new Date().toISOString(),
     version: '1.5.0',
@@ -2564,9 +2716,10 @@ app.post('/api/import', authRequired, async (req, res) => {
   // Sanitize imported string data to prevent XSS
   function sanitizePort(port) {
     return {
-      ...port,
-      label: escapeHtml(port.label),
-      status: escapeHtml(port.status),
+      id: typeof port.id === 'string' ? port.id.slice(0, 64) : String(port.id || '').slice(0, 64),
+      label: escapeHtml(String(port.label || '')).slice(0, 256),
+      status: escapeHtml(String(port.status || '')).slice(0, 64),
+      color: /^#[0-9A-Fa-f]{6}$/.test(port.color) ? port.color : '',
     };
   }
 
@@ -2575,7 +2728,6 @@ app.post('/api/import', authRequired, async (req, res) => {
     const result = {};
     for (const [key, val] of Object.entries(obj)) {
       if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
-      // Only accept strings — reject objects/arrays to prevent injection
       if (typeof val === 'string') {
         result[key] = escapeHtml(val);
       }
@@ -2588,23 +2740,27 @@ app.post('/api/import', authRequired, async (req, res) => {
   const MAX_VERSIONS = 200;
   const MAX_HISTORY = 50;
 
+  function sanitizeVersions(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.slice(0, MAX_VERSIONS).map(sanitizeVersionEntry).filter(Boolean);
+  }
+
   await withStateLock(() => {
-    // Merge mit Default-State um fehlende Felder zu ergaenzen
     const currentState = readState();
     const newState = {
       ...defaultState,
       // SECURITY: Never import credentials from external files!
-      credentials: currentState.credentials, // Keep existing credentials
+      credentials: currentState.credentials,
       speedportInfo: { ...defaultState.speedportInfo, ...sanitizeStringFields(data.speedportInfo) },
       raspberryInfo: { ...defaultState.raspberryInfo, ...sanitizeStringFields(data.raspberryInfo) },
-      // Sanitize port data (capped)
+      // Sanitize port data (capped, whitelisted properties)
       switchPorts: (data.switchPorts || currentState.switchPorts).slice(0, MAX_PORTS).map(sanitizePort),
       routerPorts: (data.routerPorts || currentState.routerPorts).slice(0, MAX_PORTS).map(sanitizePort),
-      versions: Array.isArray(data.versions) ? data.versions.slice(0, MAX_VERSIONS) : [],
-      speedportVersions: Array.isArray(data.speedportVersions) ? data.speedportVersions.slice(0, MAX_VERSIONS) : [],
-      raspberryVersions: Array.isArray(data.raspberryVersions) ? data.raspberryVersions.slice(0, MAX_VERSIONS) : [],
+      versions: sanitizeVersions(data.versions),
+      speedportVersions: sanitizeVersions(data.speedportVersions),
+      raspberryVersions: sanitizeVersions(data.raspberryVersions),
       // SECURITY: Never import device tokens from external files!
-      deviceTokens: currentState.deviceTokens, // Keep existing tokens
+      deviceTokens: currentState.deviceTokens,
       speedTestHistory: Array.isArray(data.speedTestHistory) ? data.speedTestHistory.slice(0, MAX_HISTORY) : [],
     };
 
@@ -2647,10 +2803,34 @@ app.get('/api/schedules', authRequired, (req, res) => {
 // Remote Update
 // ═══════════════════════════════════════════════════════════════════
 
-const { exec: execCb } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(execCb);
 let _updateRunning = false;
+
+// Safe spawn-based alternative to exec for git commands
+function spawnAsync(cmd, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args, { cwd: __dirname, ...options });
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => {
+      proc.kill();
+      reject(new Error(`${cmd} ${args.join(' ')} timed out`));
+    }, options.timeout || 15000);
+    proc.stdout.on('data', (data) => { stdout += data.toString(); });
+    proc.stderr.on('data', (data) => { stderr += data.toString(); });
+    proc.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve({ stdout, stderr });
+      else reject(new Error(`${cmd} ${args.join(' ')} exited with code ${code}: ${stderr}`));
+    });
+    proc.on('error', (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+// Allowlist of permitted git subcommands for update
+const ALLOWED_GIT_SUBCOMMANDS = new Set(['fetch', 'pull', 'rev-parse', 'reset', 'checkout', 'merge', 'status', 'log', 'stash']);
 
 // GET /api/update/check – prüft ob Updates via git verfügbar sind
 app.get('/api/update/check', authRequired, async (req, res) => {
@@ -2659,9 +2839,9 @@ app.get('/api/update/check', authRequired, async (req, res) => {
     return res.status(403).json({ error: 'Update feature disabled' });
   }
   try {
-    await execAsync('git fetch', { cwd: __dirname, timeout: 15000 });
-    const { stdout: localHash } = await execAsync('git rev-parse HEAD', { cwd: __dirname, timeout: 5000 });
-    const { stdout: remoteHash } = await execAsync('git rev-parse @{u}', { cwd: __dirname, timeout: 5000 });
+    await spawnAsync('git', ['fetch'], { timeout: 15000 });
+    const { stdout: localHash } = await spawnAsync('git', ['rev-parse', 'HEAD'], { timeout: 5000 });
+    const { stdout: remoteHash } = await spawnAsync('git', ['rev-parse', '@{u}'], { timeout: 5000 });
     res.json({ upToDate: localHash.trim() === remoteHash.trim() });
   } catch (err) {
     console.error('[Update] Check failed:', err.message);
@@ -2688,20 +2868,27 @@ app.post('/api/update/run', authRequired, async (req, res) => {
   try {
     for (const cmd of commands) {
       if (typeof cmd !== 'string' || !cmd.trim()) continue;
+      const parts = cmd.trim().split(/\s+/);
+      const executable = parts[0];
+      const args = parts.slice(1);
+      // Only allow git commands with whitelisted subcommands
+      if (executable !== 'git' || !ALLOWED_GIT_SUBCOMMANDS.has(args[0])) {
+        results.push({ cmd, ok: false });
+        console.error(`[Update] ${cmd} → BLOCKED: not an allowed git command`);
+        return res.json({ ok: false, results });
+      }
       try {
-        await execAsync(cmd, { cwd: __dirname, timeout: 30000 });
+        await spawnAsync(executable, args, { timeout: 30000 });
         results.push({ cmd, ok: true });
         console.log(`[Update] ${cmd} → OK`);
       } catch (err) {
         results.push({ cmd, ok: false });
-        console.error(`[Update] ${cmd} → FAILED:`, err.stderr || err.message);
+        console.error(`[Update] ${cmd} → FAILED:`, err.message);
         return res.json({ ok: false, results });
       }
     }
     res.json({ ok: true, results });
 
-    // Verzögerter Neustart – gibt dem Browser Zeit die Antwort zu empfangen
-    // systemd/pm2 startet den Prozess automatisch neu
     console.log('[Update] Alle Befehle erfolgreich. Server wird in 3s neu gestartet…');
     setTimeout(() => process.exit(0), 3000);
   } finally {
@@ -2716,6 +2903,7 @@ app.post('/api/update/run', authRequired, async (req, res) => {
 // GET device config + credentials
 app.get('/api/control/:deviceId', authRequired, (req, res) => {
   const deviceId = req.params.deviceId;
+  if (!isValidDeviceId(deviceId)) return res.status(400).json({ error: 'Invalid device ID' });
   const configDevices = readControlDevicesFromConfig();
   const device = configDevices.find(d => d.id === deviceId);
 
@@ -2755,6 +2943,7 @@ app.get('/api/control/:deviceId', authRequired, (req, res) => {
 // POST save credentials
 app.post('/api/control/:deviceId', authRequired, (req, res) => {
   const deviceId = req.params.deviceId;
+  if (!isValidDeviceId(deviceId)) return res.status(400).json({ error: 'Invalid device ID' });
   const clientIp = getClientIp(req);
   const configDevices = readControlDevicesFromConfig();
   const device = configDevices.find(d => d.id === deviceId);
@@ -2827,6 +3016,7 @@ app.post('/api/control/:deviceId', authRequired, (req, res) => {
 // GET status - ping check
 app.get('/api/control/:deviceId/status', authRequired, async (req, res) => {
   const deviceId = req.params.deviceId;
+  if (!isValidDeviceId(deviceId)) return res.status(400).json({ online: false, error: 'Invalid device ID' });
   const clientIp = getClientIp(req);
 
   if (!checkPCStatusRateLimit(clientIp)) {
@@ -2844,6 +3034,7 @@ app.get('/api/control/:deviceId/status', authRequired, async (req, res) => {
 // GET password - reveal decrypted SSH password
 app.get('/api/control/:deviceId/password', authRequired, (req, res) => {
   const deviceId = req.params.deviceId;
+  if (!isValidDeviceId(deviceId)) return res.status(400).json({ error: 'Invalid device ID' });
   const clientIp = getClientIp(req);
 
   if (!checkPasswordRateLimit(clientIp)) {
@@ -2861,6 +3052,7 @@ app.get('/api/control/:deviceId/password', authRequired, (req, res) => {
 // POST action - execute wake/restart/shutdown
 app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
   const { deviceId, action } = req.params;
+  if (!isValidDeviceId(deviceId)) return res.status(400).json({ success: false, message: 'Invalid device ID' });
   const clientIp = getClientIp(req);
 
   if (!checkPCActionRateLimit(clientIp)) {
@@ -3326,6 +3518,7 @@ app.post('/api/uptime/reset', authRequired, async (req, res) => {
 // Reset single device uptime data
 app.post('/api/uptime/reset/:deviceId', authRequired, async (req, res) => {
   const id = req.params.deviceId;
+  if (!isValidDeviceId(id)) return res.status(400).json({ error: 'Invalid device ID' });
   const data = readUptimeData();
   if (data.devices[id]) {
     delete data.devices[id];
@@ -3356,6 +3549,20 @@ function startServer() {
   const wss = new WebSocket.Server({ server });
 
   wss.on('connection', (socket, req) => {
+    // Validate Origin header to prevent cross-site WebSocket hijacking
+    const wsOrigin = req.headers.origin;
+    if (wsOrigin) {
+      const allowedOrigins = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+      const wsHost = req.headers.host;
+      if (wsHost) {
+        allowedOrigins.push(`http://${wsHost}`, `https://${wsHost}`);
+      }
+      if (!allowedOrigins.includes(wsOrigin)) {
+        socket.close(4003, 'Invalid origin');
+        return;
+      }
+    }
+
     socket.isAlive = true;
     let authenticatedToken = null;
 

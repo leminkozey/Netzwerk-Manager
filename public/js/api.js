@@ -101,10 +101,10 @@ export async function saveRaspberry(info) {
 
 // ── Credentials ──
 
-export async function saveCredentials({ username, password }) {
+export async function saveCredentials({ currentPassword, username, password }) {
   const res = await request('/api/settings/credentials', {
     method: 'POST',
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ currentPassword, username, password }),
   });
   return res.json();
 }

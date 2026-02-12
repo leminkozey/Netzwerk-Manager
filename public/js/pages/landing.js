@@ -31,15 +31,17 @@ export function renderLanding(container) {
   // ── Animated GIF above title (accent-colored via CSS mask) ──
   const cfg0 = getConfig();
   const gifSrc = cfg0?.landingGif;
-  if (gifSrc) {
+  // Sanitize: only allow simple filenames to prevent CSS injection via url()
+  const safeSrc = typeof gifSrc === 'string' && /^[a-zA-Z0-9._-]+\.(png|gif|webp|apng|jpg|jpeg)$/i.test(gifSrc) ? gifSrc : null;
+  if (safeSrc) {
     const gifSize = (cfg0?.landingGifSize ?? 200) + 'px';
     page.appendChild(el('div', {
       className: 'landing-gif',
       style: {
         width: gifSize,
         height: gifSize,
-        WebkitMaskImage: `url(${gifSrc})`,
-        maskImage: `url(${gifSrc})`,
+        WebkitMaskImage: `url(${safeSrc})`,
+        maskImage: `url(${safeSrc})`,
       },
     }));
   }

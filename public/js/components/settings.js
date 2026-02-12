@@ -556,6 +556,10 @@ function createSessionPanel() {
 function createUserPanel() {
   const form = el('form', { id: 'credentialForm' }, [
     el('div', { className: 'input-row' }, [
+      el('label', { textContent: t('settings.currentPassword'), 'data-i18n': 'settings.currentPassword' }),
+      el('input', { type: 'password', id: 'currentPassInput', autocomplete: 'current-password' }),
+    ]),
+    el('div', { className: 'input-row' }, [
       el('label', { textContent: t('settings.newUser'), 'data-i18n': 'settings.newUser' }),
       el('input', { type: 'text', id: 'newUserInput', autocomplete: 'username' }),
     ]),
@@ -571,15 +575,17 @@ function createUserPanel() {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const currentPassword = document.getElementById('currentPassInput')?.value;
     const username = document.getElementById('newUserInput')?.value?.trim();
     const password = document.getElementById('newPassInput')?.value;
-    if (!username || !password) {
+    if (!currentPassword || !username || !password) {
       showToast(t('msg.fillCredentials'), true);
       return;
     }
     try {
-      await api.saveCredentials({ username, password });
+      await api.saveCredentials({ currentPassword, username, password });
       showToast(t('msg.saved'));
+      document.getElementById('currentPassInput').value = '';
       document.getElementById('newUserInput').value = '';
       document.getElementById('newPassInput').value = '';
     } catch {
