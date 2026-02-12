@@ -709,7 +709,7 @@ Sendet automatisch E-Mails wenn ein überwachtes Gerät (aus `uptimeDevices`) of
 |--------|-----|---------|--------------|
 | `host` | `string` | — | SMTP-Server (z.B. `'smtp.gmail.com'`, `'smtp.office365.com'`). |
 | `port` | `number` | `587` | SMTP-Port. `587` für STARTTLS, `465` für SSL. |
-| `secure` | `boolean` | `false` | `true` für Port 465 (SSL), `false` für Port 587 (STARTTLS). |
+| `secure` | `boolean` | `false` | `false` = Verbindung auf Port 587, dann Upgrade auf TLS (STARTTLS). `true` = direkt verschlüsselte Verbindung auf Port 465 (SSL/TLS). Für Gmail mit Port 587 ist `false` richtig – die Verbindung ist trotzdem verschlüsselt. |
 | `user` | `string` | — | SMTP-Benutzername (E-Mail-Adresse). |
 | `pass` | `string` | — | SMTP-Passwort (bei Gmail: App-Passwort). |
 
