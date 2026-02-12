@@ -719,6 +719,7 @@ Sendet automatisch E-Mails wenn ein überwachtes Gerät (aus `uptimeDevices`) of
 |--------|-----|---------|--------------|
 | `offline` | `boolean` | `true` | E-Mail senden wenn ein Gerät offline geht. |
 | `online` | `boolean` | `true` | E-Mail senden wenn ein Gerät wieder online kommt (inkl. Ausfallzeit). |
+| `credentialsChanged` | `boolean` | `true` | E-Mail senden wenn Benutzername oder Passwort geändert werden (inkl. IP-Adresse des Auslösers). |
 
 ```js
 notifications: {
@@ -736,6 +737,7 @@ notifications: {
   events: {
     offline: true,
     online: true,
+    credentialsChanged: true,
   },
 },
 ```

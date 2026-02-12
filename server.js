@@ -1058,6 +1058,71 @@ async function sendNotificationEmail(eventType, deviceName, deviceIp, timestamp,
   }
 }
 
+function buildCredentialsChangedEmailHtml(oldUsername, newUsername, clientIp, timestamp) {
+  const time = escapeHtml(formatTimestamp(timestamp));
+  const ip = escapeHtml(clientIp);
+  const oldUser = escapeHtml(oldUsername);
+  const newUser = escapeHtml(newUsername);
+  const usernameChanged = oldUsername !== newUsername;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#06080f;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#06080f;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;overflow:hidden;">
+<tr><td style="padding:24px 32px 16px;border-bottom:1px solid #1e2a3a;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td><span style="display:inline-block;background:#f59e0b;color:#fff;font-size:13px;font-weight:600;padding:4px 12px;border-radius:6px;">SICHERHEIT</span></td>
+    <td align="right" style="color:#8b949e;font-size:13px;">${time}</td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+  <h2 style="margin:0 0 16px;color:#f0f6fc;font-size:20px;">&#128274; Zugangsdaten ge\u00E4ndert</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161b22;border:1px solid #1e2a3a;border-radius:8px;">
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;border-bottom:1px solid #1e2a3a;">Benutzername</td>
+        <td style="padding:12px 16px;color:#f0f6fc;font-size:14px;border-bottom:1px solid #1e2a3a;text-align:right;">${usernameChanged ? `${oldUser} &rarr; ${newUser}` : newUser}</td></tr>
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;border-bottom:1px solid #1e2a3a;">Passwort</td>
+        <td style="padding:12px 16px;color:#f0f6fc;font-size:14px;border-bottom:1px solid #1e2a3a;text-align:right;">wurde ge\u00E4ndert</td></tr>
+    <tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;">IP-Adresse</td>
+        <td style="padding:12px 16px;color:#f0f6fc;font-size:14px;text-align:right;">${ip}</td></tr>
+  </table>
+  <p style="margin:16px 0 0;color:#f59e0b;font-size:13px;">Falls Sie diese \u00C4nderung nicht vorgenommen haben, pr\u00FCfen Sie sofort den Zugang zu Ihrem Netzwerk Manager.</p>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #1e2a3a;">
+  <p style="margin:0;color:#484f58;font-size:12px;text-align:center;">Diese Nachricht wurde automatisch vom Netzwerk Manager gesendet.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+async function sendCredentialsChangedEmail(oldUsername, newUsername, clientIp) {
+  const config = readNotificationConfig();
+  if (!config) return;
+
+  // Check event filter
+  if (config.events && config.events.credentialsChanged === false) return;
+
+  const transporter = createMailTransporter(config.smtp);
+  if (!transporter) return;
+
+  const stripCRLF = s => String(s).replace(/[\r\n\0]/g, '');
+  const timestamp = Date.now();
+  const html = buildCredentialsChangedEmailHtml(oldUsername, newUsername, clientIp, timestamp);
+
+  try {
+    const safeFrom = stripCRLF(config.from || `"Netzwerk Manager" <${config.smtp.user}>`);
+    const safeTo = stripCRLF(config.to);
+    await transporter.sendMail({
+      from: safeFrom,
+      to: safeTo,
+      subject: '\uD83D\uDD12 Zugangsdaten ge\u00E4ndert – Netzwerk Manager',
+      html,
+    });
+    console.log('[Notification] Credentials-Change E-Mail gesendet');
+  } catch (err) {
+    console.error('[Notification] Credentials-Change E-Mail-Fehler:', err.message);
+  }
+}
+
 // Parse public/config.js and return the siteConfig object (cached with 30s TTL)
 let _siteConfigCache = null;
 let _siteConfigCacheTime = 0;
@@ -2041,8 +2106,12 @@ app.post('/api/settings/credentials', authRequired, async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
 
+  const clientIp = getClientIp(req);
+  let oldUsername;
+
   await withStateLock(() => {
     const state = readState();
+    oldUsername = state.credentials.username;
     state.credentials.username = username;
     // Hash the password for secure storage
     state.credentials.password = hashPassword(password);
@@ -2055,6 +2124,9 @@ app.post('/api/settings/credentials', authRequired, async (req, res) => {
     runtime.activeSession = null;
     res.json({ ok: true, username, sessionInvalidated: true });
   });
+
+  // Send notification email (fire-and-forget, after response)
+  sendCredentialsChangedEmail(oldUsername, username, clientIp).catch(() => {});
 });
 
 app.post('/api/speedport', authRequired, async (req, res) => {

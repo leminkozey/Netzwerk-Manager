@@ -296,6 +296,7 @@ const siteConfig = {
     events: {
       offline: true,                // E-Mail wenn Gerät offline geht
       online: true,                 // E-Mail wenn Gerät wieder online kommt
+      credentialsChanged: true,     // E-Mail wenn Zugangsdaten geändert werden
     },
   },
 };
