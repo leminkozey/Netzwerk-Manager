@@ -713,15 +713,45 @@ function buildPiholeSummaryCards(data) {
     },
   ];
 
-  return el('div', { className: 'pihole-summary-grid' }, cards.map(c =>
-    el('div', { className: `pihole-stat-card ${c.cls}` }, [
+  const scrollNums = [];
+  const grid = el('div', { className: 'pihole-summary-grid' }, cards.map((c, idx) => {
+    const numEl = createScrollNumber(c.value);
+    numEl.style.fontSize = '';
+    numEl.style.fontWeight = '';
+    numEl.style.fontFamily = '';
+    numEl.style.color = '';
+    numEl.className = 'pihole-stat-value';
+    scrollNums.push({ el: numEl, idx });
+
+    return el('div', { className: `pihole-stat-card ${c.cls}` }, [
       el('div', { style: { position: 'relative', zIndex: '1' } }, [
-        el('div', { className: 'pihole-stat-value' }, [document.createTextNode(c.value)]),
+        numEl,
         el('div', { className: 'pihole-stat-label' }, [document.createTextNode(c.label)]),
       ]),
       summaryCardIcon(c.icon),
-    ])
-  ));
+    ]);
+  }));
+
+  const summaryObserver = new IntersectionObserver((obs) => {
+    obs.forEach(e => {
+      if (e.isIntersecting) {
+        scrollNums.forEach(s => s.el._animateIn(s.idx * 0.12));
+        summaryObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.2 });
+
+  requestAnimationFrame(() => {
+    if (grid.isConnected) summaryObserver.observe(grid);
+    else {
+      const mo = new MutationObserver(() => {
+        if (grid.isConnected) { summaryObserver.observe(grid); mo.disconnect(); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+  });
+
+  return grid;
 }
 
 function buildQueriesOverTimeChart(data) {
@@ -958,23 +988,49 @@ function buildDonutChart(title, iconName, entries, colors) {
     }
   });
 
+  const legendScrollNums = [];
   const legendItems = entries.slice(0, 8).map((entry, i) => {
-    const pctDisplay = Math.round((entry.value / total) * 1000) / 10;
+    const pctDisplay = (Math.round((entry.value / total) * 1000) / 10) + '%';
+    const numEl = createScrollNumber(pctDisplay);
+    legendScrollNums.push({ el: numEl, idx: i });
+
     return el('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' } }, [
       el('div', { style: { width: '10px', height: '10px', borderRadius: '3px', background: colors[i % colors.length], flexShrink: '0' } }),
       el('span', {
         textContent: entry.label,
         style: { fontSize: '0.78rem', color: 'var(--text-secondary)', flex: '1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
       }),
-      el('span', { textContent: pctDisplay + '%', style: { fontSize: '0.78rem', fontWeight: '600', fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-muted)' } }),
+      numEl,
     ]);
   });
 
-  return el('div', { className: 'card' }, [
+  const card = el('div', { className: 'card' }, [
     sectionTitle(title, iconName),
     el('div', { style: { padding: '12px 0' } }, [svg]),
     el('div', { style: { padding: '4px 0' } }, legendItems),
   ]);
+
+  // Observe legend scroll numbers (piggyback on donut observer)
+  const legendObserver = new IntersectionObserver((obs) => {
+    obs.forEach(e => {
+      if (e.isIntersecting) {
+        legendScrollNums.forEach(s => s.el._animateIn(s.idx * 0.08));
+        legendObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.2 });
+
+  requestAnimationFrame(() => {
+    if (card.isConnected) legendObserver.observe(card);
+    else {
+      const mo = new MutationObserver(() => {
+        if (card.isConnected) { legendObserver.observe(card); mo.disconnect(); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+  });
+
+  return card;
 }
 
 function buildQueryTypesDonut(data) {
@@ -1023,7 +1079,7 @@ function extractTopList(data, key) {
 
 // Apple-style per-digit scroll counter
 function createScrollNumber(value) {
-  const formatted = formatNumber(value);
+  const formatted = typeof value === 'string' ? value : formatNumber(value);
   const container = el('span', {
     style: {
       display: 'inline-flex', alignItems: 'center',
