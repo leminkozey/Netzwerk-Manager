@@ -282,6 +282,12 @@ export async function resetDeviceUptime(deviceId) {
   return res.json();
 }
 
+export async function resetAllOutages() {
+  const res = await request('/api/outages/reset', { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to reset outages');
+  return res.json();
+}
+
 // ── Ping Monitor ──
 
 export async function getPingMonitor() {

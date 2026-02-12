@@ -3582,6 +3582,16 @@ app.post('/api/uptime/reset/:deviceId', authRequired, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Reset all outages (keep device uptime data)
+app.post('/api/outages/reset', authRequired, (req, res) => {
+  const data = readUptimeData();
+  data.outages = [];
+  saveUptimeData(data);
+  flushUptimeToDisk();
+  broadcastToAll('uptime', buildUptimeResponse());
+  res.json({ ok: true });
+});
+
 // ── Ping Monitor API ──
 
 app.get('/api/ping-monitor', authRequired, (req, res) => {

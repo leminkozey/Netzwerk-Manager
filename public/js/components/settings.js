@@ -281,10 +281,25 @@ function createAnalysenPanel() {
   const uptimeContainer = el('div', { id: 'uptimeResetContainer' });
   loadUptimeResetButtons(uptimeContainer);
 
+  const outagesBtn = el('button', {
+    className: 'btn danger',
+    textContent: t('settings.outagesResetBtn'),
+    onClick: async () => {
+      try {
+        await api.resetAllOutages();
+        showToast(t('settings.outagesResetDone'));
+        window.dispatchEvent(new CustomEvent('uptime-reset'));
+      } catch { showToast(t('msg.error'), true); }
+    },
+  });
+
   return el('div', { className: 'settings-panel', id: 'panel-analysen' }, [
     el('h4', { textContent: t('settings.uptimeReset') }),
     el('p', { className: 'setting-description', textContent: t('settings.uptimeResetDesc') }),
     uptimeContainer,
+    el('h4', { textContent: t('settings.outagesReset'), style: { marginTop: '24px' } }),
+    el('p', { className: 'setting-description', textContent: t('settings.outagesResetDesc') }),
+    outagesBtn,
   ]);
 }
 
