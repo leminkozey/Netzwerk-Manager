@@ -1706,7 +1706,7 @@ label {
 .speedtest-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 10px;
   width: 100%;
   max-width: 500px;
   margin-top: 24px;
@@ -1717,9 +1717,8 @@ label {
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 16px;
+  padding: 10px;
   min-width: 0;
-  overflow: hidden;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -1740,12 +1739,10 @@ label {
 }
 
 .speedtest-stat-value {
-  font-size: 1.2rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
-  max-width: 100%;
-  overflow: hidden;
 }
 
 .speedtest-buttons {
