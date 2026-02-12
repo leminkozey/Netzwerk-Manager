@@ -1718,6 +1718,8 @@ label {
   align-items: center;
   gap: 8px;
   padding: 16px;
+  min-width: 0;
+  overflow: hidden;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -1742,6 +1744,8 @@ label {
   font-weight: 700;
   color: var(--text);
   font-family: 'JetBrains Mono', monospace;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .speedtest-buttons {
