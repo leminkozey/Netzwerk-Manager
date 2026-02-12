@@ -22,6 +22,16 @@ const siteConfig = {
     modalSlide: true,           // Slide-Animation beim Öffnen von Modals/Overlays
     panelFade: true,            // Überblend-Effekt beim Tab-Wechsel in Einstellungen
     themeSwitcher: true,        // Animations-Effekte der Theme-Buttons (Sonne/Mond/System)
+    numberScroll: true,         // Scroll-Animationen bei Zahlen (Analysen Center)
+    analysen: {                 // Pro-Section Animationen im Analysen Center
+      speedtest: true,          // Speedtest Download/Upload/Ping Scroll-Animationen
+      uptime: true,             // Uptime-Cards: Balken + Prozent + Timer-Scroll
+      pingMonitor: true,        // Ping Monitor: Ping-Scroll + Chart-Reveal
+      piholeSummary: true,      // Pi-hole Summary Cards: Zahlen-Scroll
+      queriesOverTime: true,    // Queries Bar-Chart: Balken wachsen hoch
+      donuts: true,             // Donut-Charts: Segmente + Legende
+      topLists: true,           // Top Domains/Blocked/Clients: Balken + Zahlen
+    },
   },
 
   // ── Design Defaults ──

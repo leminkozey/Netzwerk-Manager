@@ -119,15 +119,6 @@ function createLiveScrollTimer(style) {
     let di = 0;
     for (const s of slots) {
       if (s.type !== 'digit') continue;
-      const targetChar = newChars.find((c, idx) => {
-        // Find the di-th digit in newChars
-        let count = -1;
-        for (let j = 0; j <= idx; j++) {
-          if (newChars[j] >= '0' && newChars[j] <= '9') count++;
-        }
-        return count === di;
-      });
-      // Simpler: iterate and pick digits in order
       let digitIdx = 0, target = 0;
       for (const c of newChars) {
         if (c >= '0' && c <= '9') {
@@ -211,7 +202,7 @@ function formatNumber(n) {
 // Speedtest Section
 // =================================================================
 
-function buildSpeedtestSection() {
+function buildSpeedtestSection(animRollIn) {
   const ARC_PATH = 'M 30 170 A 120 120 0 0 1 270 170';
   const ARC_LENGTH = 377;
   const MAX_SPEED = 250;
@@ -393,12 +384,15 @@ function buildSpeedtestSection() {
     pingValue.textContent = '-';
     try {
       const ping = await measurePing();
-      pingValue._rollIn(ping + ' ms');
+      if (animRollIn) pingValue._rollIn(ping + ' ms');
+      else pingValue._buildSlots(ping + ' ms');
       const dl = await measureDownload();
-      dlValue._rollIn(dl + ' Mbps');
+      if (animRollIn) dlValue._rollIn(dl + ' Mbps');
+      else dlValue._buildSlots(dl + ' Mbps');
       setGauge(0);
       const ul = await measureUpload();
-      ulValue._rollIn(ul + ' Mbps');
+      if (animRollIn) ulValue._rollIn(ul + ' Mbps');
+      else ulValue._buildSlots(ul + ' Mbps');
       setGauge(Math.max(dl, ul));
       try {
         await api.saveSpeedtest({ download: dl, upload: ul, ping, type: 'local' });
@@ -432,7 +426,7 @@ function buildSpeedtestSection() {
 // Uptime Device Card — one per device, live timer
 // =================================================================
 
-function buildDeviceUptimeCard(d, timerRefs) {
+function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
   const isOnline = d.online;
   const statusColor = isOnline ? '#22c55e' : '#ef4444';
   const statusText = isOnline ? 'Online' : 'Offline';
@@ -448,7 +442,6 @@ function buildDeviceUptimeCard(d, timerRefs) {
     fontFamily: "'JetBrains Mono', monospace",
     color: isOnline ? '#22c55e' : 'var(--text-muted)',
     letterSpacing: '0.02em',
-    padding: '8px 0 12px',
     textAlign: 'center',
     display: 'flex',
     justifyContent: 'center',
@@ -459,17 +452,23 @@ function buildDeviceUptimeCard(d, timerRefs) {
     paddingTop: '8px',
     paddingBottom: '12px',
   };
-  const timerEl = createLiveScrollTimer(timerStyle);
+  const timerEl = animTimer ? createLiveScrollTimer(timerStyle) : el('div', { style: timerStyle });
 
   if (d.onlineSinceTs && isOnline) {
-    // Online: live counting timer with scroll animation
+    // Online: live counting timer
     const initialText = formatLiveTimer(d.onlineSinceTs);
-    timerEl._buildSlots(initialText);
-    timerRefs.push({ el: timerEl, ts: d.onlineSinceTs });
+    if (animTimer) {
+      timerEl._buildSlots(initialText);
+      timerRefs.push({ el: timerEl, ts: d.onlineSinceTs, scroll: true });
+    } else {
+      timerEl.textContent = initialText;
+      timerRefs.push({ el: timerEl, ts: d.onlineSinceTs, scroll: false });
+    }
   } else if (d.onlineSinceTs && d.pausedAtTs && !isOnline) {
     // Offline but has paused timer: show frozen value
     const frozenMs = d.pausedAtTs - d.onlineSinceTs;
-    timerEl._buildSlots(formatLiveTimer(Date.now() - frozenMs));
+    if (animTimer) timerEl._buildSlots(formatLiveTimer(Date.now() - frozenMs));
+    else timerEl.textContent = formatLiveTimer(Date.now() - frozenMs);
     timerEl.style.opacity = '0.5';
   } else {
     timerEl.textContent = '—';
@@ -559,8 +558,8 @@ function buildDeviceUptimeCard(d, timerRefs) {
   ]);
 
   const animKey = 'uptime-' + d.name;
-  if (animatedSections.has(animKey)) {
-    // Already animated once — show final values instantly
+  if (!animBars || animatedSections.has(animKey)) {
+    // Animation disabled or already animated — show final values instantly
     animItems.forEach(a => {
       a.barFill.style.transition = 'none';
       a.barFill.style.width = a.pct + '%';
@@ -575,7 +574,8 @@ function buildDeviceUptimeCard(d, timerRefs) {
           animItems.forEach(a => {
             a.barFill.style.transitionDelay = `${a.idx * 0.15}s`;
             a.barFill.style.width = a.pct + '%';
-            a.numEl._animateIn(a.idx * 0.15);
+            if (animScroll) a.numEl._animateIn(a.idx * 0.15);
+            else a.numEl._animateIn(0);
           });
           cardObserver.unobserve(e.target);
         }
@@ -678,7 +678,7 @@ function buildOutagesMobileCard(outages) {
 // Ping Monitor Section
 // =================================================================
 
-function buildPingMonitorSection(data) {
+function buildPingMonitorSection(data, animSection, animScroll) {
   const hostColors = ['#00d4ff', '#f59e0b', '#22c55e', '#ef4444', '#8b5cf6', '#ec4899'];
   const frag = document.createDocumentFragment();
 
@@ -802,7 +802,7 @@ function buildPingMonitorSection(data) {
     clipRect.setAttribute('x', '0');
     clipRect.setAttribute('y', '0');
     clipRect.setAttribute('height', h);
-    if (alreadyAnimated) {
+    if (alreadyAnimated || !animSection) {
       clipRect.style.width = w + 'px';
     } else {
       clipRect.style.width = '0';
@@ -879,14 +879,16 @@ function buildPingMonitorSection(data) {
   ]);
   frag.appendChild(card);
 
-  if (alreadyAnimated) {
+  if (!animSection || alreadyAnimated) {
     scrollNums.forEach(s => s.el._animateIn(0));
+    if (clipRect && !animSection) clipRect.style.width = svgW + 'px';
   } else {
     const pmObserver = new IntersectionObserver((obs) => {
       obs.forEach(e => {
         if (e.isIntersecting) {
           animatedSections.add('ping-monitor');
-          scrollNums.forEach(s => s.el._animateIn(s.idx * 0.1));
+          if (animScroll) scrollNums.forEach(s => s.el._animateIn(s.idx * 0.1));
+          else scrollNums.forEach(s => s.el._animateIn(0));
           // Animate chart reveal from left to right via clip-rect
           if (clipRect) {
             clipRect.style.transition = 'width 3s cubic-bezier(0.65, 0, 0.35, 1)';
@@ -932,7 +934,7 @@ function summaryCardIcon(pathDefs) {
   return wrapper;
 }
 
-function buildPiholeSummaryCards(data) {
+function buildPiholeSummaryCards(data, animScroll) {
   const queries = data?.queries?.total ?? data?.dns_queries_today ?? 0;
   const blocked = data?.queries?.blocked ?? data?.ads_blocked_today ?? 0;
   const percent = data?.queries?.percent_blocked ?? data?.ads_percentage_today ?? 0;
@@ -994,7 +996,7 @@ function buildPiholeSummaryCards(data) {
     ]);
   }));
 
-  if (animatedSections.has('pihole-summary')) {
+  if (!animScroll || animatedSections.has('pihole-summary')) {
     scrollNums.forEach(s => s.el._animateIn(0));
   } else {
     const summaryObserver = new IntersectionObserver((obs) => {
@@ -1021,7 +1023,7 @@ function buildPiholeSummaryCards(data) {
   return grid;
 }
 
-function buildQueriesOverTimeChart(data) {
+function buildQueriesOverTimeChart(data, animBars) {
   // Pi-hole v6: data.history is array of { timestamp, total, blocked, cached, forwarded }
   const history = Array.isArray(data?.history) ? data.history : [];
   if (history.length === 0) {
@@ -1118,7 +1120,7 @@ function buildQueriesOverTimeChart(data) {
     }
   }
 
-  if (animatedSections.has('queries-over-time')) {
+  if (!animBars || animatedSections.has('queries-over-time')) {
     barRects.forEach(r => {
       r.style.transition = 'none';
       r.setAttribute('y', r.dataset.targetY);
@@ -1189,7 +1191,7 @@ function buildQueriesOverTimeChart(data) {
   ]);
 }
 
-function buildDonutChart(title, iconName, entries, colors) {
+function buildDonutChart(title, iconName, entries, colors, animDonut, animScroll) {
   if (!entries || entries.length === 0) {
     return el('div', { className: 'card', style: { padding: '24px', textAlign: 'center', color: 'var(--text-muted)' } }, [
       el('span', { textContent: t('analysen.noData') }),
@@ -1265,8 +1267,8 @@ function buildDonutChart(title, iconName, entries, colors) {
   ]);
 
   const animKey = 'donut-' + title;
-  if (animatedSections.has(animKey)) {
-    // Already animated — show final state instantly
+  if (!animDonut || animatedSections.has(animKey)) {
+    // Animation disabled or already animated — show final state instantly
     circles.forEach(c => { c.style.transition = 'none'; c.style.strokeDashoffset = c.dataset.targetOffset; });
     legendScrollNums.forEach(s => s.el._animateIn(0));
   } else {
@@ -1275,7 +1277,8 @@ function buildDonutChart(title, iconName, entries, colors) {
         if (e.isIntersecting) {
           animatedSections.add(animKey);
           circles.forEach(c => { c.style.strokeDashoffset = c.dataset.targetOffset; });
-          legendScrollNums.forEach(s => s.el._animateIn(s.idx * 0.08));
+          if (animScroll) legendScrollNums.forEach(s => s.el._animateIn(s.idx * 0.08));
+          else legendScrollNums.forEach(s => s.el._animateIn(0));
           donutObserver.unobserve(e.target);
         }
       });
@@ -1295,7 +1298,7 @@ function buildDonutChart(title, iconName, entries, colors) {
   return card;
 }
 
-function buildQueryTypesDonut(data) {
+function buildQueryTypesDonut(data, animDonut, animScroll) {
   const types = data?.types || data?.querytypes || {};
   const entries = Object.entries(types)
     .filter(([, v]) => v > 0)
@@ -1303,10 +1306,10 @@ function buildQueryTypesDonut(data) {
     .map(([label, value]) => ({ label, value }));
 
   const colors = ['#ec4899', '#ef4444', '#f59e0b', '#22c55e', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316'];
-  return buildDonutChart(t('pihole.queryTypes'), 'piholeDns', entries, colors);
+  return buildDonutChart(t('pihole.queryTypes'), 'piholeDns', entries, colors, animDonut, animScroll);
 }
 
-function buildUpstreamsDonut(data) {
+function buildUpstreamsDonut(data, animDonut, animScroll) {
   const upstreams = data?.upstreams || [];
   let entries;
   if (Array.isArray(upstreams)) {
@@ -1322,7 +1325,7 @@ function buildUpstreamsDonut(data) {
   }
 
   const colors = ['#ef4444', '#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
-  return buildDonutChart(t('pihole.upstreamServers'), 'uptime', entries, colors);
+  return buildDonutChart(t('pihole.upstreamServers'), 'uptime', entries, colors, animDonut, animScroll);
 }
 
 function extractTopList(data, key) {
@@ -1391,7 +1394,7 @@ function createScrollNumber(value) {
   return container;
 }
 
-function buildTopList(title, iconName, items, color) {
+function buildTopList(title, iconName, items, color, animBars, animScroll) {
   if (!items || items.length === 0) {
     return el('div', { className: 'card' }, [
       sectionTitle(title, iconName),
@@ -1441,7 +1444,7 @@ function buildTopList(title, iconName, items, color) {
   ]);
 
   const animKey = 'toplist-' + title;
-  if (animatedSections.has(animKey)) {
+  if (!animBars || animatedSections.has(animKey)) {
     scrollNums.forEach(s => s.el._animateIn(0));
     barFills.forEach(b => { b.el.style.transition = 'none'; b.el.style.width = b.pct + '%'; });
   } else {
@@ -1449,7 +1452,8 @@ function buildTopList(title, iconName, items, color) {
       obs.forEach(e => {
         if (e.isIntersecting) {
           animatedSections.add(animKey);
-          scrollNums.forEach(s => s.el._animateIn(s.idx * 0.07));
+          if (animScroll) scrollNums.forEach(s => s.el._animateIn(s.idx * 0.07));
+          else scrollNums.forEach(s => s.el._animateIn(0));
           barFills.forEach(b => {
             b.el.style.transitionDelay = `${b.idx * 0.07}s`;
             b.el.style.width = b.pct + '%';
@@ -1487,6 +1491,25 @@ export function renderAnalysen(container) {
 
   // Read poll intervals from config
   const cfg = getConfig();
+
+  // Animation config
+  const anim = cfg?.animations || {};
+  const animAnalysen = anim.analysen || {};
+  const animEnabled = anim.enabled !== false;
+  const scrollEnabled = animEnabled && anim.numberScroll !== false;
+  const animSpeedtest = animEnabled && animAnalysen.speedtest !== false && scrollEnabled;
+  const animUptime = animEnabled && animAnalysen.uptime !== false;
+  const animUptimeScroll = animUptime && scrollEnabled;
+  const animUptimeTimer = animUptime && scrollEnabled;
+  const animPingMonitor = animEnabled && animAnalysen.pingMonitor !== false;
+  const animPingMonitorScroll = animPingMonitor && scrollEnabled;
+  const animPiholeSummary = animEnabled && animAnalysen.piholeSummary !== false && scrollEnabled;
+  const animQueriesOverTime = animEnabled && animAnalysen.queriesOverTime !== false;
+  const animDonuts = animEnabled && animAnalysen.donuts !== false;
+  const animDonutsScroll = animDonuts && scrollEnabled;
+  const animTopLists = animEnabled && animAnalysen.topLists !== false;
+  const animTopListsScroll = animTopLists && scrollEnabled;
+
   const pollSec = (cfg?.uptimeInterval && cfg.uptimeInterval >= 10) ? cfg.uptimeInterval : 60;
   const pollMs = pollSec * 1000;
   const piholeSec = (cfg?.piholeInterval && cfg.piholeInterval >= 30) ? cfg.piholeInterval : 60;
@@ -1507,7 +1530,7 @@ export function renderAnalysen(container) {
   const topRow = el('div', { className: 'analysen-top' });
 
   // Top row: Speedtest (left) | Outages (right) — side by side
-  if (showSpeedtest) topRow.appendChild(buildSpeedtestSection());
+  if (showSpeedtest) topRow.appendChild(buildSpeedtestSection(animSpeedtest));
 
   let outagesPlaceholder = null;
   if (showOutages) {
@@ -1587,7 +1610,7 @@ export function renderAnalysen(container) {
       if (data && data.devices && data.devices.length > 0) {
         uptimeGrid.replaceChildren();
         for (const d of data.devices) {
-          uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs));
+          uptimeGrid.appendChild(buildDeviceUptimeCard(d, timerRefs, animUptime, animUptimeScroll, animUptimeTimer));
         }
       } else {
         uptimeGrid.replaceChildren();
@@ -1610,7 +1633,9 @@ export function renderAnalysen(container) {
     if (timerRefs.length > 0) {
       timerInterval = setInterval(() => {
         for (const ref of timerRefs) {
-          ref.el._update(formatLiveTimer(ref.ts));
+          const text = formatLiveTimer(ref.ts);
+          if (ref.scroll) ref.el._update(text);
+          else ref.el.textContent = text;
         }
       }, 1000);
     }
@@ -1619,7 +1644,7 @@ export function renderAnalysen(container) {
   function renderPingMonitorData(data) {
     if (destroyed) return;
     pingMonContainer.replaceChildren();
-    pingMonContainer.appendChild(buildPingMonitorSection(data));
+    pingMonContainer.appendChild(buildPingMonitorSection(data, animPingMonitor, animPingMonitorScroll));
   }
 
   function refreshUptime() {
@@ -1700,27 +1725,27 @@ export function renderAnalysen(container) {
 
         // Summary cards
         if (show('summary')) {
-          piholeContainer.appendChild(buildPiholeSummaryCards(r.summary));
+          piholeContainer.appendChild(buildPiholeSummaryCards(r.summary, animPiholeSummary));
         }
 
         // Queries over time (full width)
         if (show('queriesOverTime')) {
-          piholeContainer.appendChild(buildQueriesOverTimeChart(r.queriesOverTime));
+          piholeContainer.appendChild(buildQueriesOverTimeChart(r.queriesOverTime, animQueriesOverTime));
         }
 
         // Donuts row: query types + upstream servers (2 columns)
         const donuts = [];
-        if (show('queryTypes')) donuts.push(buildQueryTypesDonut(r.queryTypes));
-        if (show('upstreams')) donuts.push(buildUpstreamsDonut(r.upstreams));
+        if (show('queryTypes')) donuts.push(buildQueryTypesDonut(r.queryTypes, animDonuts, animDonutsScroll));
+        if (show('upstreams')) donuts.push(buildUpstreamsDonut(r.upstreams, animDonuts, animDonutsScroll));
         if (donuts.length > 0) {
           piholeContainer.appendChild(el('div', { className: 'pihole-donuts-row' }, donuts));
         }
 
         // Top lists: up to 3 columns
         const topCols = [];
-        if (show('topDomains')) topCols.push(buildTopList(t('pihole.topDomains'), 'traffic', extractTopList(r.topDomains, 'domains'), 'var(--accent)'));
-        if (show('topBlocked')) topCols.push(buildTopList(t('pihole.topBlocked'), 'outage', extractTopList(r.topBlocked, 'domains'), '#ef4444'));
-        if (show('topClients')) topCols.push(buildTopList(t('pihole.topClients'), 'power', extractTopList(r.topClients, 'clients'), '#8b5cf6'));
+        if (show('topDomains')) topCols.push(buildTopList(t('pihole.topDomains'), 'traffic', extractTopList(r.topDomains, 'domains'), 'var(--accent)', animTopLists, animTopListsScroll));
+        if (show('topBlocked')) topCols.push(buildTopList(t('pihole.topBlocked'), 'outage', extractTopList(r.topBlocked, 'domains'), '#ef4444', animTopLists, animTopListsScroll));
+        if (show('topClients')) topCols.push(buildTopList(t('pihole.topClients'), 'power', extractTopList(r.topClients, 'clients'), '#8b5cf6', animTopLists, animTopListsScroll));
         if (topCols.length > 0) {
           const cls = topCols.length === 3 ? 'grid three equal-height'
                     : topCols.length === 2 ? 'pihole-donuts-row'
@@ -1807,7 +1832,9 @@ export function renderAnalysen(container) {
       if (timerRefs.length > 0 && !timerInterval) {
         timerInterval = setInterval(() => {
           for (const ref of timerRefs) {
-            ref.el._update(formatLiveTimer(ref.ts));
+            const text = formatLiveTimer(ref.ts);
+            if (ref.scroll) ref.el._update(text);
+            else ref.el.textContent = text;
           }
         }, 1000);
       }

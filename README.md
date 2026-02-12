@@ -74,8 +74,28 @@ Steuert alle visuellen Animationen der Oberfläche.
 | `modalSlide` | `boolean` | `true` | Slide-Animation beim Öffnen von Modals und Overlays. |
 | `panelFade` | `boolean` | `true` | Überblend-Effekt beim Tab-Wechsel in den Einstellungen. |
 | `themeSwitcher` | `boolean` | `true` | Animations-Effekte der Theme-Buttons (Sonne/Mond/System). |
+| `numberScroll` | `boolean` | `true` | Scroll-Animationen bei Zahlen im Analysen Center. Bei `false` erscheinen alle Zahlen sofort, aber Balken/Charts/Donuts animieren weiterhin. |
 
 Die Einzel-Optionen wirken nur, wenn `enabled: true` ist.
+
+#### Analysen-Animationen (`animations.analysen`)
+
+Granulare Steuerung der Scroll-/Reveal-Animationen pro Sektion im Analysen Center. Jede Option wirkt nur, wenn `enabled: true` ist. Bei `false` wird die jeweilige Sektion sofort im Endzustand angezeigt (keine Observer, keine Transition).
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `speedtest` | `boolean` | `true` | Speedtest Download/Upload/Ping Scroll-Animationen. |
+| `uptime` | `boolean` | `true` | Uptime-Cards: Balken-Animation, Prozent-Scroll und Timer-Scroll. |
+| `pingMonitor` | `boolean` | `true` | Ping Monitor: Ping-Scroll-Zahlen und Chart-Reveal von links nach rechts. |
+| `piholeSummary` | `boolean` | `true` | Pi-hole Summary Cards: Zahlen-Scroll-Animation. |
+| `queriesOverTime` | `boolean` | `true` | Queries Bar-Chart: Balken wachsen von unten nach oben. |
+| `donuts` | `boolean` | `true` | Donut-Charts (Query Types + Upstreams): Segmente und Legenden-Zahlen. |
+| `topLists` | `boolean` | `true` | Top Domains/Blocked/Clients: Balken und Zahlen-Scroll. |
+
+**Hierarchie:**
+- `animations.enabled: false` → alle Animationen aus (auch Analysen)
+- `animations.numberScroll: false` → alle Scroll-Zahlen im Analysen Center sofort sichtbar, aber Balken/Charts/Donuts animieren noch
+- `animations.analysen.X: false` → nur diese Sektion ohne Animation
 
 ```js
 animations: {
@@ -85,6 +105,16 @@ animations: {
   modalSlide: true,
   panelFade: true,
   themeSwitcher: true,
+  numberScroll: true,
+  analysen: {
+    speedtest: true,
+    uptime: true,
+    pingMonitor: true,
+    piholeSummary: true,
+    queriesOverTime: true,
+    donuts: true,
+    topLists: true,
+  },
 },
 ```
 
