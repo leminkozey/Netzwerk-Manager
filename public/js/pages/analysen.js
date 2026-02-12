@@ -13,6 +13,9 @@ import { wsConnected } from '../ws.js';
 // Helpers
 // =================================================================
 
+// Track which sections have already played their intro animation
+const animatedSections = new Set();
+
 function isLocalhost() {
   const h = location.hostname;
   return h === 'localhost' || h === '127.0.0.1' || h === '::1';
@@ -136,8 +139,57 @@ function createLiveScrollTimer(style) {
     }
   }
 
+  // Build slots at digit 0, then animate to target value
+  function rollIn(text) {
+    container.replaceChildren();
+    slots = [];
+    const targets = [];
+    for (const char of text) {
+      if (char >= '0' && char <= '9') {
+        const col = el('span', {
+          style: {
+            display: 'inline-block', height: '1.2em', overflow: 'hidden',
+            position: 'relative', width: '0.62em', textAlign: 'center',
+          },
+        });
+        const strip = el('span', {
+          style: {
+            display: 'block', lineHeight: '1.2em',
+            transition: 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+            transform: 'translateY(0)',
+          },
+        });
+        for (let d = 0; d <= 9; d++) {
+          strip.appendChild(el('span', { textContent: String(d), style: { display: 'block', height: '1.2em' } }));
+        }
+        col.appendChild(strip);
+        container.appendChild(col);
+        const digit = parseInt(char);
+        slots.push({ col, strip, currentDigit: 0, type: 'digit' });
+        targets.push({ strip, digit });
+      } else {
+        const span = el('span', { textContent: char, style: { display: 'inline-block' } });
+        container.appendChild(span);
+        slots.push({ span, char, type: 'label' });
+      }
+    }
+    // Animate after a frame so the browser registers the initial state
+    requestAnimationFrame(() => {
+      targets.forEach((t, i) => {
+        t.strip.style.transitionDelay = `${i * 0.04}s`;
+        t.strip.style.transform = `translateY(${-t.digit * 1.2}em)`;
+      });
+      // Update currentDigit tracking
+      let di = 0;
+      for (const s of slots) {
+        if (s.type === 'digit') { s.currentDigit = targets[di].digit; di++; }
+      }
+    });
+  }
+
   container._update = update;
   container._buildSlots = buildSlots;
+  container._rollIn = rollIn;
   return container;
 }
 
@@ -207,9 +259,15 @@ function buildSpeedtestSection() {
   const gaugeWrapper = el('div', { className: 'speedtest-gauge-wrapper' }, [svg]);
   const noteEl = el('div', { className: 'speedtest-note', textContent: t('speedtest.ready') });
 
-  const dlValue = el('span', { className: 'speedtest-stat-value', textContent: '-' });
-  const ulValue = el('span', { className: 'speedtest-stat-value', textContent: '-' });
-  const pingValue = el('span', { className: 'speedtest-stat-value', textContent: '-' });
+  const dlValue = createLiveScrollTimer({ display: 'inline-flex', justifyContent: 'center', overflow: 'hidden', height: '1.2em' });
+  dlValue.className = 'speedtest-stat-value';
+  dlValue.textContent = '-';
+  const ulValue = createLiveScrollTimer({ display: 'inline-flex', justifyContent: 'center', overflow: 'hidden', height: '1.2em' });
+  ulValue.className = 'speedtest-stat-value';
+  ulValue.textContent = '-';
+  const pingValue = createLiveScrollTimer({ display: 'inline-flex', justifyContent: 'center', overflow: 'hidden', height: '1.2em' });
+  pingValue.className = 'speedtest-stat-value';
+  pingValue.textContent = '-';
 
   const statsRow = el('div', { className: 'speedtest-stats' }, [
     el('div', { className: 'speedtest-stat' }, [
@@ -326,12 +384,12 @@ function buildSpeedtestSection() {
     pingValue.textContent = '-';
     try {
       const ping = await measurePing();
-      pingValue.textContent = ping + ' ms';
+      pingValue._rollIn(ping + ' ms');
       const dl = await measureDownload();
-      dlValue.textContent = dl + ' Mbps';
+      dlValue._rollIn(dl + ' Mbps');
       setGauge(0);
       const ul = await measureUpload();
-      ulValue.textContent = ul + ' Mbps';
+      ulValue._rollIn(ul + ' Mbps');
       setGauge(Math.max(dl, ul));
       try {
         await api.saveSpeedtest({ download: dl, upload: ul, ping, type: 'local' });
@@ -491,29 +549,40 @@ function buildDeviceUptimeCard(d, timerRefs) {
     uptimeBar('7d', pct7d, barColor7d, 1),
   ]);
 
-  // Observe scroll to animate bars + percentage numbers
-  const cardObserver = new IntersectionObserver((obs) => {
-    obs.forEach(e => {
-      if (e.isIntersecting) {
-        animItems.forEach(a => {
-          a.barFill.style.transitionDelay = `${a.idx * 0.15}s`;
-          a.barFill.style.width = a.pct + '%';
-          a.numEl._animateIn(a.idx * 0.15);
+  const animKey = 'uptime-' + d.name;
+  if (animatedSections.has(animKey)) {
+    // Already animated once — show final values instantly
+    animItems.forEach(a => {
+      a.barFill.style.transition = 'none';
+      a.barFill.style.width = a.pct + '%';
+      a.numEl._animateIn(0);
+    });
+  } else {
+    // First render — observe scroll to animate
+    const cardObserver = new IntersectionObserver((obs) => {
+      obs.forEach(e => {
+        if (e.isIntersecting) {
+          animatedSections.add(animKey);
+          animItems.forEach(a => {
+            a.barFill.style.transitionDelay = `${a.idx * 0.15}s`;
+            a.barFill.style.width = a.pct + '%';
+            a.numEl._animateIn(a.idx * 0.15);
+          });
+          cardObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.2 });
+
+    requestAnimationFrame(() => {
+      if (card.isConnected) cardObserver.observe(card);
+      else {
+        const mo = new MutationObserver(() => {
+          if (card.isConnected) { cardObserver.observe(card); mo.disconnect(); }
         });
-        cardObserver.unobserve(e.target);
+        mo.observe(document.body, { childList: true, subtree: true });
       }
     });
-  }, { threshold: 0.2 });
-
-  requestAnimationFrame(() => {
-    if (card.isConnected) cardObserver.observe(card);
-    else {
-      const mo = new MutationObserver(() => {
-        if (card.isConnected) { cardObserver.observe(card); mo.disconnect(); }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-  });
+  }
 
   return card;
 }
@@ -853,24 +922,29 @@ function buildPiholeSummaryCards(data) {
     ]);
   }));
 
-  const summaryObserver = new IntersectionObserver((obs) => {
-    obs.forEach(e => {
-      if (e.isIntersecting) {
-        scrollNums.forEach(s => s.el._animateIn(s.idx * 0.12));
-        summaryObserver.unobserve(e.target);
+  if (animatedSections.has('pihole-summary')) {
+    scrollNums.forEach(s => s.el._animateIn(0));
+  } else {
+    const summaryObserver = new IntersectionObserver((obs) => {
+      obs.forEach(e => {
+        if (e.isIntersecting) {
+          animatedSections.add('pihole-summary');
+          scrollNums.forEach(s => s.el._animateIn(s.idx * 0.12));
+          summaryObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.2 });
+
+    requestAnimationFrame(() => {
+      if (grid.isConnected) summaryObserver.observe(grid);
+      else {
+        const mo = new MutationObserver(() => {
+          if (grid.isConnected) { summaryObserver.observe(grid); mo.disconnect(); }
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
       }
     });
-  }, { threshold: 0.2 });
-
-  requestAnimationFrame(() => {
-    if (grid.isConnected) summaryObserver.observe(grid);
-    else {
-      const mo = new MutationObserver(() => {
-        if (grid.isConnected) { summaryObserver.observe(grid); mo.disconnect(); }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-  });
+  }
 
   return grid;
 }
@@ -972,28 +1046,36 @@ function buildQueriesOverTimeChart(data) {
     }
   }
 
-  // Observe scroll to animate bars growing upward
-  const barObserver = new IntersectionObserver((obs) => {
-    obs.forEach(e => {
-      if (e.isIntersecting) {
-        barRects.forEach(r => {
-          r.setAttribute('y', r.dataset.targetY);
-          r.setAttribute('height', r.dataset.targetH);
+  if (animatedSections.has('queries-over-time')) {
+    barRects.forEach(r => {
+      r.style.transition = 'none';
+      r.setAttribute('y', r.dataset.targetY);
+      r.setAttribute('height', r.dataset.targetH);
+    });
+  } else {
+    const barObserver = new IntersectionObserver((obs) => {
+      obs.forEach(e => {
+        if (e.isIntersecting) {
+          animatedSections.add('queries-over-time');
+          barRects.forEach(r => {
+            r.setAttribute('y', r.dataset.targetY);
+            r.setAttribute('height', r.dataset.targetH);
+          });
+          barObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.2 });
+
+    requestAnimationFrame(() => {
+      if (svg.isConnected) barObserver.observe(svg);
+      else {
+        const mo = new MutationObserver(() => {
+          if (svg.isConnected) { barObserver.observe(svg); mo.disconnect(); }
         });
-        barObserver.unobserve(e.target);
+        mo.observe(document.body, { childList: true, subtree: true });
       }
     });
-  }, { threshold: 0.2 });
-
-  requestAnimationFrame(() => {
-    if (svg.isConnected) barObserver.observe(svg);
-    else {
-      const mo = new MutationObserver(() => {
-        if (svg.isConnected) { barObserver.observe(svg); mo.disconnect(); }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-  });
+  }
 
   // X-axis time labels
   const labelCount = Math.min(12, history.length);
@@ -1088,27 +1170,6 @@ function buildDonutChart(title, iconName, entries, colors) {
     offset += segLen;
   });
 
-  // Observe when SVG enters viewport, then animate segments in
-  const observer = new IntersectionObserver((obs) => {
-    obs.forEach(e => {
-      if (e.isIntersecting) {
-        circles.forEach(c => { c.style.strokeDashoffset = c.dataset.targetOffset; });
-        observer.unobserve(e.target);
-      }
-    });
-  }, { threshold: 0.3 });
-
-  // Schedule observe after element is in DOM
-  requestAnimationFrame(() => {
-    if (svg.isConnected) observer.observe(svg);
-    else {
-      const mo = new MutationObserver(() => {
-        if (svg.isConnected) { observer.observe(svg); mo.disconnect(); }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-  });
-
   const legendScrollNums = [];
   const legendItems = entries.slice(0, 8).map((entry, i) => {
     const pctDisplay = (Math.round((entry.value / total) * 1000) / 10) + '%';
@@ -1131,25 +1192,33 @@ function buildDonutChart(title, iconName, entries, colors) {
     el('div', { style: { padding: '4px 0' } }, legendItems),
   ]);
 
-  // Observe legend scroll numbers (piggyback on donut observer)
-  const legendObserver = new IntersectionObserver((obs) => {
-    obs.forEach(e => {
-      if (e.isIntersecting) {
-        legendScrollNums.forEach(s => s.el._animateIn(s.idx * 0.08));
-        legendObserver.unobserve(e.target);
+  const animKey = 'donut-' + title;
+  if (animatedSections.has(animKey)) {
+    // Already animated — show final state instantly
+    circles.forEach(c => { c.style.transition = 'none'; c.style.strokeDashoffset = c.dataset.targetOffset; });
+    legendScrollNums.forEach(s => s.el._animateIn(0));
+  } else {
+    const donutObserver = new IntersectionObserver((obs) => {
+      obs.forEach(e => {
+        if (e.isIntersecting) {
+          animatedSections.add(animKey);
+          circles.forEach(c => { c.style.strokeDashoffset = c.dataset.targetOffset; });
+          legendScrollNums.forEach(s => s.el._animateIn(s.idx * 0.08));
+          donutObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.3 });
+
+    requestAnimationFrame(() => {
+      if (card.isConnected) donutObserver.observe(card);
+      else {
+        const mo = new MutationObserver(() => {
+          if (card.isConnected) { donutObserver.observe(card); mo.disconnect(); }
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
       }
     });
-  }, { threshold: 0.2 });
-
-  requestAnimationFrame(() => {
-    if (card.isConnected) legendObserver.observe(card);
-    else {
-      const mo = new MutationObserver(() => {
-        if (card.isConnected) { legendObserver.observe(card); mo.disconnect(); }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-  });
+  }
 
   return card;
 }
@@ -1296,29 +1365,35 @@ function buildTopList(title, iconName, items, color) {
     ...rows,
   ]);
 
-  // Observe scroll to trigger animations
-  const listObserver = new IntersectionObserver((obs) => {
-    obs.forEach(e => {
-      if (e.isIntersecting) {
-        scrollNums.forEach(s => s.el._animateIn(s.idx * 0.07));
-        barFills.forEach(b => {
-          b.el.style.transitionDelay = `${b.idx * 0.07}s`;
-          b.el.style.width = b.pct + '%';
+  const animKey = 'toplist-' + title;
+  if (animatedSections.has(animKey)) {
+    scrollNums.forEach(s => s.el._animateIn(0));
+    barFills.forEach(b => { b.el.style.transition = 'none'; b.el.style.width = b.pct + '%'; });
+  } else {
+    const listObserver = new IntersectionObserver((obs) => {
+      obs.forEach(e => {
+        if (e.isIntersecting) {
+          animatedSections.add(animKey);
+          scrollNums.forEach(s => s.el._animateIn(s.idx * 0.07));
+          barFills.forEach(b => {
+            b.el.style.transitionDelay = `${b.idx * 0.07}s`;
+            b.el.style.width = b.pct + '%';
+          });
+          listObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    requestAnimationFrame(() => {
+      if (card.isConnected) listObserver.observe(card);
+      else {
+        const mo = new MutationObserver(() => {
+          if (card.isConnected) { listObserver.observe(card); mo.disconnect(); }
         });
-        listObserver.unobserve(e.target);
+        mo.observe(document.body, { childList: true, subtree: true });
       }
     });
-  }, { threshold: 0.15 });
-
-  requestAnimationFrame(() => {
-    if (card.isConnected) listObserver.observe(card);
-    else {
-      const mo = new MutationObserver(() => {
-        if (card.isConnected) { listObserver.observe(card); mo.disconnect(); }
-      });
-      mo.observe(document.body, { childList: true, subtree: true });
-    }
-  });
+  }
 
   return card;
 }
@@ -1670,6 +1745,7 @@ export function renderAnalysen(container) {
 
   return function cleanup() {
     destroyed = true;
+    animatedSections.clear();
     if (timerInterval) clearInterval(timerInterval);
     stopFallbackPolling();
     if (piholeInterval) clearInterval(piholeInterval);
