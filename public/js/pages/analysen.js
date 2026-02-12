@@ -59,6 +59,88 @@ function formatLiveTimer(sinceTs) {
   return parts.join(' ');
 }
 
+// Scroll-digit timer element that animates each digit on change
+function createLiveScrollTimer(style) {
+  const container = el('div', { style });
+  let slots = []; // { col, strip, currentDigit, type:'digit' } or { span, type:'label' }
+
+  function buildSlots(text) {
+    container.replaceChildren();
+    slots = [];
+    for (const char of text) {
+      if (char >= '0' && char <= '9') {
+        const col = el('span', {
+          style: {
+            display: 'inline-block', height: '1.2em', overflow: 'hidden',
+            position: 'relative', width: '0.62em', textAlign: 'center',
+          },
+        });
+        const strip = el('span', {
+          style: {
+            display: 'block', lineHeight: '1.2em',
+            transition: 'transform 0.45s cubic-bezier(0.16, 1, 0.3, 1)',
+          },
+        });
+        for (let d = 0; d <= 9; d++) {
+          strip.appendChild(el('span', { textContent: String(d), style: { display: 'block', height: '1.2em' } }));
+        }
+        const digit = parseInt(char);
+        strip.style.transform = `translateY(${-digit * 1.2}em)`;
+        col.appendChild(strip);
+        container.appendChild(col);
+        slots.push({ col, strip, currentDigit: digit, type: 'digit' });
+      } else {
+        const span = el('span', { textContent: char, style: { display: 'inline-block' } });
+        container.appendChild(span);
+        slots.push({ span, char, type: 'label' });
+      }
+    }
+  }
+
+  function update(text) {
+    // If structure changed (different length or label positions), rebuild
+    const newChars = [...text];
+    const oldStructure = slots.map(s => s.type === 'digit' ? 'D' : s.char).join('');
+    const newStructure = newChars.map(c => (c >= '0' && c <= '9') ? 'D' : c).join('');
+
+    if (oldStructure !== newStructure) {
+      buildSlots(text);
+      return;
+    }
+
+    // Same structure: animate only changed digits
+    let di = 0;
+    for (const s of slots) {
+      if (s.type !== 'digit') continue;
+      const targetChar = newChars.find((c, idx) => {
+        // Find the di-th digit in newChars
+        let count = -1;
+        for (let j = 0; j <= idx; j++) {
+          if (newChars[j] >= '0' && newChars[j] <= '9') count++;
+        }
+        return count === di;
+      });
+      // Simpler: iterate and pick digits in order
+      let digitIdx = 0, target = 0;
+      for (const c of newChars) {
+        if (c >= '0' && c <= '9') {
+          if (digitIdx === di) { target = parseInt(c); break; }
+          digitIdx++;
+        }
+      }
+      if (target !== s.currentDigit) {
+        s.currentDigit = target;
+        s.strip.style.transform = `translateY(${-target * 1.2}em)`;
+      }
+      di++;
+    }
+  }
+
+  container._update = update;
+  container._buildSlots = buildSlots;
+  return container;
+}
+
 function formatNumber(n) {
   if (typeof n !== 'number' || isNaN(n)) return '0';
   const locale = getCurrentLang() === 'en' ? 'en-US' : 'de-DE';
@@ -292,33 +374,60 @@ function buildDeviceUptimeCard(d, timerRefs) {
   const barColor24 = pct24 >= 99 ? '#22c55e' : pct24 >= 95 ? '#f59e0b' : '#ef4444';
   const barColor7d = pct7d >= 99 ? '#22c55e' : pct7d >= 95 ? '#f59e0b' : '#ef4444';
 
-  // Timer element — ticks every second
-  const timerEl = el('div', {
-    style: {
-      fontSize: '1.4rem',
-      fontWeight: '700',
-      fontFamily: "'JetBrains Mono', monospace",
-      color: isOnline ? '#22c55e' : 'var(--text-muted)',
-      letterSpacing: '0.02em',
-      padding: '8px 0 12px',
-      textAlign: 'center',
-    },
-  });
+  // Timer element — ticks every second with scroll digits
+  const timerStyle = {
+    fontSize: '1.4rem',
+    fontWeight: '700',
+    fontFamily: "'JetBrains Mono', monospace",
+    color: isOnline ? '#22c55e' : 'var(--text-muted)',
+    letterSpacing: '0.02em',
+    padding: '8px 0 12px',
+    textAlign: 'center',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    height: '1.2em',
+    boxSizing: 'content-box',
+    paddingTop: '8px',
+    paddingBottom: '12px',
+  };
+  const timerEl = createLiveScrollTimer(timerStyle);
 
   if (d.onlineSinceTs && isOnline) {
-    // Online: live counting timer
-    timerEl.textContent = formatLiveTimer(d.onlineSinceTs);
+    // Online: live counting timer with scroll animation
+    const initialText = formatLiveTimer(d.onlineSinceTs);
+    timerEl._buildSlots(initialText);
     timerRefs.push({ el: timerEl, ts: d.onlineSinceTs });
   } else if (d.onlineSinceTs && d.pausedAtTs && !isOnline) {
     // Offline but has paused timer: show frozen value
     const frozenMs = d.pausedAtTs - d.onlineSinceTs;
-    timerEl.textContent = formatLiveTimer(Date.now() - frozenMs);
+    timerEl._buildSlots(formatLiveTimer(Date.now() - frozenMs));
     timerEl.style.opacity = '0.5';
   } else {
     timerEl.textContent = '—';
   }
 
-  function uptimeBar(label, pct, barColor) {
+  const animItems = []; // { barFill, numEl, pct, idx }
+
+  function uptimeBar(label, pct, barColor, idx) {
+    const barFill = el('div', {
+      style: {
+        height: '100%', width: '0%', borderRadius: '3px',
+        background: `linear-gradient(90deg, ${barColor}, ${barColor}88)`,
+        transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
+      },
+    });
+    const numEl = createScrollNumber(pct + '%');
+    numEl.style.minWidth = '42px';
+    numEl.style.textAlign = 'right';
+    numEl.style.fontSize = '0.8rem';
+    numEl.style.fontWeight = '700';
+    numEl.style.fontFamily = "'JetBrains Mono', monospace";
+    numEl.style.color = barColor;
+
+    animItems.push({ barFill, numEl, pct, idx });
+
     return el('div', {
       style: { display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' },
     }, [
@@ -334,26 +443,12 @@ function buildDeviceUptimeCard(d, timerRefs) {
           flex: '1', height: '6px', borderRadius: '3px',
           background: 'var(--border)', overflow: 'hidden',
         },
-      }, [
-        el('div', {
-          style: {
-            height: '100%', width: pct + '%', borderRadius: '3px',
-            background: `linear-gradient(90deg, ${barColor}, ${barColor}88)`,
-            transition: 'width 0.8s ease',
-          },
-        }),
-      ]),
-      el('span', {
-        textContent: pct + '%',
-        style: {
-          minWidth: '42px', textAlign: 'right', fontSize: '0.8rem',
-          fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", color: barColor,
-        },
-      }),
+      }, [barFill]),
+      numEl,
     ]);
   }
 
-  return el('div', { className: 'card', style: { marginBottom: '0' } }, [
+  const card = el('div', { className: 'card', style: { marginBottom: '0' } }, [
     // Header: dot + name + ip | status badge
     el('div', {
       style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' },
@@ -392,9 +487,35 @@ function buildDeviceUptimeCard(d, timerRefs) {
     // Live timer
     timerEl,
     // Bars
-    uptimeBar('24h', pct24, barColor24),
-    uptimeBar('7d', pct7d, barColor7d),
+    uptimeBar('24h', pct24, barColor24, 0),
+    uptimeBar('7d', pct7d, barColor7d, 1),
   ]);
+
+  // Observe scroll to animate bars + percentage numbers
+  const cardObserver = new IntersectionObserver((obs) => {
+    obs.forEach(e => {
+      if (e.isIntersecting) {
+        animItems.forEach(a => {
+          a.barFill.style.transitionDelay = `${a.idx * 0.15}s`;
+          a.barFill.style.width = a.pct + '%';
+          a.numEl._animateIn(a.idx * 0.15);
+        });
+        cardObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.2 });
+
+  requestAnimationFrame(() => {
+    if (card.isConnected) cardObserver.observe(card);
+    else {
+      const mo = new MutationObserver(() => {
+        if (card.isConnected) { cardObserver.observe(card); mo.disconnect(); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+  });
+
+  return card;
 }
 
 // =================================================================
@@ -1335,11 +1456,11 @@ export function renderAnalysen(container) {
       currentOutages = newOutages;
     }
 
-    // Start live timer
+    // Start live timer with scroll-digit updates
     if (timerRefs.length > 0) {
       timerInterval = setInterval(() => {
         for (const ref of timerRefs) {
-          ref.el.textContent = formatLiveTimer(ref.ts);
+          ref.el._update(formatLiveTimer(ref.ts));
         }
       }, 1000);
     }
@@ -1536,7 +1657,7 @@ export function renderAnalysen(container) {
       if (timerRefs.length > 0 && !timerInterval) {
         timerInterval = setInterval(() => {
           for (const ref of timerRefs) {
-            ref.el.textContent = formatLiveTimer(ref.ts);
+            ref.el._update(formatLiveTimer(ref.ts));
           }
         }, 1000);
       }
