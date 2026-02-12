@@ -770,8 +770,10 @@ function buildQueriesOverTimeChart(data) {
     svg.appendChild(label);
   }
 
-  // Stacked bars
+  // Stacked bars (animated on scroll)
   const bottom = toY(0);
+  const barRects = [];
+
   for (let i = 0; i < history.length; i++) {
     const h = history[i];
     const forwarded = h.forwarded ?? 0;
@@ -781,29 +783,33 @@ function buildQueriesOverTimeChart(data) {
     if (total === 0) continue;
 
     const x = padL + i * barW + (barW - barInner) / 2;
-
-    // Calculate segment heights proportionally from the total bar
     const totalH = bottom - toY(total);
+
+    const makeBar = (fill, targetY, targetH) => {
+      const rect = document.createElementNS(ns, 'rect');
+      rect.setAttribute('x', x); rect.setAttribute('width', barInner);
+      rect.setAttribute('fill', fill); rect.setAttribute('rx', '0.5');
+      // Start collapsed at bottom
+      rect.setAttribute('y', bottom);
+      rect.setAttribute('height', 0);
+      rect.dataset.targetY = targetY;
+      rect.dataset.targetH = targetH;
+      rect.style.transition = `y 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.012}s, height 1.2s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.012}s`;
+      svg.appendChild(rect);
+      barRects.push(rect);
+    };
 
     // Forwarded (bottom, blue)
     if (forwarded > 0) {
       const fH = (forwarded / total) * totalH;
-      const rect = document.createElementNS(ns, 'rect');
-      rect.setAttribute('x', x); rect.setAttribute('width', barInner);
-      rect.setAttribute('y', bottom - fH); rect.setAttribute('height', fH);
-      rect.setAttribute('fill', '#3b82f6'); rect.setAttribute('rx', '0.5');
-      svg.appendChild(rect);
+      makeBar('#3b82f6', bottom - fH, fH);
     }
 
     // Cached (middle, green)
     if (cached > 0) {
       const fH = (forwarded / total) * totalH;
       const cH = (cached / total) * totalH;
-      const rect = document.createElementNS(ns, 'rect');
-      rect.setAttribute('x', x); rect.setAttribute('width', barInner);
-      rect.setAttribute('y', bottom - fH - cH); rect.setAttribute('height', cH);
-      rect.setAttribute('fill', '#22c55e'); rect.setAttribute('rx', '0.5');
-      svg.appendChild(rect);
+      makeBar('#22c55e', bottom - fH - cH, cH);
     }
 
     // Blocked (top, red)
@@ -811,13 +817,32 @@ function buildQueriesOverTimeChart(data) {
       const fH = (forwarded / total) * totalH;
       const cH = (cached / total) * totalH;
       const bH = (blocked / total) * totalH;
-      const rect = document.createElementNS(ns, 'rect');
-      rect.setAttribute('x', x); rect.setAttribute('width', barInner);
-      rect.setAttribute('y', bottom - fH - cH - bH); rect.setAttribute('height', bH);
-      rect.setAttribute('fill', '#ef4444'); rect.setAttribute('rx', '0.5');
-      svg.appendChild(rect);
+      makeBar('#ef4444', bottom - fH - cH - bH, bH);
     }
   }
+
+  // Observe scroll to animate bars growing upward
+  const barObserver = new IntersectionObserver((obs) => {
+    obs.forEach(e => {
+      if (e.isIntersecting) {
+        barRects.forEach(r => {
+          r.setAttribute('y', r.dataset.targetY);
+          r.setAttribute('height', r.dataset.targetH);
+        });
+        barObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.2 });
+
+  requestAnimationFrame(() => {
+    if (svg.isConnected) barObserver.observe(svg);
+    else {
+      const mo = new MutationObserver(() => {
+        if (svg.isConnected) { barObserver.observe(svg); mo.disconnect(); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+  });
 
   // X-axis time labels
   const labelCount = Math.min(12, history.length);
@@ -905,7 +930,7 @@ function buildDonutChart(title, iconName, entries, colors) {
     // Initial state: fully hidden (will animate on scroll)
     circle.style.strokeDashoffset = `${circumference + circumference * 0.25}`;
     circle.dataset.targetOffset = `${-offset + circumference * 0.25}`;
-    circle.style.transition = `stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`;
+    circle.style.transition = `stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.15}s`;
 
     svg.appendChild(circle);
     circles.push(circle);
