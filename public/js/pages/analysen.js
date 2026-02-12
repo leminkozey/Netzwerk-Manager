@@ -1021,6 +1021,55 @@ function extractTopList(data, key) {
   return [];
 }
 
+// Apple-style per-digit scroll counter
+function createScrollNumber(value) {
+  const formatted = formatNumber(value);
+  const container = el('span', {
+    style: {
+      display: 'inline-flex', alignItems: 'center',
+      fontSize: '0.78rem', fontWeight: '600', fontFamily: "'JetBrains Mono', monospace",
+      color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden',
+    },
+  });
+
+  const digitCols = [];
+  for (const char of formatted) {
+    if (char >= '0' && char <= '9') {
+      const col = el('span', {
+        style: {
+          display: 'inline-block', height: '1.2em', overflow: 'hidden', position: 'relative',
+          width: '0.62em', textAlign: 'center',
+        },
+      });
+      const strip = el('span', {
+        style: {
+          display: 'block', transition: 'transform 1.4s cubic-bezier(0.16, 1, 0.3, 1)',
+          transform: 'translateY(0)', lineHeight: '1.2em',
+        },
+      });
+      // Build digit strip: 0-9 stacked, target digit scrolls into view
+      for (let d = 0; d <= 9; d++) {
+        strip.appendChild(el('span', { textContent: String(d), style: { display: 'block', height: '1.2em' } }));
+      }
+      col.appendChild(strip);
+      container.appendChild(col);
+      digitCols.push({ strip, target: parseInt(char) });
+    } else {
+      // Separator (dot, comma, space)
+      container.appendChild(el('span', { textContent: char, style: { display: 'inline-block' } }));
+    }
+  }
+
+  container._animateIn = (delay) => {
+    digitCols.forEach((d, i) => {
+      d.strip.style.transitionDelay = `${delay + i * 0.06}s`;
+      d.strip.style.transform = `translateY(${-d.target * 1.2}em)`;
+    });
+  };
+
+  return container;
+}
+
 function buildTopList(title, iconName, items, color) {
   if (!items || items.length === 0) {
     return el('div', { className: 'card' }, [
@@ -1030,9 +1079,17 @@ function buildTopList(title, iconName, items, color) {
   }
 
   const maxCount = items.reduce((m, i) => Math.max(m, i.count), 1);
+  const scrollNums = [];
+  const barFills = [];
 
   const rows = items.slice(0, 10).map((item, idx) => {
     const pct = (item.count / maxCount) * 100;
+    const numEl = createScrollNumber(item.count);
+    scrollNums.push({ el: numEl, idx });
+
+    const barFill = el('div', { style: { height: '100%', width: '0%', borderRadius: '2px', background: color, transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)' } });
+    barFills.push({ el: barFill, pct, idx });
+
     return el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 0' } }, [
       el('span', {
         textContent: String(idx + 1),
@@ -1050,23 +1107,43 @@ function buildTopList(title, iconName, items, color) {
           },
         }),
         el('div', { style: { height: '4px', borderRadius: '2px', background: 'var(--border)', marginTop: '4px', overflow: 'hidden' } }, [
-          el('div', { style: { height: '100%', width: pct + '%', borderRadius: '2px', background: color, transition: 'width 0.6s ease' } }),
+          barFill,
         ]),
       ]),
-      el('span', {
-        textContent: formatNumber(item.count),
-        style: {
-          fontSize: '0.78rem', fontWeight: '600', fontFamily: "'JetBrains Mono', monospace",
-          color: 'var(--text-muted)', whiteSpace: 'nowrap',
-        },
-      }),
+      numEl,
     ]);
   });
 
-  return el('div', { className: 'card' }, [
+  const card = el('div', { className: 'card' }, [
     sectionTitle(title, iconName),
     ...rows,
   ]);
+
+  // Observe scroll to trigger animations
+  const listObserver = new IntersectionObserver((obs) => {
+    obs.forEach(e => {
+      if (e.isIntersecting) {
+        scrollNums.forEach(s => s.el._animateIn(s.idx * 0.07));
+        barFills.forEach(b => {
+          b.el.style.transitionDelay = `${b.idx * 0.07}s`;
+          b.el.style.width = b.pct + '%';
+        });
+        listObserver.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15 });
+
+  requestAnimationFrame(() => {
+    if (card.isConnected) listObserver.observe(card);
+    else {
+      const mo = new MutationObserver(() => {
+        if (card.isConnected) { listObserver.observe(card); mo.disconnect(); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+  });
+
+  return card;
 }
 
 // =================================================================
