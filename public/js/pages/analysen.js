@@ -878,28 +878,59 @@ function buildDonutChart(title, iconName, entries, colors) {
   svg.setAttribute('viewBox', '0 0 200 200');
   svg.style.cssText = 'width:100%;max-width:180px;height:auto;display:block;margin:0 auto';
 
-  const cx = 100, cy = 100, r = 80, inner = 50;
-  let startAngle = -Math.PI / 2;
+  // Use stroke-based circles for scroll animation
+  const cx = 100, cy = 100, midR = 65; // radius at middle of ring
+  const strokeW = 30; // ring thickness
+  const circumference = 2 * Math.PI * midR;
+  let offset = 0;
 
+  const circles = [];
   entries.forEach((entry, i) => {
-    const sliceAngle = (entry.value / total) * 2 * Math.PI;
-    if (sliceAngle < 0.01) { startAngle += sliceAngle; return; }
-    const endAngle = startAngle + sliceAngle;
-    const largeArc = sliceAngle > Math.PI ? 1 : 0;
+    const fraction = entry.value / total;
+    const segLen = fraction * circumference;
+    if (segLen < 0.5) { offset += segLen; return; }
 
-    const path = document.createElementNS(ns, 'path');
-    const d = [
-      `M ${cx + r * Math.cos(startAngle)} ${cy + r * Math.sin(startAngle)}`,
-      `A ${r} ${r} 0 ${largeArc} 1 ${cx + r * Math.cos(endAngle)} ${cy + r * Math.sin(endAngle)}`,
-      `L ${cx + inner * Math.cos(endAngle)} ${cy + inner * Math.sin(endAngle)}`,
-      `A ${inner} ${inner} 0 ${largeArc} 0 ${cx + inner * Math.cos(startAngle)} ${cy + inner * Math.sin(startAngle)}`,
-      'Z',
-    ].join(' ');
-    path.setAttribute('d', d);
-    path.setAttribute('fill', colors[i % colors.length]);
-    path.setAttribute('opacity', '0.85');
-    svg.appendChild(path);
-    startAngle = endAngle;
+    const circle = document.createElementNS(ns, 'circle');
+    circle.setAttribute('cx', cx);
+    circle.setAttribute('cy', cy);
+    circle.setAttribute('r', midR);
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', colors[i % colors.length]);
+    circle.setAttribute('stroke-width', strokeW);
+    circle.setAttribute('opacity', '0.85');
+    // dasharray: segment length, then rest of circumference
+    circle.setAttribute('stroke-dasharray', `${segLen} ${circumference - segLen}`);
+    // dashoffset to position segment; start from top (-90°)
+    circle.setAttribute('stroke-dashoffset', `${-offset + circumference * 0.25}`);
+    // Initial state: fully hidden (will animate on scroll)
+    circle.style.strokeDashoffset = `${circumference + circumference * 0.25}`;
+    circle.dataset.targetOffset = `${-offset + circumference * 0.25}`;
+    circle.style.transition = `stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1) ${i * 0.08}s`;
+
+    svg.appendChild(circle);
+    circles.push(circle);
+    offset += segLen;
+  });
+
+  // Observe when SVG enters viewport, then animate segments in
+  const observer = new IntersectionObserver((obs) => {
+    obs.forEach(e => {
+      if (e.isIntersecting) {
+        circles.forEach(c => { c.style.strokeDashoffset = c.dataset.targetOffset; });
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.3 });
+
+  // Schedule observe after element is in DOM
+  requestAnimationFrame(() => {
+    if (svg.isConnected) observer.observe(svg);
+    else {
+      const mo = new MutationObserver(() => {
+        if (svg.isConnected) { observer.observe(svg); mo.disconnect(); }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
   });
 
   const legendItems = entries.slice(0, 8).map((entry, i) => {
