@@ -3366,7 +3366,7 @@ label {
 
 .analysen-top {
   display: grid;
-  grid-template-columns: 340px 260px 1fr;
+  grid-template-columns: 340px 340px 1fr;
   gap: 16px;
   align-items: stretch;
 }
