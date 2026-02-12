@@ -183,7 +183,7 @@ Bestimmt, welche Bereiche der Einstellungen für den Benutzer sichtbar sind.
 | Tab | Default | Beschreibung |
 |-----|---------|--------------|
 | `design` | `true` | Theme, Akzentfarbe, Button-Stil, Glow-Einstellungen. |
-| `analysen` | `true` | Uptime-Daten zurücksetzen. |
+| `analysen` | `true` | Uptime-Daten und Ausfälle zurücksetzen. |
 | `daten` | `true` | Versionshistorie, Daten-Export und -Import. |
 | `session` | `true` | Session-Timeout konfigurieren. |
 | `user` | `true` | Benutzername und Passwort ändern, Logout. |
