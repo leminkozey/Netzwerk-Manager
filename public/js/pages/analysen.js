@@ -691,9 +691,11 @@ function buildPingMonitorSection(data) {
   }
 
   const hosts = data.hosts;
+  const scrollNums = [];
+  const alreadyAnimated = animatedSections.has('ping-monitor');
 
   // ── Compact host stats: one row per host ──
-  function hostRow(host, color) {
+  function hostRow(host, color, rowIdx) {
     const isReachable = host.currentPing !== null;
     const statusColor = isReachable ? '#22c55e' : '#ef4444';
     const pingDisplay = isReachable ? host.currentPing.toFixed(1) : '—';
@@ -710,6 +712,14 @@ function buildPingMonitorSection(data) {
       ]);
     }
 
+    // Current ping as scroll number
+    const pingNumEl = createScrollNumber(pingDisplay);
+    pingNumEl.style.fontSize = '1.1rem';
+    pingNumEl.style.fontWeight = '700';
+    pingNumEl.style.fontFamily = "'JetBrains Mono', monospace";
+    pingNumEl.style.color = color;
+    scrollNums.push({ el: pingNumEl, idx: rowIdx });
+
     return el('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '6px 0' } }, [
       // Color dot
       el('div', { style: { width: '8px', height: '8px', borderRadius: '2px', background: color, flexShrink: '0' } }),
@@ -720,10 +730,7 @@ function buildPingMonitorSection(data) {
       ]),
       // Current ping
       el('div', { style: { minWidth: '65px', textAlign: 'right' } }, [
-        el('span', {
-          textContent: pingDisplay,
-          style: { fontSize: '1.1rem', fontWeight: '700', fontFamily: "'JetBrains Mono', monospace", color },
-        }),
+        pingNumEl,
         el('span', { textContent: isReachable ? ' ms' : '', style: { fontSize: '0.68rem', color: 'var(--text-muted)' } }),
       ]),
       // Status dot
@@ -740,15 +747,17 @@ function buildPingMonitorSection(data) {
 
   const statsBlock = el('div', {
     style: { borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '4px' },
-  }, hosts.map((h, i) => hostRow(h, hostColors[i % hostColors.length])));
+  }, hosts.map((h, i) => hostRow(h, hostColors[i % hostColors.length], i)));
 
   // ── Compact combined chart ──
   const allCharts = hosts.filter(h => h.chart && h.chart.length > 1);
   let chartEl = el('div');
+  let clipRect = null;
+  const svgW = 700, svgH = 140;
 
   if (allCharts.length > 0) {
     const ns = 'http://www.w3.org/2000/svg';
-    const w = 700, h = 140;
+    const w = svgW, h = svgH;
     const padL = 38, padR = 8, padT = 8, padB = 22;
     const cW = w - padL - padR;
     const cH = h - padT - padB;
@@ -784,6 +793,28 @@ function buildPingMonitorSection(data) {
       svg.appendChild(label);
     }
 
+    // Clip path for reveal animation (left to right, smooth ease-in-out)
+    const clipId = 'pm-clip-' + Math.random().toString(36).slice(2, 8);
+    const defs = document.createElementNS(ns, 'defs');
+    const clipPath = document.createElementNS(ns, 'clipPath');
+    clipPath.setAttribute('id', clipId);
+    clipRect = document.createElementNS(ns, 'rect');
+    clipRect.setAttribute('x', '0');
+    clipRect.setAttribute('y', '0');
+    clipRect.setAttribute('height', h);
+    if (alreadyAnimated) {
+      clipRect.style.width = w + 'px';
+    } else {
+      clipRect.style.width = '0';
+    }
+    clipPath.appendChild(clipRect);
+    defs.appendChild(clipPath);
+    svg.appendChild(defs);
+
+    // Group for all chart lines/areas, clipped
+    const chartGroup = document.createElementNS(ns, 'g');
+    chartGroup.setAttribute('clip-path', `url(#${clipId})`);
+
     // Draw area + line per host
     for (let hi = 0; hi < allCharts.length; hi++) {
       const host = allCharts[hi];
@@ -804,7 +835,7 @@ function buildPingMonitorSection(data) {
         area.setAttribute('points', `${points}${lastX},${padT + cH} ${firstX},${padT + cH}`);
         area.setAttribute('fill', color);
         area.setAttribute('opacity', '0.06');
-        svg.appendChild(area);
+        chartGroup.appendChild(area);
 
         const polyline = document.createElementNS(ns, 'polyline');
         polyline.setAttribute('points', points.trim());
@@ -813,9 +844,11 @@ function buildPingMonitorSection(data) {
         polyline.setAttribute('stroke-width', '1.8');
         polyline.setAttribute('stroke-linejoin', 'round');
         polyline.setAttribute('opacity', '0.85');
-        svg.appendChild(polyline);
+        chartGroup.appendChild(polyline);
       }
     }
+
+    svg.appendChild(chartGroup);
 
     // X-axis time labels
     const refChart = allCharts[0].chart;
@@ -839,11 +872,41 @@ function buildPingMonitorSection(data) {
   }
 
   // ── Single compact card ──
-  frag.appendChild(el('div', { className: 'card' }, [
+  const card = el('div', { className: 'card' }, [
     sectionTitle(t('analysen.pingMonitor'), 'pingMonitorColor'),
     statsBlock,
     chartEl,
-  ]));
+  ]);
+  frag.appendChild(card);
+
+  if (alreadyAnimated) {
+    scrollNums.forEach(s => s.el._animateIn(0));
+  } else {
+    const pmObserver = new IntersectionObserver((obs) => {
+      obs.forEach(e => {
+        if (e.isIntersecting) {
+          animatedSections.add('ping-monitor');
+          scrollNums.forEach(s => s.el._animateIn(s.idx * 0.1));
+          // Animate chart reveal from left to right via clip-rect
+          if (clipRect) {
+            clipRect.style.transition = 'width 3s cubic-bezier(0.65, 0, 0.35, 1)';
+            clipRect.style.width = svgW + 'px';
+          }
+          pmObserver.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.15 });
+
+    requestAnimationFrame(() => {
+      if (card.isConnected) pmObserver.observe(card);
+      else {
+        const mo = new MutationObserver(() => {
+          if (card.isConnected) { pmObserver.observe(card); mo.disconnect(); }
+        });
+        mo.observe(document.body, { childList: true, subtree: true });
+      }
+    });
+  }
 
   return frag;
 }
