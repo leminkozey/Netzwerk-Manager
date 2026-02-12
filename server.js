@@ -126,7 +126,7 @@ function hashDeviceToken(token) {
 
 // HTML escape to prevent XSS
 function escapeHtml(str) {
-  if (typeof str !== 'string') return str;
+  if (typeof str !== 'string') str = String(str ?? '');
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -534,8 +534,13 @@ function sanitizeVersionEntry(entry) {
   if (entry.label !== undefined) sanitized.label = escapeHtml(String(entry.label || '')).slice(0, 256);
   if (entry.summary !== undefined) sanitized.summary = escapeHtml(String(entry.summary || '')).slice(0, 512);
   if (entry.id !== undefined) sanitized.id = String(entry.id || '').slice(0, 64);
-  if (entry.snapshot && typeof entry.snapshot === 'object') {
-    sanitized.snapshot = { ...entry.snapshot };
+  if (entry.snapshot && typeof entry.snapshot === 'object' && !Array.isArray(entry.snapshot)) {
+    const snap = {};
+    for (const [k, v] of Object.entries(entry.snapshot)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+      snap[k] = v;
+    }
+    sanitized.snapshot = snap;
     if (sanitized.snapshot.speedportInfo) {
       sanitized.snapshot.speedportInfo = { ...sanitized.snapshot.speedportInfo };
       delete sanitized.snapshot.speedportInfo.wifiPassword;
@@ -547,6 +552,24 @@ function sanitizeVersionEntry(entry) {
     }
   }
   return sanitized;
+}
+
+function sanitizeSpeedTestEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const safeFloat = (v, max = 100000) => {
+    const n = parseFloat(v);
+    return (Number.isFinite(n) && n >= 0) ? Math.min(n, max) : 0;
+  };
+  const allowedTypes = ['local', 'internet', 'unknown'];
+  return {
+    id: typeof entry.id === 'string' ? entry.id.slice(0, 64) : randomUUID(),
+    download: safeFloat(entry.download),
+    upload: safeFloat(entry.upload),
+    ping: safeFloat(entry.ping, 60000),
+    type: allowedTypes.includes(entry.type) ? entry.type : 'unknown',
+    timestamp: (typeof entry.timestamp === 'number' && Number.isFinite(entry.timestamp) && entry.timestamp > 0)
+      ? entry.timestamp : 0,
+  };
 }
 
 function buildVersionLabel() {
@@ -646,15 +669,40 @@ function ensureLoginTokenFile() {
 
 function readLoginTokens() {
   if (!fs.existsSync(LOGIN_TOKEN_FILE)) return [];
-  const lines = fs.readFileSync(LOGIN_TOKEN_FILE, 'utf-8').split('\n');
-  return lines
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith('#'))
-    .map((line) => {
-      const [token, name] = line.split('|').map((p) => (p || '').trim());
-      return { token, name };
-    })
-    .filter((entry) => entry.token);
+  const raw = fs.readFileSync(LOGIN_TOKEN_FILE, 'utf-8');
+  const lines = raw.split('\n');
+  const entries = [];
+  let needsMigration = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [token, name] = trimmed.split('|').map((p) => (p || '').trim());
+    if (!token) continue;
+    // If token is not already a SHA-256 hash (64 hex chars), hash it
+    const isAlreadyHashed = /^[a-f0-9]{64}$/.test(token);
+    if (isAlreadyHashed) {
+      entries.push({ token, name });
+    } else {
+      entries.push({ token: hashDeviceToken(token), name });
+      needsMigration = true;
+    }
+  }
+
+  // Auto-migrate: rewrite file with hashed tokens
+  if (needsMigration) {
+    const commentLines = lines.filter(l => l.trim().startsWith('#') || l.trim() === '');
+    const hashedLines = entries.map(e => e.name ? `${e.token}|${e.name}` : e.token);
+    const newContent = [...commentLines, ...hashedLines, ''].join('\n');
+    try {
+      atomicWriteFileSync(LOGIN_TOKEN_FILE, newContent, { mode: 0o600 });
+      console.log('[Security] LoginToken.txt migrated to hashed tokens');
+    } catch (err) {
+      console.error('[Security] Failed to migrate LoginToken.txt:', err.message);
+    }
+  }
+
+  return entries;
 }
 
 // #20 Cache for default-password check to avoid PBKDF2 on every request
@@ -2003,16 +2051,17 @@ app.post('/api/login', (req, res) => {
   let needsTokenMigration = false;
   if (deviceToken) {
     // Check hashed tokens first
+    const isHash = t => /^[a-f0-9]{64}$/.test(t);
     isWhitelisted = state.deviceTokens.some(t =>
-      t.length === 64 ? timingSafeEqual(t, hashedDeviceToken) : timingSafeEqual(t, deviceToken)
+      isHash(t) ? timingSafeEqual(t, hashedDeviceToken) : timingSafeEqual(t, deviceToken)
     );
     // Check if any matched as plaintext (needs migration)
     if (isWhitelisted) {
-      needsTokenMigration = state.deviceTokens.some(t => t.length !== 64 && timingSafeEqual(t, deviceToken));
+      needsTokenMigration = state.deviceTokens.some(t => !isHash(t) && timingSafeEqual(t, deviceToken));
     }
-    // Also check file-based tokens
+    // Also check file-based tokens (already hashed by readLoginTokens)
     if (!isWhitelisted) {
-      isWhitelisted = fileTokenList.some(t => timingSafeEqual(t, deviceToken));
+      isWhitelisted = fileTokenList.some(t => timingSafeEqual(t, hashedDeviceToken));
     }
   }
 
@@ -2063,7 +2112,7 @@ app.post('/api/login', (req, res) => {
   const token = randomUUID();
   const loginAt = Date.now();
   const expiresAt = loginAt + SESSION_EXPIRY_MS;
-  const matchedFileToken = fileTokenEntries.find((t) => t.token === deviceToken);
+  const matchedFileToken = hashedDeviceToken ? fileTokenEntries.find((t) => timingSafeEqual(t.token, hashedDeviceToken)) : null;
   const effectiveDeviceName = matchedFileToken?.name || deviceName || 'Unknown device';
   const previousSession = runtime.activeSession;
   runtime.activeSession = { token, deviceName: effectiveDeviceName, loginAt, expiresAt };
@@ -2085,7 +2134,7 @@ app.post('/api/login', (req, res) => {
   } else if (needsTokenMigration) {
     // Migrate plaintext tokens to hashed format
     state.deviceTokens = state.deviceTokens.map(t =>
-      t.length !== 64 ? hashDeviceToken(t) : t
+      /^[a-f0-9]{64}$/.test(t) ? t : hashDeviceToken(t)
     );
     saveState(state);
   }
@@ -2216,8 +2265,8 @@ app.post('/api/settings/credentials', authRequired, async (req, res) => {
   if (username.length > 64 || password.length > 256) {
     return res.status(400).json({ error: 'Username or password too long' });
   }
-  if (password.length < 4) {
-    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters' });
   }
 
   // Require current password for verification
@@ -2248,6 +2297,8 @@ app.post('/api/settings/credentials', authRequired, async (req, res) => {
     const prevUsername = state.credentials.username;
     state.credentials.username = username;
     state.credentials.password = hashPassword(password);
+    // Revoke all device tokens so old auto-login sessions are invalidated
+    state.deviceTokens = [];
     saveState(state);
     writeCredentialsFile({
       username,
@@ -2761,7 +2812,7 @@ app.post('/api/import', authRequired, async (req, res) => {
       raspberryVersions: sanitizeVersions(data.raspberryVersions),
       // SECURITY: Never import device tokens from external files!
       deviceTokens: currentState.deviceTokens,
-      speedTestHistory: Array.isArray(data.speedTestHistory) ? data.speedTestHistory.slice(0, MAX_HISTORY) : [],
+      speedTestHistory: Array.isArray(data.speedTestHistory) ? data.speedTestHistory.slice(0, MAX_HISTORY).map(sanitizeSpeedTestEntry).filter(Boolean) : [],
     };
 
     saveState(newState);
@@ -2993,7 +3044,7 @@ app.post('/api/control/:deviceId', authRequired, (req, res) => {
   const creds = readControlDeviceCredentials(deviceId);
   if (hostname !== undefined) creds.hostname = hostname;
   if (ipAddress !== undefined) creds.ipAddress = ipAddress;
-  if (macAddress !== undefined) creds.macAddress = macAddress.toUpperCase();
+  if (macAddress !== undefined && macAddress !== null) creds.macAddress = macAddress.toUpperCase();
   if (sshUser !== undefined) creds.sshUser = sshUser;
   if (sshPassword !== undefined) creds.sshPassword = sshPassword;
   if (sshPort !== undefined) creds.sshPort = parseInt(sshPort, 10) || 22;
@@ -3551,16 +3602,19 @@ function startServer() {
   wss.on('connection', (socket, req) => {
     // Validate Origin header to prevent cross-site WebSocket hijacking
     const wsOrigin = req.headers.origin;
-    if (wsOrigin) {
-      const allowedOrigins = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
-      const wsHost = req.headers.host;
-      if (wsHost) {
-        allowedOrigins.push(`http://${wsHost}`, `https://${wsHost}`);
-      }
-      if (!allowedOrigins.includes(wsOrigin)) {
-        socket.close(4003, 'Invalid origin');
-        return;
-      }
+    if (!wsOrigin) {
+      // Reject connections without Origin header to prevent cross-site WebSocket hijacking
+      socket.close(4003, 'Missing origin');
+      return;
+    }
+    const allowedOrigins = [`http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`];
+    const wsHost = req.headers.host;
+    if (wsHost) {
+      allowedOrigins.push(`http://${wsHost}`, `https://${wsHost}`);
+    }
+    if (!allowedOrigins.includes(wsOrigin)) {
+      socket.close(4003, 'Invalid origin');
+      return;
     }
 
     socket.isAlive = true;
@@ -3631,7 +3685,7 @@ function startServer() {
     clearInterval(heartbeatInterval);
   });
 
-  // Memory cleanup: Remove old rate limiting entries every hour
+  // Memory cleanup: Remove old entries every 15 minutes
   setInterval(() => {
     const now = Date.now();
     const oneHourAgo = now - 3600000;
@@ -3657,6 +3711,13 @@ function startServer() {
     for (const [ip, data] of pcPasswordLimits.entries()) {
       if (data.windowStart < oneHourAgo) {
         pcPasswordLimits.delete(ip);
+      }
+    }
+
+    // Cleanup notification cooldowns (older than 1 hour)
+    for (const [key, ts] of _notificationCooldowns.entries()) {
+      if (ts < oneHourAgo) {
+        _notificationCooldowns.delete(key);
       }
     }
   }, 900000); // Every 15 minutes

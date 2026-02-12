@@ -118,6 +118,9 @@ export function el(tag, attrs = {}, children = []) {
       }
     } else if (key.startsWith('on') && typeof value === 'function') {
       elem.addEventListener(key.slice(2).toLowerCase(), value);
+    } else if (key.startsWith('on') && typeof value === 'string') {
+      // Block string-valued on* attributes to prevent inline event handler injection
+      continue;
     } else {
       elem.setAttribute(key, value);
     }

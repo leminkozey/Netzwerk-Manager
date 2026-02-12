@@ -102,6 +102,8 @@ export async function tryAutoLogin() {
 
 // ── Logout ──
 export function handleLogout() {
+  // Invalidate server session first (fire-and-forget)
+  api.logout().catch(() => {});
   state.token = null;
   localStorage.removeItem(STORAGE_KEYS.deviceToken);
   closeSocket();

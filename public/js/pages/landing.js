@@ -34,7 +34,7 @@ export function renderLanding(container) {
   // Sanitize: only allow simple filenames to prevent CSS injection via url()
   const safeSrc = typeof gifSrc === 'string' && /^[a-zA-Z0-9._-]+\.(png|gif|webp|apng|jpg|jpeg)$/i.test(gifSrc) ? gifSrc : null;
   if (safeSrc) {
-    const gifSize = (cfg0?.landingGifSize ?? 200) + 'px';
+    const gifSize = Math.min(1000, Math.max(50, Number(cfg0?.landingGifSize) || 200)) + 'px';
     page.appendChild(el('div', {
       className: 'landing-gif',
       style: {

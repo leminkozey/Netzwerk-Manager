@@ -310,3 +310,10 @@ export async function runUpdate() {
   return res.json();
 }
 
+// ── Logout ──
+
+export async function logout() {
+  const res = await request('/api/logout', { method: 'POST' });
+  return res.json();
+}
+
