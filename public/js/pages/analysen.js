@@ -76,6 +76,7 @@ function createLiveScrollTimer(style) {
           style: {
             display: 'inline-block', height: '1.2em', overflow: 'hidden',
             position: 'relative', width: '0.62em', textAlign: 'center',
+            verticalAlign: 'bottom',
           },
         });
         const strip = el('span', {
@@ -93,7 +94,10 @@ function createLiveScrollTimer(style) {
         container.appendChild(col);
         slots.push({ col, strip, currentDigit: digit, type: 'digit' });
       } else {
-        const span = el('span', { textContent: char, style: { display: 'inline-block' } });
+        const span = el('span', {
+          textContent: char,
+          style: { display: 'inline-block', height: '1.2em', lineHeight: '1.2em', verticalAlign: 'bottom' },
+        });
         container.appendChild(span);
         slots.push({ span, char, type: 'label' });
       }
@@ -150,6 +154,7 @@ function createLiveScrollTimer(style) {
           style: {
             display: 'inline-block', height: '1.2em', overflow: 'hidden',
             position: 'relative', width: '0.62em', textAlign: 'center',
+            verticalAlign: 'bottom',
           },
         });
         const strip = el('span', {
@@ -168,7 +173,10 @@ function createLiveScrollTimer(style) {
         slots.push({ col, strip, currentDigit: 0, type: 'digit' });
         targets.push({ strip, digit });
       } else {
-        const span = el('span', { textContent: char, style: { display: 'inline-block' } });
+        const span = el('span', {
+          textContent: char,
+          style: { display: 'inline-block', height: '1.2em', lineHeight: '1.2em', verticalAlign: 'bottom' },
+        });
         container.appendChild(span);
         slots.push({ span, char, type: 'label' });
       }
@@ -259,13 +267,14 @@ function buildSpeedtestSection() {
   const gaugeWrapper = el('div', { className: 'speedtest-gauge-wrapper' }, [svg]);
   const noteEl = el('div', { className: 'speedtest-note', textContent: t('speedtest.ready') });
 
-  const dlValue = createLiveScrollTimer({ display: 'inline-flex', justifyContent: 'center', overflow: 'hidden', height: '1.2em' });
+  const speedStatStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden', height: '1.2em' };
+  const dlValue = createLiveScrollTimer(speedStatStyle);
   dlValue.className = 'speedtest-stat-value';
   dlValue.textContent = '-';
-  const ulValue = createLiveScrollTimer({ display: 'inline-flex', justifyContent: 'center', overflow: 'hidden', height: '1.2em' });
+  const ulValue = createLiveScrollTimer(speedStatStyle);
   ulValue.className = 'speedtest-stat-value';
   ulValue.textContent = '-';
-  const pingValue = createLiveScrollTimer({ display: 'inline-flex', justifyContent: 'center', overflow: 'hidden', height: '1.2em' });
+  const pingValue = createLiveScrollTimer(speedStatStyle);
   pingValue.className = 'speedtest-stat-value';
   pingValue.textContent = '-';
 
@@ -1284,7 +1293,7 @@ function createScrollNumber(value) {
       const col = el('span', {
         style: {
           display: 'inline-block', height: '1.2em', overflow: 'hidden', position: 'relative',
-          width: '0.62em', textAlign: 'center',
+          width: '0.62em', textAlign: 'center', verticalAlign: 'bottom',
         },
       });
       const strip = el('span', {
@@ -1302,7 +1311,10 @@ function createScrollNumber(value) {
       digitCols.push({ strip, target: parseInt(char) });
     } else {
       // Separator (dot, comma, space)
-      container.appendChild(el('span', { textContent: char, style: { display: 'inline-block' } }));
+      container.appendChild(el('span', {
+        textContent: char,
+        style: { display: 'inline-block', height: '1.2em', lineHeight: '1.2em', verticalAlign: 'bottom' },
+      }));
     }
   }
 
