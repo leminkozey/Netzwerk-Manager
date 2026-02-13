@@ -1460,6 +1460,80 @@ label {
   transform: scale(1.1);
 }
 
+/* ── Settings Sidebar Icon Animations ── */
+
+/* Design (sun): Strahlen rotieren */
+.settings-tab svg .sun-rays-path {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+.settings-tab[data-tab="design"]:hover svg .sun-rays-path {
+  animation: start-rotate 2.5s linear infinite;
+}
+
+/* Analysen (chart): Linie zeichnet sich */
+.settings-tab[data-tab="analysen"] svg .chart-line {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 0;
+}
+.settings-tab[data-tab="analysen"]:hover svg .chart-line {
+  animation: chart-draw 1.4s ease-out infinite;
+}
+
+/* Control (start): Strahlen rotieren */
+.settings-tab[data-tab="control"] svg .start-ray {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+.settings-tab[data-tab="control"]:hover svg .start-ray {
+  animation: start-rotate 2.5s linear infinite;
+}
+
+/* Daten (copy): Seiten gleiten auseinander */
+@keyframes copy-lift {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(1.5px, -1.5px); }
+}
+@keyframes copy-drop {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(-1.5px, 1.5px); }
+}
+.settings-tab[data-tab="daten"]:hover svg .copy-front {
+  animation: copy-lift 0.9s ease-in-out infinite;
+}
+.settings-tab[data-tab="daten"]:hover svg .copy-back {
+  animation: copy-drop 0.9s ease-in-out infinite;
+}
+
+/* Session (uptime/clock): Zeiger dreht sich */
+.settings-tab[data-tab="session"] svg .clock-hand {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+}
+.settings-tab[data-tab="session"]:hover svg .clock-hand {
+  animation: clock-spin 2s linear infinite;
+}
+
+/* User: Sanftes Wippen */
+@keyframes user-nod {
+  0%, 100% { transform: rotate(0deg) scale(1.1); }
+  30%      { transform: rotate(-8deg) scale(1.1); }
+  60%      { transform: rotate(6deg) scale(1.1); }
+}
+.settings-tab[data-tab="user"]:hover svg {
+  animation: user-nod 0.7s ease-in-out;
+}
+
+/* Credits (info): "i" wackelt */
+@keyframes info-tilt {
+  0%, 100% { transform: rotate(0deg) scale(1.1); }
+  25%      { transform: rotate(14deg) scale(1.1); }
+  75%      { transform: rotate(-10deg) scale(1.1); }
+}
+.settings-tab[data-tab="credits"]:hover svg {
+  animation: info-tilt 0.5s ease-in-out;
+}
+
 .settings-tab.active {
   background: var(--accent);
   color: #fff;
@@ -1568,6 +1642,30 @@ label {
 
 .theme-option:hover svg {
   transform: scale(1.15);
+}
+
+/* Theme-Switcher Icon Hover Animations */
+@keyframes moon-rock {
+  0%, 100% { transform: scale(1.15) rotate(0deg); }
+  25%      { transform: scale(1.15) rotate(-15deg); }
+  75%      { transform: scale(1.15) rotate(10deg); }
+}
+@keyframes sun-hover-spin {
+  from { transform: scale(1.15) rotate(0deg); }
+  to   { transform: scale(1.15) rotate(360deg); }
+}
+@keyframes monitor-pulse {
+  0%, 100% { transform: scale(1.15); filter: drop-shadow(0 0 0px var(--accent)); }
+  50%      { transform: scale(1.2); filter: drop-shadow(0 0 5px var(--accent)); }
+}
+.theme-option[data-value="dark"]:hover svg {
+  animation: moon-rock 0.8s ease-in-out infinite;
+}
+.theme-option[data-value="light"]:hover svg {
+  animation: sun-hover-spin 2s linear infinite;
+}
+.theme-option[data-value="system"]:hover svg {
+  animation: monitor-pulse 1s ease-in-out infinite;
 }
 
 .theme-option.active {
@@ -1720,6 +1818,14 @@ label {
 .glow-icon svg {
   width: 100%;
   height: 100%;
+}
+
+/* Glow-Slider: Sonnenstrahlen skalieren mit Slider-Wert */
+.glow-icon-sun svg .sun-rays-path {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transform: scale(var(--ray-scale, 1));
+  transition: transform 0.25s ease;
 }
 
 .glow-icon[data-variant="high"] {

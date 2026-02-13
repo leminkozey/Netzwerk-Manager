@@ -230,10 +230,14 @@ function createGlowSlider() {
     value: String(currentGlow),
   });
 
+  const glowControl = el('div', { className: 'glow-control' });
+
   const updatePercent = () => {
     const val = Number(slider.value);
     const percent = Math.round((val / 2) * 100);
     slider.style.setProperty('--glow-percent', `${percent}%`);
+    // Scale sun rays: slider 0→0.4, slider 2→1.4
+    glowControl.style.setProperty('--ray-scale', String(0.4 + (val / 2) * 1));
   };
   updatePercent();
 
@@ -245,11 +249,10 @@ function createGlowSlider() {
     localStorage.setItem(STORAGE_KEYS.glowStrength, slider.value);
   });
 
-  return el('div', { className: 'glow-control' }, [
-    el('span', { className: 'glow-icon' }, [iconEl('moon', 18)]),
-    slider,
-    el('span', { className: 'glow-icon', style: { color: 'var(--accent)' } }, [iconEl('sun', 18)]),
-  ]);
+  glowControl.appendChild(el('span', { className: 'glow-icon' }, [iconEl('moon', 18)]));
+  glowControl.appendChild(slider);
+  glowControl.appendChild(el('span', { className: 'glow-icon glow-icon-sun', style: { color: 'var(--accent)' } }, [iconEl('sun', 18)]));
+  return glowControl;
 }
 
 function createAccentPicker() {
