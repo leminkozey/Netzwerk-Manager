@@ -3040,6 +3040,48 @@ label {
   box-shadow: 0 0 calc(14px * var(--glow-strength)) var(--accent-glow);
 }
 
+/* ── Landing Button Icon Animations ── */
+
+/* Info: "i" wackelt hin und her */
+@keyframes info-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  20%      { transform: rotate(12deg); }
+  40%      { transform: rotate(-10deg); }
+  60%      { transform: rotate(6deg); }
+  80%      { transform: rotate(-4deg); }
+}
+.action-btn[data-icon="info"]:hover svg {
+  animation: info-wobble 0.6s ease-in-out;
+}
+
+/* Start/Control Center: Strahlen rotieren */
+@keyframes start-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.action-btn[data-icon="start"] svg .start-ray {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition: transform 0.3s ease;
+}
+.action-btn[data-icon="start"]:hover svg .start-ray {
+  animation: start-rotate 3s linear infinite;
+}
+
+/* Analysen: Chart-Linie zeichnet sich */
+@keyframes chart-draw {
+  0%   { stroke-dashoffset: 30; }
+  100% { stroke-dashoffset: 0; }
+}
+.action-btn[data-icon="analysen"] svg .chart-line {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.action-btn[data-icon="analysen"]:hover svg .chart-line {
+  animation: chart-draw 1.2s ease-out infinite;
+}
+
 .action-btn-text {
   display: flex;
   flex-direction: column;

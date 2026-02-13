@@ -6,25 +6,25 @@ export const icons = {
   // ── Navigation & Action (outline, uses currentColor) ──
   info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="10"/>
-    <path d="M12 16v-4"/>
-    <path d="M12 8h.01"/>
+    <path class="info-line" d="M12 16v-4"/>
+    <path class="info-dot" d="M12 8h.01"/>
   </svg>`,
 
   start: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 2v4"/>
-    <path d="M12 18v4"/>
-    <path d="M4.93 4.93l2.83 2.83"/>
-    <path d="M16.24 16.24l2.83 2.83"/>
-    <path d="M2 12h4"/>
-    <path d="M18 12h4"/>
-    <path d="M4.93 19.07l2.83-2.83"/>
-    <path d="M16.24 7.76l2.83-2.83"/>
+    <path class="start-ray" d="M12 2v4"/>
+    <path class="start-ray" d="M12 18v4"/>
+    <path class="start-ray" d="M4.93 4.93l2.83 2.83"/>
+    <path class="start-ray" d="M16.24 16.24l2.83 2.83"/>
+    <path class="start-ray" d="M2 12h4"/>
+    <path class="start-ray" d="M18 12h4"/>
+    <path class="start-ray" d="M4.93 19.07l2.83-2.83"/>
+    <path class="start-ray" d="M16.24 7.76l2.83-2.83"/>
     <circle cx="12" cy="12" r="4"/>
   </svg>`,
 
   analysen: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M3 3v18h18"/>
-    <path d="M7 16l4-8 4 4 4-6"/>
+    <path class="chart-line" d="M7 16l4-8 4 4 4-6"/>
   </svg>`,
 
   schedule: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

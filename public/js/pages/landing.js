@@ -66,6 +66,7 @@ export function renderLanding(container) {
   for (const action of actions) {
     btnRow.appendChild(el('button', {
       className: 'action-btn',
+      'data-icon': action.icon,
       onClick: () => navigate(action.route),
     }, [
       el('span', { className: 'action-btn-icon' }, [iconEl(action.icon, 28)]),
