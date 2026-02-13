@@ -74,6 +74,7 @@ Steuert alle visuellen Animationen der Oberfläche.
 | `modalSlide` | `boolean` | `true` | Slide-Animation beim Öffnen von Modals und Overlays. |
 | `panelFade` | `boolean` | `true` | Überblend-Effekt beim Tab-Wechsel in den Einstellungen. |
 | `themeSwitcher` | `boolean` | `true` | Animations-Effekte der Theme-Buttons (Sonne/Mond/System). |
+| `iconAnimations` | `boolean` | `true` | Hover-Animationen der Icons auf allen Seiten (Analysen, Control Center, Einstellungen, Landing). Uhrzeiger drehen, Tacho schwingt, Warndreieck pulsiert usw. |
 | `numberScroll` | `boolean` | `true` | Scroll-Animationen bei Zahlen im Analysen Center. Bei `false` erscheinen alle Zahlen sofort, aber Balken/Charts/Donuts animieren weiterhin. |
 
 Die Einzel-Optionen wirken nur, wenn `enabled: true` ist.
@@ -93,7 +94,8 @@ Granulare Steuerung der Scroll-/Reveal-Animationen pro Sektion im Analysen Cente
 | `topLists` | `boolean` | `true` | Top Domains/Blocked/Clients: Balken und Zahlen-Scroll. |
 
 **Hierarchie:**
-- `animations.enabled: false` → alle Animationen aus (auch Analysen)
+- `animations.enabled: false` → alle Animationen aus (auch Analysen + Icon-Hover)
+- `animations.iconAnimations: false` → alle Icon-Hover-Animationen aus (Uhrzeiger, Tacho, Warndreieck, Buttons usw.)
 - `animations.numberScroll: false` → alle Scroll-Zahlen im Analysen Center sofort sichtbar, aber Balken/Charts/Donuts animieren noch
 - `animations.analysen.X: false` → nur diese Sektion ohne Animation
 
@@ -105,6 +107,7 @@ animations: {
   modalSlide: true,
   panelFade: true,
   themeSwitcher: true,
+  iconAnimations: true,
   numberScroll: true,
   analysen: {
     speedtest: true,

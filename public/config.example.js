@@ -22,6 +22,7 @@ const siteConfig = {
     modalSlide: true,           // Slide-Animation beim Öffnen von Modals/Overlays
     panelFade: true,            // Überblend-Effekt beim Tab-Wechsel in Einstellungen
     themeSwitcher: true,        // Animations-Effekte der Theme-Buttons (Sonne/Mond/System)
+    iconAnimations: true,       // Hover-Animationen der Icons (Analysen, Control Center, Einstellungen, Landing)
     numberScroll: true,         // Scroll-Animationen bei Zahlen (Analysen Center)
     analysen: {                 // Pro-Section Animationen im Analysen Center
       speedtest: true,          // Speedtest Download/Upload/Ping Scroll-Animationen

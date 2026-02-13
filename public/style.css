@@ -2466,6 +2466,26 @@ label {
   animation: none !important;
 }
 
+/* Icon hover animations off */
+[data-animation-icons="off"] .icon-badge svg,
+[data-animation-icons="off"] .icon-badge svg *,
+[data-animation-icons="off"] .action-btn svg,
+[data-animation-icons="off"] .action-btn svg *,
+[data-animation-icons="off"] .wake-btn svg,
+[data-animation-icons="off"] .pc-wake-btn svg,
+[data-animation-icons="off"] .restart-btn svg,
+[data-animation-icons="off"] .pc-restart-btn svg,
+[data-animation-icons="off"] .shutdown-btn svg,
+[data-animation-icons="off"] .pc-shutdown-btn svg,
+[data-animation-icons="off"] .pause-btn svg,
+[data-animation-icons="off"] .resume-btn svg,
+[data-animation-icons="off"] .settings-tab svg,
+[data-animation-icons="off"] .settings-tab svg *,
+[data-animation-icons="off"] .theme-option:hover svg,
+[data-animation-icons="off"] .pihole-stat-card .pihole-stat-icon {
+  animation: none !important;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Actions Row
    ═══════════════════════════════════════════════════════════════════ */

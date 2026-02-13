@@ -365,6 +365,7 @@ function applyConfigSettings() {
     if (!anim.modalSlide) document.body.setAttribute('data-animation-modal', 'off');
     if (!anim.panelFade) document.body.setAttribute('data-animation-panel', 'off');
     if (!anim.themeSwitcher) document.body.setAttribute('data-animation-theme', 'off');
+    if (anim.iconAnimations === false) document.body.setAttribute('data-animation-icons', 'off');
   }
 }
 
