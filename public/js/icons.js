@@ -79,7 +79,7 @@ export const icons = {
   speedtestColor: `<svg viewBox="0 0 24 24" fill="none">
     <path d="M12 20A9 9 0 0 1 3.6 7.8" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
     <path d="M12 20a9 9 0 0 0 8.4-12.2" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M12 12l4.5-6" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
+    <path class="tacho-needle" d="M12 12l4.5-6" stroke="#f59e0b" stroke-width="2" stroke-linecap="round"/>
     <circle cx="12" cy="12" r="2.5" fill="#f59e0b"/>
   </svg>`,
 
@@ -118,7 +118,7 @@ export const icons = {
   speedtest: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 20A9 9 0 0 1 3.6 7.8"/>
     <path d="M12 20a9 9 0 0 0 8.4-12.2"/>
-    <path d="M12 12l5-7"/>
+    <path class="tacho-needle" d="M12 12l5-7"/>
     <circle cx="12" cy="12" r="2"/>
   </svg>`,
 
@@ -224,13 +224,13 @@ export const icons = {
   // ── Analysen ──
   uptime: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="12" cy="12" r="10"/>
-    <polyline points="12 6 12 12 16 14"/>
+    <polyline class="clock-hand" points="12 6 12 12 16 14"/>
   </svg>`,
 
   traffic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 2v20"/>
-    <path d="M8 6l4-4 4 4"/>
-    <path d="M8 18l4 4 4-4"/>
+    <path class="traffic-up" d="M8 6l4-4 4 4"/>
+    <path class="traffic-down" d="M8 18l4 4 4-4"/>
     <path d="M3 12h3"/>
     <path d="M18 12h3"/>
   </svg>`,
@@ -240,35 +240,35 @@ export const icons = {
   </svg>`,
 
   outage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-    <line x1="12" y1="9" x2="12" y2="13"/>
-    <line x1="12" y1="17" x2="12.01" y2="17"/>
+    <path class="outage-triangle" d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+    <line class="outage-excl" x1="12" y1="9" x2="12" y2="13"/>
+    <line class="outage-dot" x1="12" y1="17" x2="12.01" y2="17"/>
   </svg>`,
 
   power: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+    <path class="bolt" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
   </svg>`,
 
   // ── Ping Monitor ──
   pingMonitor: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="2 17 6 13 10 16 14 8 18 12 22 6"/>
-    <circle cx="22" cy="6" r="1.5" fill="currentColor"/>
+    <polyline class="ping-line" points="2 17 6 13 10 16 14 8 18 12 22 6"/>
+    <circle class="ping-dot" cx="22" cy="6" r="1.5" fill="currentColor"/>
   </svg>`,
 
   pingMonitorColor: `<svg viewBox="0 0 24 24" fill="none">
-    <polyline points="2 17 6 13 10 16 14 8 18 12 22 6" stroke="#00d4ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="22" cy="6" r="2" fill="#00d4ff" opacity="0.85"/>
-    <polyline points="2 17 6 13 10 16 14 8 18 12 22 6" stroke="#00d4ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.15"/>
+    <polyline class="ping-line" points="2 17 6 13 10 16 14 8 18 12 22 6" stroke="#00d4ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle class="ping-dot" cx="22" cy="6" r="2" fill="#00d4ff" opacity="0.85"/>
+    <polyline class="ping-glow" points="2 17 6 13 10 16 14 8 18 12 22 6" stroke="#00d4ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.15"/>
   </svg>`,
 
   // ── Pi-hole DNS ──
   piholeDns: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z"/>
+    <path class="shield-body" d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z"/>
     <line x1="8" y1="12" x2="16" y2="12"/>
   </svg>`,
 
   piholeDnsColor: `<svg viewBox="0 0 24 24" fill="none">
-    <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z" fill="#ef4444" opacity="0.85"/>
+    <path class="shield-body" d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z" fill="#ef4444" opacity="0.85"/>
     <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z" stroke="#fca5a5" stroke-width="0.8" fill="none"/>
     <line x1="8" y1="12" x2="16" y2="12" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
   </svg>`,

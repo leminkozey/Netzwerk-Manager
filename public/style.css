@@ -969,70 +969,157 @@ label {
 }
 
 /* ── Icon Badge Hover Animations ── */
-@keyframes icon-tick-tock {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(15deg); }
-  75% { transform: rotate(-15deg); }
+
+/* --- Uptime: Uhrzeiger dreht sich --- */
+@keyframes clock-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
-@keyframes icon-sweep {
-  0% { transform: rotate(-10deg); }
-  50% { transform: rotate(15deg); }
-  100% { transform: rotate(-10deg); }
+.icon-badge svg .clock-hand {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition: transform 0.3s ease;
 }
-@keyframes icon-shake {
-  0%, 100% { transform: translateX(0); }
-  15%, 45%, 75% { transform: translateX(-2.5px); }
-  30%, 60%, 90% { transform: translateX(2.5px); }
-}
-@keyframes icon-bounce {
-  0%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-3px); }
-  60% { transform: translateY(-1px); }
-}
-@keyframes icon-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
-@keyframes icon-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
-}
-@keyframes icon-flash {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  25% { opacity: 0.6; transform: scale(0.92); }
-  50% { opacity: 1; transform: scale(1.1); }
-  75% { opacity: 0.8; transform: scale(0.96); }
+.card:hover .icon-badge[data-icon="uptime"] svg .clock-hand {
+  animation: clock-spin 2s linear infinite;
 }
 
-.icon-badge svg { transition: transform 0.3s ease, opacity 0.3s ease; }
-
-.card:hover .icon-badge[data-icon="uptime"] svg {
-  animation: icon-tick-tock 0.8s ease-in-out infinite;
+/* --- Speedtest: Tachonadel schwingt --- */
+@keyframes tacho-swing {
+  0%   { transform: rotate(-45deg); }
+  30%  { transform: rotate(55deg); }
+  50%  { transform: rotate(30deg); }
+  70%  { transform: rotate(50deg); }
+  85%  { transform: rotate(10deg); }
+  100% { transform: rotate(-45deg); }
 }
-.card:hover .icon-badge[data-icon="speedtestColor"] svg,
-.card:hover .icon-badge[data-icon="speedtest"] svg {
-  animation: icon-sweep 1s ease-in-out infinite;
+.icon-badge svg .tacho-needle {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  transition: transform 0.3s ease;
+}
+.card:hover .icon-badge[data-icon="speedtestColor"] svg .tacho-needle,
+.card:hover .icon-badge[data-icon="speedtest"] svg .tacho-needle {
+  animation: tacho-swing 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* --- Outage: Warnung pulsiert leuchtend --- */
+@keyframes outage-glow {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(239, 68, 68, 0));
+  }
+  50% {
+    transform: scale(1.18);
+    filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
+  }
+}
+@keyframes outage-excl-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
 }
 .card:hover .icon-badge[data-icon="outage"] svg {
-  animation: icon-shake 0.6s ease-in-out infinite;
+  animation: outage-glow 1.3s ease-in-out infinite;
 }
-.card:hover .icon-badge[data-icon="pingMonitorColor"] svg,
-.card:hover .icon-badge[data-icon="pingMonitor"] svg {
-  animation: icon-bounce 0.7s ease-in-out infinite;
+.card:hover .icon-badge[data-icon="outage"] svg .outage-excl,
+.card:hover .icon-badge[data-icon="outage"] svg .outage-dot {
+  animation: outage-excl-blink 0.65s ease-in-out infinite;
 }
-.card:hover .icon-badge[data-icon="traffic"] svg {
-  animation: icon-float 0.9s ease-in-out infinite;
+
+/* --- Ping Monitor: Linie zeichnet sich von kurz zu lang --- */
+@keyframes ping-draw {
+  0%   { stroke-dashoffset: 34; }
+  100% { stroke-dashoffset: 0; }
+}
+@keyframes ping-dot-pop {
+  0%, 75% { opacity: 0; r: 0; }
+  100%    { opacity: 1; r: 2; }
+}
+@keyframes ping-dot-pop-sm {
+  0%, 75% { opacity: 0; r: 0; }
+  100%    { opacity: 1; r: 1.5; }
+}
+.icon-badge svg .ping-line {
+  stroke-dasharray: 34;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.icon-badge svg .ping-glow {
+  stroke-dasharray: 34;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-line,
+.card:hover .icon-badge[data-icon="pingMonitor"] svg .ping-line {
+  animation: ping-draw 1.5s ease-out infinite;
+}
+.card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-glow {
+  animation: ping-draw 1.5s ease-out infinite;
+}
+.card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-dot {
+  animation: ping-dot-pop 1.5s ease-out infinite;
+}
+.card:hover .icon-badge[data-icon="pingMonitor"] svg .ping-dot {
+  animation: ping-dot-pop-sm 1.5s ease-out infinite;
+}
+
+/* --- Traffic: Pfeile bewegen sich gegenläufig --- */
+@keyframes traffic-arrow-up {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+@keyframes traffic-arrow-down {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(3px); }
+}
+.icon-badge svg .traffic-up,
+.icon-badge svg .traffic-down {
+  transition: transform 0.3s ease;
+}
+.card:hover .icon-badge[data-icon="traffic"] svg .traffic-up {
+  animation: traffic-arrow-up 0.8s ease-in-out infinite;
+}
+.card:hover .icon-badge[data-icon="traffic"] svg .traffic-down {
+  animation: traffic-arrow-down 0.8s ease-in-out infinite;
+}
+
+/* --- Pi-hole DNS: Schild pulsiert mit Glow --- */
+@keyframes shield-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgba(239, 68, 68, 0));
+  }
+  50% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));
+  }
 }
 .card:hover .icon-badge[data-icon="piholeDnsColor"] svg,
 .card:hover .icon-badge[data-icon="piholeDns"] svg {
-  animation: icon-pulse 0.9s ease-in-out infinite;
+  animation: shield-pulse 1.2s ease-in-out infinite;
 }
-.card:hover .icon-badge[data-icon="power"] svg,
+
+/* --- Power / Lightning: Blitz flackert --- */
+@keyframes bolt-flash {
+  0%   { opacity: 1; filter: drop-shadow(0 0 0px currentColor); }
+  15%  { opacity: 0.2; filter: drop-shadow(0 0 0px currentColor); }
+  30%  { opacity: 1; filter: drop-shadow(0 0 5px currentColor); }
+  45%  { opacity: 0.4; filter: drop-shadow(0 0 0px currentColor); }
+  60%  { opacity: 1; filter: drop-shadow(0 0 8px currentColor); }
+  100% { opacity: 1; filter: drop-shadow(0 0 0px currentColor); }
+}
+.card:hover .icon-badge[data-icon="power"] svg .bolt,
 .card:hover .icon-badge[data-icon="linkSpeed"] svg {
-  animation: icon-flash 0.7s ease-in-out infinite;
+  animation: bolt-flash 1s ease-in-out infinite;
+}
+
+/* --- Monitor: Bildschirm glimmt --- */
+@keyframes monitor-glow {
+  0%, 100% { filter: drop-shadow(0 0 0px var(--accent)); }
+  50%      { filter: drop-shadow(0 0 6px var(--accent)); }
 }
 .card:hover .icon-badge[data-icon="monitor"] svg {
-  animation: icon-pulse 0.9s ease-in-out infinite;
+  animation: monitor-glow 1.4s ease-in-out infinite;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
