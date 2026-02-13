@@ -882,7 +882,8 @@ label {
   height: 22px;
 }
 
-.card:hover .icon-badge {
+.card:hover .icon-badge,
+.section-title:hover .icon-badge {
   transform: scale(1.08);
   box-shadow: 0 0 calc(14px * var(--glow-strength)) var(--accent-glow);
 }
@@ -893,7 +894,8 @@ label {
   border-color: rgba(34, 197, 94, 0.35);
   color: #22c55e;
 }
-.card:hover .icon-green {
+.card:hover .icon-green,
+.section-title:hover .icon-green {
   background: rgba(34, 197, 94, 0.25);
   box-shadow: 0 0 calc(14px * var(--glow-strength)) rgba(34, 197, 94, 0.4);
 }
@@ -913,7 +915,8 @@ label {
   border-color: rgba(239, 68, 68, 0.35);
   color: #ef4444;
 }
-.card:hover .icon-red {
+.card:hover .icon-red,
+.section-title:hover .icon-red {
   background: rgba(239, 68, 68, 0.25);
   box-shadow: 0 0 calc(14px * var(--glow-strength)) rgba(239, 68, 68, 0.4);
 }
@@ -980,7 +983,8 @@ label {
   transform-origin: 50% 50%;
   transition: transform 0.3s ease;
 }
-.card:hover .icon-badge[data-icon="uptime"] svg .clock-hand {
+.card:hover .icon-badge[data-icon="uptime"] svg .clock-hand,
+.section-title:hover .icon-badge[data-icon="uptime"] svg .clock-hand {
   animation: clock-spin 2s linear infinite;
 }
 
@@ -999,7 +1003,9 @@ label {
   transition: transform 0.3s ease;
 }
 .card:hover .icon-badge[data-icon="speedtestColor"] svg .tacho-needle,
-.card:hover .icon-badge[data-icon="speedtest"] svg .tacho-needle {
+.card:hover .icon-badge[data-icon="speedtest"] svg .tacho-needle,
+.section-title:hover .icon-badge[data-icon="speedtestColor"] svg .tacho-needle,
+.section-title:hover .icon-badge[data-icon="speedtest"] svg .tacho-needle {
   animation: tacho-swing 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
@@ -1018,11 +1024,14 @@ label {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.3; }
 }
-.card:hover .icon-badge[data-icon="outage"] svg {
+.card:hover .icon-badge[data-icon="outage"] svg,
+.section-title:hover .icon-badge[data-icon="outage"] svg {
   animation: outage-glow 1.3s ease-in-out infinite;
 }
 .card:hover .icon-badge[data-icon="outage"] svg .outage-excl,
-.card:hover .icon-badge[data-icon="outage"] svg .outage-dot {
+.card:hover .icon-badge[data-icon="outage"] svg .outage-dot,
+.section-title:hover .icon-badge[data-icon="outage"] svg .outage-excl,
+.section-title:hover .icon-badge[data-icon="outage"] svg .outage-dot {
   animation: outage-excl-blink 0.65s ease-in-out infinite;
 }
 
@@ -1050,16 +1059,21 @@ label {
   transition: stroke-dashoffset 0.3s ease;
 }
 .card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-line,
-.card:hover .icon-badge[data-icon="pingMonitor"] svg .ping-line {
+.card:hover .icon-badge[data-icon="pingMonitor"] svg .ping-line,
+.section-title:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-line,
+.section-title:hover .icon-badge[data-icon="pingMonitor"] svg .ping-line {
   animation: ping-draw 1.5s ease-out infinite;
 }
-.card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-glow {
+.card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-glow,
+.section-title:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-glow {
   animation: ping-draw 1.5s ease-out infinite;
 }
-.card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-dot {
+.card:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-dot,
+.section-title:hover .icon-badge[data-icon="pingMonitorColor"] svg .ping-dot {
   animation: ping-dot-pop 1.5s ease-out infinite;
 }
-.card:hover .icon-badge[data-icon="pingMonitor"] svg .ping-dot {
+.card:hover .icon-badge[data-icon="pingMonitor"] svg .ping-dot,
+.section-title:hover .icon-badge[data-icon="pingMonitor"] svg .ping-dot {
   animation: ping-dot-pop-sm 1.5s ease-out infinite;
 }
 
@@ -1076,10 +1090,12 @@ label {
 .icon-badge svg .traffic-down {
   transition: transform 0.3s ease;
 }
-.card:hover .icon-badge[data-icon="traffic"] svg .traffic-up {
+.card:hover .icon-badge[data-icon="traffic"] svg .traffic-up,
+.section-title:hover .icon-badge[data-icon="traffic"] svg .traffic-up {
   animation: traffic-arrow-up 0.8s ease-in-out infinite;
 }
-.card:hover .icon-badge[data-icon="traffic"] svg .traffic-down {
+.card:hover .icon-badge[data-icon="traffic"] svg .traffic-down,
+.section-title:hover .icon-badge[data-icon="traffic"] svg .traffic-down {
   animation: traffic-arrow-down 0.8s ease-in-out infinite;
 }
 
@@ -1095,7 +1111,9 @@ label {
   }
 }
 .card:hover .icon-badge[data-icon="piholeDnsColor"] svg,
-.card:hover .icon-badge[data-icon="piholeDns"] svg {
+.card:hover .icon-badge[data-icon="piholeDns"] svg,
+.section-title:hover .icon-badge[data-icon="piholeDnsColor"] svg,
+.section-title:hover .icon-badge[data-icon="piholeDns"] svg {
   animation: shield-pulse 1.2s ease-in-out infinite;
 }
 
@@ -1109,7 +1127,9 @@ label {
   100% { opacity: 1; filter: drop-shadow(0 0 0px currentColor); }
 }
 .card:hover .icon-badge[data-icon="power"] svg .bolt,
-.card:hover .icon-badge[data-icon="linkSpeed"] svg {
+.card:hover .icon-badge[data-icon="linkSpeed"] svg,
+.section-title:hover .icon-badge[data-icon="power"] svg .bolt,
+.section-title:hover .icon-badge[data-icon="linkSpeed"] svg {
   animation: bolt-flash 1s ease-in-out infinite;
 }
 
