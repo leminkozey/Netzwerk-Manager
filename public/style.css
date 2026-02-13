@@ -2629,6 +2629,107 @@ label {
   pointer-events: none;
 }
 
+/* ── Action Button Icon Animations ── */
+
+/* --- Wake: Sonne dreht sich --- */
+@keyframes wake-rotate {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes wake-press-flash {
+  0%   { filter: drop-shadow(0 0 0px #22c55e); transform: scale(1); }
+  50%  { filter: drop-shadow(0 0 12px #22c55e); transform: scale(1.15); }
+  100% { filter: drop-shadow(0 0 0px #22c55e); transform: scale(1); }
+}
+.wake-btn svg, .pc-wake-btn svg {
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+.wake-btn:hover svg, .pc-wake-btn:hover svg {
+  animation: wake-rotate 3s linear infinite;
+}
+.wake-btn:active svg, .pc-wake-btn:active svg {
+  animation: wake-press-flash 0.4s ease-out forwards;
+}
+
+/* --- Restart: Pfeile drehen sich 360° --- */
+@keyframes restart-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.restart-btn svg, .pc-restart-btn svg {
+  transition: transform 0.3s ease;
+}
+.restart-btn:hover svg, .pc-restart-btn:hover svg {
+  animation: restart-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.restart-btn:active svg, .pc-restart-btn:active svg {
+  animation: restart-spin 0.3s linear 1;
+}
+
+/* --- Shutdown: Bounce --- */
+@keyframes shutdown-bounce {
+  0%, 100% { transform: translateY(0); }
+  25%      { transform: translateY(-3px); }
+  50%      { transform: translateY(0); }
+  75%      { transform: translateY(-1.5px); }
+}
+@keyframes shutdown-press-bounce {
+  0%   { transform: translateY(0); }
+  30%  { transform: translateY(-5px); }
+  60%  { transform: translateY(2px); }
+  80%  { transform: translateY(-1px); }
+  100% { transform: translateY(0); }
+}
+.shutdown-btn svg, .pc-shutdown-btn svg {
+  transition: transform 0.3s ease;
+}
+.shutdown-btn:hover svg, .pc-shutdown-btn:hover svg {
+  animation: shutdown-bounce 0.8s ease-in-out infinite;
+}
+.shutdown-btn:active svg, .pc-shutdown-btn:active svg {
+  animation: shutdown-press-bounce 0.35s ease-out forwards;
+}
+
+/* --- Pause: Balken rücken zusammen --- */
+@keyframes pause-squeeze {
+  0%, 100% { transform: scaleX(1); }
+  50%      { transform: scaleX(0.7); }
+}
+@keyframes pause-press {
+  0%   { transform: scaleY(1); }
+  40%  { transform: scaleY(0.6); }
+  100% { transform: scaleY(1); }
+}
+.pause-btn svg {
+  transition: transform 0.3s ease;
+}
+.pause-btn:hover svg {
+  animation: pause-squeeze 0.8s ease-in-out infinite;
+}
+.pause-btn:active svg {
+  animation: pause-press 0.3s ease-out forwards;
+}
+
+/* --- Resume/Play: Dreieck springt vor --- */
+@keyframes play-nudge {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(3px); }
+}
+@keyframes play-press {
+  0%   { transform: scale(1); filter: drop-shadow(0 0 0px #22c55e); }
+  50%  { transform: scale(1.2); filter: drop-shadow(0 0 10px #22c55e); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 0px #22c55e); }
+}
+.resume-btn svg {
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+.resume-btn:hover svg {
+  animation: play-nudge 0.7s ease-in-out infinite;
+}
+.resume-btn:active svg {
+  animation: play-press 0.35s ease-out forwards;
+}
+
 .pc-info-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
