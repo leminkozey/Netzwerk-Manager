@@ -1113,15 +1113,6 @@ label {
   animation: bolt-flash 1s ease-in-out infinite;
 }
 
-/* --- Monitor: Bildschirm glimmt --- */
-@keyframes monitor-glow {
-  0%, 100% { filter: drop-shadow(0 0 0px var(--accent)); }
-  50%      { filter: drop-shadow(0 0 6px var(--accent)); }
-}
-.card:hover .icon-badge[data-icon="monitor"] svg {
-  animation: monitor-glow 1.4s ease-in-out infinite;
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    Link Buttons
    ═══════════════════════════════════════════════════════════════════ */
