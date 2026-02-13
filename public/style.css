@@ -1820,14 +1820,6 @@ label {
   height: 100%;
 }
 
-/* Glow-Slider: Sonnenstrahlen skalieren mit Slider-Wert */
-.glow-icon-sun svg .sun-rays-path {
-  transform-box: view-box;
-  transform-origin: 50% 50%;
-  transform: scale(var(--ray-scale, 1));
-  transition: transform 0.25s ease;
-}
-
 .glow-icon[data-variant="high"] {
   color: var(--accent);
 }

@@ -219,6 +219,21 @@ function createToggleGroup(name, options, current, onChange) {
   return group;
 }
 
+function glowThumbSvg(rayScale) {
+  const s = Math.max(0.15, Math.min(1.5, rayScale));
+  const c = 12, inner = 5.8, len = 1 + 5.2 * s;
+  const angles = [90, 45, 0, 315, 270, 225, 180, 135];
+  const d = angles.map(a => {
+    const r = a * Math.PI / 180;
+    const x1 = (c + inner * Math.cos(r)).toFixed(1);
+    const y1 = (c - inner * Math.sin(r)).toFixed(1);
+    const x2 = (c + (inner + len) * Math.cos(r)).toFixed(1);
+    const y2 = (c - (inner + len) * Math.sin(r)).toFixed(1);
+    return `M${x1} ${y1}L${x2} ${y2}`;
+  }).join('');
+  return `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round'><circle cx='12' cy='12' r='4' fill='none'/><path d='${d}'/></svg>")`;
+}
+
 function createGlowSlider() {
   const currentGlow = state.glowStrength ?? defaults.glowStrength;
   const slider = el('input', {
@@ -230,29 +245,27 @@ function createGlowSlider() {
     value: String(currentGlow),
   });
 
-  const glowControl = el('div', { className: 'glow-control' });
-
-  const updatePercent = () => {
+  const updateSlider = () => {
     const val = Number(slider.value);
     const percent = Math.round((val / 2) * 100);
     slider.style.setProperty('--glow-percent', `${percent}%`);
-    // Scale sun rays: slider 0→0.4, slider 2→1.4
-    glowControl.style.setProperty('--ray-scale', String(0.4 + (val / 2) * 1));
+    slider.style.setProperty('--glow-thumb-icon', glowThumbSvg(val / 2));
   };
-  updatePercent();
+  updateSlider();
 
   slider.addEventListener('input', () => {
     applyGlowStrength(Number(slider.value));
-    updatePercent();
+    updateSlider();
   });
   slider.addEventListener('change', () => {
     localStorage.setItem(STORAGE_KEYS.glowStrength, slider.value);
   });
 
-  glowControl.appendChild(el('span', { className: 'glow-icon' }, [iconEl('moon', 18)]));
-  glowControl.appendChild(slider);
-  glowControl.appendChild(el('span', { className: 'glow-icon glow-icon-sun', style: { color: 'var(--accent)' } }, [iconEl('sun', 18)]));
-  return glowControl;
+  return el('div', { className: 'glow-control' }, [
+    el('span', { className: 'glow-icon' }, [iconEl('moon', 18)]),
+    slider,
+    el('span', { className: 'glow-icon', style: { color: 'var(--accent)' } }, [iconEl('sun', 18)]),
+  ]);
 }
 
 function createAccentPicker() {
