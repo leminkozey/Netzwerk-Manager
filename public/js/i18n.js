@@ -59,6 +59,11 @@ const translations = {
     'speedtest.complete': 'Test abgeschlossen',
     'speedtest.error': 'Speed-Test fehlgeschlagen',
     'speedtest.localhostNotice': 'Bitte über die LAN-IP öffnen (nicht localhost).',
+    'speedtest.history': 'Speed-Test Verlauf',
+    'speedtest.noHistory': 'Noch keine Tests vorhanden',
+    'speedtest.historyDownload': 'Download',
+    'speedtest.historyUpload': 'Upload',
+    'speedtest.historyPing': 'Ping',
 
     'pc.status.online': 'Online',
     'pc.status.offline': 'Offline',
@@ -351,6 +356,11 @@ const translations = {
     'speedtest.complete': 'Test complete',
     'speedtest.error': 'Speed test failed',
     'speedtest.localhostNotice': 'Please open via LAN IP (not localhost).',
+    'speedtest.history': 'Speed Test History',
+    'speedtest.noHistory': 'No tests yet',
+    'speedtest.historyDownload': 'Download',
+    'speedtest.historyUpload': 'Upload',
+    'speedtest.historyPing': 'Ping',
 
     'pc.status.online': 'Online',
     'pc.status.offline': 'Offline',

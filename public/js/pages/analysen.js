@@ -199,6 +199,194 @@ function formatNumber(n) {
 }
 
 // =================================================================
+// Speedtest History Overlay
+// =================================================================
+
+function showSpeedtestHistory(data) {
+  // Filter valid entries and sort ascending by timestamp
+  const sorted = (Array.isArray(data) ? data : [])
+    .filter(e => e && e.download != null && e.upload != null && e.ping != null && e.timestamp)
+    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+  // Remove any existing overlay
+  document.querySelector('.speedtest-history-overlay')?.remove();
+
+  const overlay = el('div', { className: 'overlay active speedtest-history-overlay' });
+
+  if (sorted.length === 0) {
+    const content = el('div', { className: 'overlay-content' }, [
+      el('div', { className: 'speedtest-history-header' }, [
+        el('h3', { textContent: t('speedtest.history') }),
+        el('button', { className: 'speedtest-history-close', textContent: '\u00d7' }),
+      ]),
+      el('div', {
+        textContent: t('speedtest.noHistory'),
+        style: { padding: '40px 0', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' },
+      }),
+    ]);
+    overlay.appendChild(content);
+    content.querySelector('.speedtest-history-close').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    return;
+  }
+
+  // Build SVG chart
+  const ns = 'http://www.w3.org/2000/svg';
+  const svgW = 700, svgH = 320;
+  const padL = 62, padR = 56, padT = 28, padB = 50;
+  const cW = svgW - padL - padR;
+  const cH = svgH - padT - padB;
+
+  // Find max values for dual Y-axes
+  let maxMbps = 1, maxPing = 1;
+  for (const entry of sorted) {
+    if (entry.download > maxMbps) maxMbps = entry.download;
+    if (entry.upload > maxMbps) maxMbps = entry.upload;
+    if (entry.ping > maxPing) maxPing = entry.ping;
+  }
+  // Round up nicely
+  maxMbps = Math.ceil(maxMbps / 50) * 50 || 50;
+  maxPing = Math.ceil(maxPing / 5) * 5 || 10;
+
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${svgW} ${svgH}`);
+  svg.style.cssText = 'width:100%;height:auto;display:block';
+
+  function toY(val, max) { return padT + cH - (val / max) * cH; }
+  function toX(i) { return padL + (sorted.length === 1 ? cW / 2 : (i / (sorted.length - 1)) * cW); }
+
+  // Y-grid lines + left labels (Mbps) + right labels (ms)
+  const ySteps = 4;
+  for (let i = 0; i <= ySteps; i++) {
+    const val = (maxMbps / ySteps) * i;
+    const y = toY(val, maxMbps);
+
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', padL); line.setAttribute('x2', svgW - padR);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('stroke', 'var(--border)'); line.setAttribute('stroke-width', '0.5');
+    svg.appendChild(line);
+
+    // Left label (Mbps)
+    const leftLabel = document.createElementNS(ns, 'text');
+    leftLabel.setAttribute('x', padL - 8); leftLabel.setAttribute('y', y + 4);
+    leftLabel.setAttribute('text-anchor', 'end'); leftLabel.setAttribute('fill', 'var(--text-muted)');
+    leftLabel.setAttribute('font-size', '12');
+    leftLabel.textContent = Math.round(val);
+    svg.appendChild(leftLabel);
+
+    // Right label (ms) – mapped to ping scale
+    const pingVal = (maxPing / ySteps) * i;
+    const rightLabel = document.createElementNS(ns, 'text');
+    rightLabel.setAttribute('x', svgW - padR + 8); rightLabel.setAttribute('y', y + 4);
+    rightLabel.setAttribute('text-anchor', 'start'); rightLabel.setAttribute('fill', 'var(--text-muted)');
+    rightLabel.setAttribute('font-size', '12');
+    rightLabel.textContent = Math.round(pingVal);
+    svg.appendChild(rightLabel);
+  }
+
+  // Axis unit labels
+  const mbpsLabel = document.createElementNS(ns, 'text');
+  mbpsLabel.setAttribute('x', padL - 8); mbpsLabel.setAttribute('y', padT - 10);
+  mbpsLabel.setAttribute('text-anchor', 'end'); mbpsLabel.setAttribute('fill', 'var(--text-muted)');
+  mbpsLabel.setAttribute('font-size', '11'); mbpsLabel.setAttribute('font-weight', '600');
+  mbpsLabel.textContent = 'Mbps';
+  svg.appendChild(mbpsLabel);
+
+  const msLabel = document.createElementNS(ns, 'text');
+  msLabel.setAttribute('x', svgW - padR + 8); msLabel.setAttribute('y', padT - 10);
+  msLabel.setAttribute('text-anchor', 'start'); msLabel.setAttribute('fill', 'var(--text-muted)');
+  msLabel.setAttribute('font-size', '11'); msLabel.setAttribute('font-weight', '600');
+  msLabel.textContent = 'ms';
+  svg.appendChild(msLabel);
+
+  // Helper to draw a line + area fill
+  function drawLine(values, max, color) {
+    let points = '';
+    let firstX = null, lastX = null;
+    for (let i = 0; i < sorted.length; i++) {
+      const x = toX(i);
+      const y = toY(values[i], max);
+      points += `${x},${y} `;
+      if (firstX === null) firstX = x;
+      lastX = x;
+    }
+    if (!points || firstX === null) return;
+
+    // Area fill
+    const area = document.createElementNS(ns, 'polygon');
+    area.setAttribute('points', `${points}${lastX},${padT + cH} ${firstX},${padT + cH}`);
+    area.setAttribute('fill', color); area.setAttribute('opacity', '0.06');
+    svg.appendChild(area);
+
+    // Line
+    const polyline = document.createElementNS(ns, 'polyline');
+    polyline.setAttribute('points', points.trim());
+    polyline.setAttribute('fill', 'none'); polyline.setAttribute('stroke', color);
+    polyline.setAttribute('stroke-width', '2.5'); polyline.setAttribute('stroke-linejoin', 'round');
+    polyline.setAttribute('opacity', '0.9');
+    svg.appendChild(polyline);
+
+    // Dots
+    for (let i = 0; i < sorted.length; i++) {
+      const circle = document.createElementNS(ns, 'circle');
+      circle.setAttribute('cx', toX(i)); circle.setAttribute('cy', toY(values[i], max));
+      circle.setAttribute('r', sorted.length > 20 ? '2' : '3.5');
+      circle.setAttribute('fill', color);
+      svg.appendChild(circle);
+    }
+  }
+
+  drawLine(sorted.map(e => e.download), maxMbps, 'var(--accent)');
+  drawLine(sorted.map(e => e.upload), maxMbps, '#22c55e');
+  drawLine(sorted.map(e => e.ping), maxPing, '#f59e0b');
+
+  // X-axis date labels
+  const labelCount = Math.min(5, sorted.length);
+  for (let i = 0; i < labelCount; i++) {
+    const idx = labelCount <= 1 ? 0 : Math.round((i / (labelCount - 1)) * (sorted.length - 1));
+    const d = new Date(sorted[idx].timestamp);
+    const dateStr = `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', toX(idx)); label.setAttribute('y', svgH - 12);
+    label.setAttribute('text-anchor', 'middle'); label.setAttribute('fill', 'var(--text-muted)');
+    label.setAttribute('font-size', '11');
+    label.textContent = `${dateStr} ${timeStr}`;
+    svg.appendChild(label);
+  }
+
+  // Legend
+  function legendItem(color, label) {
+    return el('div', { className: 'speedtest-history-legend-item' }, [
+      el('div', { style: { width: '10px', height: '10px', borderRadius: '3px', background: color, flexShrink: '0' } }),
+      el('span', { textContent: label, style: { fontSize: '0.78rem', color: 'var(--text-muted)' } }),
+    ]);
+  }
+
+  const legend = el('div', { className: 'speedtest-history-legend' }, [
+    legendItem('var(--accent)', t('speedtest.historyDownload') + ' (Mbps)'),
+    legendItem('#22c55e', t('speedtest.historyUpload') + ' (Mbps)'),
+    legendItem('#f59e0b', t('speedtest.historyPing') + ' (ms)'),
+  ]);
+
+  const content = el('div', { className: 'overlay-content' }, [
+    el('div', { className: 'speedtest-history-header' }, [
+      el('h3', { textContent: t('speedtest.history') }),
+      el('button', { className: 'speedtest-history-close', textContent: '\u00d7' }),
+    ]),
+    el('div', { className: 'speedtest-history-chart' }, [svg]),
+    legend,
+  ]);
+
+  overlay.appendChild(content);
+  content.querySelector('.speedtest-history-close').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// =================================================================
 // Speedtest Section
 // =================================================================
 
@@ -410,8 +598,25 @@ function buildSpeedtestSection(animRollIn) {
     }
   });
 
+  const historyBtn = el('button', {
+    className: 'speedtest-history-btn',
+    title: t('speedtest.history'),
+  }, [iconEl('info', 16)]);
+
+  historyBtn.addEventListener('click', async () => {
+    historyBtn.disabled = true;
+    try {
+      const res = await api.getSpeedtestHistory();
+      showSpeedtestHistory(res.history || res);
+    } catch {
+      showToast(t('msg.error'), true);
+    } finally {
+      historyBtn.disabled = false;
+    }
+  });
+
   return el('div', { className: 'card' }, [
-    sectionTitle(t('analysen.speedtest'), 'speedtestColor'),
+    sectionTitle(t('analysen.speedtest'), 'speedtestColor', historyBtn),
     el('div', { className: 'speedtest-container' }, [
       ...(isLocal ? [localhostWarn] : []),
       gaugeWrapper,
