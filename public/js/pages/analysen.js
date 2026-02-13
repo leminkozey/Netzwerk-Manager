@@ -39,7 +39,7 @@ function sectionTitle(titleText, iconName, badge) {
   const colorClass = iconName in iconColors ? iconColors[iconName] : 'icon-cyan';
   const children = [
     el('div', { className: 'section-header' }, [
-      el('span', { className: `icon-badge ${colorClass}` }, [iconEl(iconName, 22)]),
+      el('span', { className: `icon-badge ${colorClass}`, 'data-icon': iconName }, [iconEl(iconName, 22)]),
       el('h3', { textContent: titleText }),
     ]),
   ];
@@ -1547,7 +1547,7 @@ export function renderAnalysen(container) {
     const uptimeCol = el('div');
     uptimeCol.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
       el('div', { className: 'section-header' }, [
-        el('span', { className: 'icon-badge icon-green' }, [iconEl('uptime', 22)]),
+        el('span', { className: 'icon-badge icon-green', 'data-icon': 'uptime' }, [iconEl('uptime', 22)]),
         el('h3', { textContent: t('analysen.uptime') }),
       ]),
     ]));
@@ -1718,7 +1718,7 @@ export function renderAnalysen(container) {
         // Section title
         piholeContainer.appendChild(el('div', { className: 'section-title', style: { marginBottom: '16px' } }, [
           el('div', { className: 'section-header' }, [
-            el('span', { className: 'icon-badge icon-red' }, [iconEl('piholeDnsColor', 22)]),
+            el('span', { className: 'icon-badge icon-red', 'data-icon': 'piholeDnsColor' }, [iconEl('piholeDnsColor', 22)]),
             el('h3', { textContent: t('analysen.pihole') }),
           ]),
         ]));
