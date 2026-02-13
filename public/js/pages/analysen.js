@@ -203,15 +203,27 @@ function formatNumber(n) {
 // =================================================================
 
 function showSpeedtestHistory(data) {
-  // Filter valid entries and sort ascending by timestamp
+  // Filter valid entries (strict type check) and sort ascending by timestamp
   const sorted = (Array.isArray(data) ? data : [])
-    .filter(e => e && e.download != null && e.upload != null && e.ping != null && e.timestamp)
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    .filter(e => e
+      && typeof e.download === 'number' && Number.isFinite(e.download)
+      && typeof e.upload === 'number' && Number.isFinite(e.upload)
+      && typeof e.ping === 'number' && Number.isFinite(e.ping)
+      && typeof e.timestamp === 'number' && e.timestamp > 0)
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   // Remove any existing overlay
   document.querySelector('.speedtest-history-overlay')?.remove();
 
   const overlay = el('div', { className: 'overlay active speedtest-history-overlay' });
+
+  function closeOverlay() {
+    document.removeEventListener('keydown', onEscape);
+    overlay.remove();
+  }
+  function onEscape(e) { if (e.key === 'Escape') closeOverlay(); }
+  document.addEventListener('keydown', onEscape);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeOverlay(); });
 
   if (sorted.length === 0) {
     const content = el('div', { className: 'overlay-content' }, [
@@ -225,8 +237,7 @@ function showSpeedtestHistory(data) {
       }),
     ]);
     overlay.appendChild(content);
-    content.querySelector('.speedtest-history-close').addEventListener('click', () => overlay.remove());
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    content.querySelector('.speedtest-history-close').addEventListener('click', closeOverlay);
     document.body.appendChild(overlay);
     return;
   }
@@ -381,8 +392,7 @@ function showSpeedtestHistory(data) {
   ]);
 
   overlay.appendChild(content);
-  content.querySelector('.speedtest-history-close').addEventListener('click', () => overlay.remove());
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  content.querySelector('.speedtest-history-close').addEventListener('click', closeOverlay);
   document.body.appendChild(overlay);
 }
 

@@ -4064,6 +4064,8 @@ label {
 .speedtest-history-overlay .overlay-content {
   max-width: 720px;
   width: 94%;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .speedtest-history-header {

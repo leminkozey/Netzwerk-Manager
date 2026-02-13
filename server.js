@@ -2674,36 +2674,51 @@ app.post('/api/speedtest/save', authRequired, async (req, res) => {
   }
 
   const allowedTypes = ['local', 'internet', 'unknown'];
+  const now = Date.now();
+  const MIN_TS = 1577836800000; // 2020-01-01
 
-  await withStateLock(() => {
-    const state = readState();
+  try {
+    const history = await withStateLock(() => {
+      const state = readState();
 
-    const testResult = {
-      id: randomUUID(),
-      download: safeFloat(download),
-      upload: safeFloat(upload),
-      ping: safeFloat(ping, 60000),
-      type: allowedTypes.includes(type) ? type : 'unknown',
-      timestamp: (typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0)
-        ? timestamp : Date.now(),
-    };
+      const testResult = {
+        id: randomUUID(),
+        download: safeFloat(download),
+        upload: safeFloat(upload),
+        ping: safeFloat(ping, 60000),
+        type: allowedTypes.includes(type) ? type : 'unknown',
+        timestamp: (typeof timestamp === 'number' && Number.isFinite(timestamp)
+          && timestamp > MIN_TS && timestamp < now + 86400000)
+          ? timestamp : now,
+      };
 
-    state.speedTestHistory = Array.isArray(state.speedTestHistory) ? state.speedTestHistory : [];
-    state.speedTestHistory.unshift(testResult);
+      state.speedTestHistory = Array.isArray(state.speedTestHistory) ? state.speedTestHistory : [];
+      state.speedTestHistory.unshift(testResult);
 
-    // Keep only last 50 tests
-    if (state.speedTestHistory.length > 50) {
-      state.speedTestHistory = state.speedTestHistory.slice(0, 50);
-    }
+      // Keep only last 50 tests
+      if (state.speedTestHistory.length > 50) {
+        state.speedTestHistory = state.speedTestHistory.slice(0, 50);
+      }
 
-    saveState(state);
-    res.json({ ok: true, history: state.speedTestHistory });
-  });
+      saveState(state);
+      return state.speedTestHistory;
+    });
+    res.json({ ok: true, history });
+  } catch {
+    res.status(500).json({ error: 'Failed to save speedtest' });
+  }
 });
 
-app.get('/api/speedtest/history', authRequired, (req, res) => {
-  const state = readState();
-  res.json({ history: state.speedTestHistory || [] });
+app.get('/api/speedtest/history', authRequired, async (req, res) => {
+  try {
+    const history = await withStateLock(() => {
+      const state = readState();
+      return state.speedTestHistory || [];
+    });
+    res.json({ history });
+  } catch {
+    res.status(500).json({ error: 'Failed to read history' });
+  }
 });
 
 app.get('/api/export', authRequired, (req, res) => {
