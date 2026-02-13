@@ -633,7 +633,7 @@ function createCreditsPanel() {
     el('img', { className: 'credits-avatar', src: 'https://github.com/leminkozey.png', alt: 'leminkozey' }),
     el('span', { className: 'credits-label', textContent: 'made by' }),
     el('a', { className: 'credits-name', href: 'https://github.com/leminkozey', target: '_blank', rel: 'noopener', textContent: 'leminkozey' }),
-    el('span', { className: 'credits-version', textContent: 'v3.4.0' }),
+    el('span', { className: 'credits-version', textContent: 'v3.5.0' }),
   ];
 
   if (updateEnabled) {
