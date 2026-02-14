@@ -8,10 +8,12 @@ import { t } from './i18n.js';
 // ── Debounce ──
 export function debounce(fn, wait) {
   let t;
-  return (...args) => {
+  const debounced = (...args) => {
     clearTimeout(t);
     t = setTimeout(() => fn(...args), wait);
   };
+  debounced.cancel = () => clearTimeout(t);
+  return debounced;
 }
 
 // ── Color Helpers ──

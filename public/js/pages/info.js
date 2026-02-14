@@ -116,6 +116,8 @@ function buildCardLinks(links) {
 // ── Generic Table Card (replaces buildPortCard for config-driven tables) ──
 
 function buildGenericTableCard(cardDef) {
+  if (!cardDef.id) return el('div');
+
   const tbody = el('tbody');
   const cardId = cardDef.id;
   const columns = cardDef.columns || {};
@@ -130,6 +132,7 @@ function buildGenericTableCard(cardDef) {
       showToast(t('msg.error'), true);
     }
   }, 600);
+  _unsubs.push(() => debouncedSave.cancel());
 
   function renderRows() {
     tbody.replaceChildren();
@@ -212,6 +215,8 @@ function buildGenericTableCard(cardDef) {
 // ── Generic Info Card (replaces PiHole/Speedport/WindowsPC builders) ──
 
 function buildGenericInfoCard(cardDef) {
+  if (!cardDef.id) return el('div');
+
   const cardId = cardDef.id;
   const fieldContainer = el('div', { className: 'service-fields' });
 
@@ -220,13 +225,13 @@ function buildGenericInfoCard(cardDef) {
 
   const debouncedSave = debounce(async () => {
     try {
-      const result = await api.saveInfoCard(cardId, fieldData);
-      if (result.data) fieldData = result.data;
+      await api.saveInfoCard(cardId, fieldData);
       showToast(t('msg.saved'));
     } catch {
       showToast(t('msg.error'), true);
     }
   }, 800);
+  _unsubs.push(() => debouncedSave.cancel());
 
   // Track link renderers for updates
   let linksObj = null;

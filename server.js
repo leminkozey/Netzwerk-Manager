@@ -2522,7 +2522,7 @@ app.post('/api/raspberry', authRequired, async (req, res) => {
 
 // ── Generic Info Cards (configurable) ──
 
-app.get('/api/info-card/:cardId', authRequired, (req, res) => {
+app.get('/api/info-card/:cardId', authRequired, async (req, res) => {
   const { cardId } = req.params;
   if (!isValidDeviceId(cardId)) {
     return res.status(400).json({ error: 'Invalid card ID' });
@@ -2531,20 +2531,25 @@ app.get('/api/info-card/:cardId', authRequired, (req, res) => {
   if (!cardDef) {
     return res.status(404).json({ error: 'Card not found in config' });
   }
-  const allData = readInfoCardsData();
-  const cardData = allData[cardId] || {};
 
-  // Decrypt password fields
-  const pwKeys = getPasswordFieldKeys(cardDef);
-  const result = { ...cardData };
-  for (const key of pwKeys) {
-    if (result[key]) result[key] = decryptValue(result[key]);
-  }
+  const result = await withStateLock(() => {
+    const allData = readInfoCardsData();
+    const cardData = allData[cardId] || {};
 
-  // For table cards, return rows data
-  if (cardDef.type === 'table' && Array.isArray(cardDef.rows)) {
-    if (!result.rows) result.rows = {};
-  }
+    // Decrypt password fields
+    const pwKeys = getPasswordFieldKeys(cardDef);
+    const decrypted = { ...cardData };
+    for (const key of pwKeys) {
+      if (decrypted[key]) decrypted[key] = decryptValue(decrypted[key]);
+    }
+
+    // For table cards, return rows data
+    if (cardDef.type === 'table' && Array.isArray(cardDef.rows)) {
+      if (!decrypted.rows) decrypted.rows = {};
+    }
+
+    return decrypted;
+  });
 
   res.json(result);
 });
@@ -2563,9 +2568,11 @@ app.post('/api/info-card/:cardId', authRequired, async (req, res) => {
   const MAX_FIELD_LEN = 512;
   const pwKeys = getPasswordFieldKeys(cardDef);
 
+  const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
+
   if (cardDef.type === 'info') {
     // Validate: only allow keys defined in config fields
-    const allowedKeys = (cardDef.fields || []).map(f => f.key);
+    const allowedKeys = (cardDef.fields || []).map(f => f.key).filter(k => !DANGEROUS_KEYS.includes(k));
     const dataToSave = {};
 
     for (const key of allowedKeys) {
