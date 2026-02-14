@@ -21,6 +21,9 @@ export const state = {
   speedportVersions: [],
   raspberryVersions: [],
 
+  // Info Cards (generic configurable cards)
+  infoCards: {},
+
   // Live data (latest from server)
   live: {
     switchPorts: [],

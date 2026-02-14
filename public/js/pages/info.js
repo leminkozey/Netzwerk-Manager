@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { t } from '../i18n.js';
-import { state, on } from '../state.js';
+import { state, on, getConfig } from '../state.js';
 import { el, showToast, debounce, pickTextColor, copyToClipboard } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
@@ -71,12 +71,13 @@ function buildServiceField(label, value, onChange, opts = {}) {
     ]);
   }
 
+  const showCopy = opts.copy !== false;
+  const valueChildren = [inputWrapper || input];
+  if (showCopy) valueChildren.push(copyBtn(() => input.value));
+
   const row = el('div', { className: 'service-field' }, [
     el('span', { className: 'service-field-label', textContent: label }),
-    el('div', { className: 'service-field-value' }, [
-      inputWrapper || input,
-      copyBtn(() => input.value),
-    ]),
+    el('div', { className: 'service-field-value' }, valueChildren),
   ]);
 
   return { row, input };
@@ -107,6 +108,180 @@ function buildCardLinks(links) {
   render();
   return { container, render };
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// Generic Card Builders (for configurable infoCenter)
+// ═══════════════════════════════════════════════════════════════════
+
+// ── Generic Table Card (replaces buildPortCard for config-driven tables) ──
+
+function buildGenericTableCard(cardDef) {
+  const tbody = el('tbody');
+  const cardId = cardDef.id;
+  const columns = cardDef.columns || {};
+
+  // Local data store
+  let rowData = {};
+
+  const debouncedSave = debounce(async () => {
+    try {
+      await api.saveInfoCard(cardId, { rows: rowData });
+    } catch {
+      showToast(t('msg.error'), true);
+    }
+  }, 600);
+
+  function renderRows() {
+    tbody.replaceChildren();
+    for (const rowDef of (cardDef.rows || [])) {
+      const rd = rowData[rowDef.id] || { status: '', color: '#000000' };
+
+      const statusInput = el('input', {
+        type: 'text',
+        className: 'inline-input',
+        value: rd.status || '',
+        placeholder: columns.inputPlaceholder || t('table.notAssigned'),
+      });
+
+      statusInput.addEventListener('input', () => {
+        if (!rowData[rowDef.id]) rowData[rowDef.id] = { status: '', color: '#000000' };
+        rowData[rowDef.id].status = statusInput.value;
+        debouncedSave();
+      });
+
+      const colorInput = el('input', {
+        type: 'color',
+        className: 'color-input',
+        value: rd.color || '#000000',
+      });
+
+      colorInput.addEventListener('input', () => {
+        const color = colorInput.value;
+        statusInput.style.color = pickTextColor(color);
+        statusInput.style.backgroundColor = color;
+        statusInput.classList.add('has-color');
+        if (!rowData[rowDef.id]) rowData[rowDef.id] = { status: '', color: '#000000' };
+        rowData[rowDef.id].color = color;
+        debouncedSave();
+      });
+
+      if (rd.color && rd.color !== '#000000') {
+        statusInput.style.color = pickTextColor(rd.color);
+        statusInput.style.backgroundColor = rd.color;
+        statusInput.classList.add('has-color');
+      }
+
+      tbody.appendChild(el('tr', {}, [
+        el('td', { textContent: rowDef.label || rowDef.id }),
+        el('td', {}, [statusInput]),
+        el('td', {}, [colorInput]),
+      ]));
+    }
+  }
+
+  // Load data from server
+  (async () => {
+    try {
+      const data = await api.getInfoCard(cardId);
+      rowData = data.rows || {};
+      state.infoCards[cardId] = data;
+    } catch { /* ignore */ }
+    renderRows();
+  })();
+
+  const card = el('section', { className: 'card' }, [
+    el('div', { className: 'section-title' }, [
+      el('div', { className: 'section-header' }, [
+        el('span', { className: 'icon-badge' }, [iconEl(cardDef.icon || 'info', 24)]),
+        el('h3', { textContent: cardDef.title }),
+      ]),
+    ]),
+    el('table', { className: 'table' }, [
+      el('thead', {}, [el('tr', {}, [
+        el('th', { textContent: columns.label || 'Name' }),
+        el('th', { textContent: columns.input || 'Value' }),
+        el('th', { textContent: columns.color || 'Color' }),
+      ])]),
+      tbody,
+    ]),
+  ]);
+
+  return card;
+}
+
+// ── Generic Info Card (replaces PiHole/Speedport/WindowsPC builders) ──
+
+function buildGenericInfoCard(cardDef) {
+  const cardId = cardDef.id;
+  const fieldContainer = el('div', { className: 'service-fields' });
+
+  // Local data store
+  let fieldData = {};
+
+  const debouncedSave = debounce(async () => {
+    try {
+      const result = await api.saveInfoCard(cardId, fieldData);
+      if (result.data) fieldData = result.data;
+      showToast(t('msg.saved'));
+    } catch {
+      showToast(t('msg.error'), true);
+    }
+  }, 800);
+
+  // Track link renderers for updates
+  let linksObj = null;
+
+  function renderFields() {
+    fieldContainer.replaceChildren();
+    for (const f of (cardDef.fields || [])) {
+      const value = fieldData[f.key] || '';
+      const { row } = buildServiceField(f.label, value, (val) => {
+        fieldData[f.key] = val;
+        debouncedSave();
+        if (linksObj) linksObj.render();
+      }, { password: f.password, copy: f.copy });
+      fieldContainer.appendChild(row);
+    }
+  }
+
+  // Build links from config
+  if (Array.isArray(cardDef.links) && cardDef.links.length > 0) {
+    const linkDefs = cardDef.links.map(linkDef => ({
+      label: linkDef.label,
+      url: () => fieldData[linkDef.linkField] || '',
+    }));
+    linksObj = buildCardLinks(linkDefs);
+  }
+
+  // Load data from server
+  (async () => {
+    try {
+      const data = await api.getInfoCard(cardId);
+      fieldData = data;
+      state.infoCards[cardId] = data;
+    } catch { /* ignore */ }
+    renderFields();
+    if (linksObj) linksObj.render();
+  })();
+
+  const children = [
+    el('div', { className: 'section-title' }, [
+      el('div', { className: 'section-header' }, [
+        el('span', { className: 'icon-badge' }, [iconEl(cardDef.icon || 'info', 26)]),
+        el('h3', { textContent: cardDef.title }),
+      ]),
+    ]),
+    fieldContainer,
+  ];
+  if (linksObj) children.push(linksObj.container);
+
+  return el('section', { className: 'card service-card' }, children);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Legacy Card Builders (used when config.infoCenter is not set)
+// ═══════════════════════════════════════════════════════════════════
 
 // ── Port table builder (Switch / Router) ─────────────────────────
 
@@ -349,7 +524,6 @@ function buildWindowsPCCard() {
     try {
       const data = await api.getControlDevice('windowspc');
       if (!state.windowsPCInfo) state.windowsPCInfo = {};
-      // Only copy the fields we care about (not id, name, type, actions, etc.)
       for (const f of fields) {
         if (data[f.key] !== undefined && data[f.key] !== '') {
           state.windowsPCInfo[f.key] = data[f.key];
@@ -361,7 +535,6 @@ function buildWindowsPCCard() {
     renderFields();
   })();
 
-  // Guard: don't re-render while user is editing fields in this card
   _unsubs.push(on('stateUpdated', () => {
     if (!document.activeElement || !fieldContainer.contains(document.activeElement)) renderFields();
   }));
@@ -379,18 +552,53 @@ function buildWindowsPCCard() {
 
 
 // ═══════════════════════════════════════════════════════════════════
-// Main render
+// Dynamic Renderer (config-driven)
 // ═══════════════════════════════════════════════════════════════════
 
-export function renderInfo(container) {
-  _unsubs.forEach(fn => fn());
-  _unsubs = [];
+function renderDynamic(page) {
+  const cfg = getConfig();
+  const sections = cfg.infoCenter;
 
-  const parentPage = container.closest('.page');
-  if (parentPage) parentPage.style.maxWidth = 'none';
+  for (const section of sections) {
+    if (!section.heading || !Array.isArray(section.cards) || section.cards.length === 0) continue;
 
-  const page = el('div', { className: 'page-wide', style: { maxWidth: 'none' } });
+    page.appendChild(sectionHeading(section.heading));
 
+    const cards = section.cards.filter(c => c.type === 'table' || c.type === 'info');
+    if (cards.length === 0) continue;
+
+    if (section.layout === 'single') {
+      // Each card gets full width
+      for (const cardDef of cards) {
+        const cardEl = cardDef.type === 'table'
+          ? buildGenericTableCard(cardDef)
+          : buildGenericInfoCard(cardDef);
+        page.appendChild(cardEl);
+      }
+    } else {
+      // 'double' layout — cards pairwise in grid
+      for (let i = 0; i < cards.length; i += 2) {
+        const pair = [cards[i]];
+        if (i + 1 < cards.length) pair.push(cards[i + 1]);
+
+        const gridChildren = pair.map(cardDef =>
+          cardDef.type === 'table'
+            ? buildGenericTableCard(cardDef)
+            : buildGenericInfoCard(cardDef)
+        );
+
+        page.appendChild(el('div', { className: 'grid two equal-height' }, gridChildren));
+      }
+    }
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Legacy Renderer (used when config.infoCenter is not set)
+// ═══════════════════════════════════════════════════════════════════
+
+function renderLegacy(page) {
   // Netzwerkgeräte
   page.appendChild(sectionHeading(t('section.devices')));
   page.appendChild(el('div', { className: 'grid two equal-height' }, [
@@ -408,6 +616,29 @@ export function renderInfo(container) {
   // Clients
   page.appendChild(sectionHeading(t('section.clients')));
   page.appendChild(buildWindowsPCCard());
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Main render
+// ═══════════════════════════════════════════════════════════════════
+
+export function renderInfo(container) {
+  _unsubs.forEach(fn => fn());
+  _unsubs = [];
+
+  const parentPage = container.closest('.page');
+  if (parentPage) parentPage.style.maxWidth = 'none';
+
+  const page = el('div', { className: 'page-wide', style: { maxWidth: 'none' } });
+
+  // Check if config has infoCenter defined
+  const cfg = getConfig();
+  if (cfg?.infoCenter && Array.isArray(cfg.infoCenter) && cfg.infoCenter.length > 0) {
+    renderDynamic(page);
+  } else {
+    renderLegacy(page);
+  }
 
   container.appendChild(page);
 

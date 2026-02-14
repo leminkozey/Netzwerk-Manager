@@ -170,6 +170,7 @@ const WINDOWS_PC_FILE = path.join(DATA_DIR, 'WindowsPC.json');
 const CONTROL_DEVICES_FILE = path.join(DATA_DIR, 'ControlDevices.json');
 const UPTIME_FILE = path.join(DATA_DIR, 'uptime.json');
 const PING_MONITOR_FILE = path.join(DATA_DIR, 'ping-monitor.json');
+const INFO_CARDS_FILE = path.join(DATA_DIR, 'InfoCards.json');
 const CONFIG_FILE = path.join(__dirname, 'public', 'config.js');
 const MAX_VERSIONS = 100;
 
@@ -439,6 +440,78 @@ function ensureDataFile() {
     }
     saveState(existing);
   }
+  migrateToInfoCards();
+}
+
+function migrateToInfoCards() {
+  // Only migrate if InfoCards.json doesn't exist yet AND config has infoCenter
+  if (fs.existsSync(INFO_CARDS_FILE)) return;
+  const cfg = readSiteConfig();
+  if (!cfg?.infoCenter || !Array.isArray(cfg.infoCenter)) return;
+
+  const state = readState();
+  const migrated = {};
+
+  // Build a map of all card IDs in the new config
+  const cardDefs = {};
+  for (const section of cfg.infoCenter) {
+    for (const card of (section.cards || [])) {
+      cardDefs[card.id] = card;
+    }
+  }
+
+  // Migrate switch ports
+  if (cardDefs['switch'] && cardDefs['switch'].type === 'table' && Array.isArray(state.switchPorts)) {
+    const rows = {};
+    for (const port of state.switchPorts) {
+      rows[port.id] = { status: port.status || '', color: port.color || '#000000' };
+    }
+    migrated['switch'] = { rows };
+  }
+
+  // Migrate router ports
+  if (cardDefs['router'] && cardDefs['router'].type === 'table' && Array.isArray(state.routerPorts)) {
+    const rows = {};
+    for (const port of state.routerPorts) {
+      rows[port.id] = { status: port.status || '', color: port.color || '#000000' };
+    }
+    migrated['router'] = { rows };
+  }
+
+  // Migrate raspberryInfo (pihole card)
+  if (cardDefs['pihole'] && cardDefs['pihole'].type === 'info' && state.raspberryInfo) {
+    const data = {};
+    const allowedKeys = (cardDefs['pihole'].fields || []).map(f => f.key);
+    for (const key of allowedKeys) {
+      if (state.raspberryInfo[key] !== undefined) {
+        data[key] = state.raspberryInfo[key]; // Already encrypted in state.json
+      }
+    }
+    if (Object.keys(data).length > 0) migrated['pihole'] = data;
+  }
+
+  // Migrate speedportInfo
+  if (cardDefs['speedport'] && cardDefs['speedport'].type === 'info' && state.speedportInfo) {
+    const data = {};
+    const pwKeys = getPasswordFieldKeys(cardDefs['speedport']);
+    const allowedKeys = (cardDefs['speedport'].fields || []).map(f => f.key);
+    for (const key of allowedKeys) {
+      if (state.speedportInfo[key] !== undefined) {
+        // Speedport passwords were stored as plaintext in state.json - encrypt them
+        if (pwKeys.includes(key) && state.speedportInfo[key] && !state.speedportInfo[key].startsWith('enc:')) {
+          data[key] = encryptValue(state.speedportInfo[key]);
+        } else {
+          data[key] = state.speedportInfo[key];
+        }
+      }
+    }
+    if (Object.keys(data).length > 0) migrated['speedport'] = data;
+  }
+
+  if (Object.keys(migrated).length > 0) {
+    saveInfoCardsData(migrated);
+    console.log(`[Migration] Migrated ${Object.keys(migrated).length} cards to InfoCards.json: ${Object.keys(migrated).join(', ')}`);
+  }
 }
 
 // Synchronous mutex for state file operations to prevent race conditions
@@ -519,6 +592,38 @@ function atomicWriteFileSync(filePath, data, options = {}) {
     try { fs.unlinkSync(tmpPath); } catch { /* ignore cleanup */ }
     fs.writeFileSync(filePath, data, options);
   }
+}
+
+// ── InfoCards Storage ──
+function readInfoCardsData() {
+  try {
+    if (!fs.existsSync(INFO_CARDS_FILE)) return {};
+    return JSON.parse(fs.readFileSync(INFO_CARDS_FILE, 'utf-8'));
+  } catch { return {}; }
+}
+
+function saveInfoCardsData(data) {
+  atomicWriteFileSync(INFO_CARDS_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
+}
+
+function getInfoCardDefinition(cardId) {
+  const cfg = readSiteConfig();
+  if (!cfg?.infoCenter || !Array.isArray(cfg.infoCenter)) return null;
+  for (const section of cfg.infoCenter) {
+    if (!Array.isArray(section.cards)) continue;
+    for (const card of section.cards) {
+      if (card.id === cardId) return card;
+    }
+  }
+  return null;
+}
+
+function getPasswordFieldKeys(cardDef) {
+  if (!cardDef) return [];
+  if (cardDef.type === 'info' && Array.isArray(cardDef.fields)) {
+    return cardDef.fields.filter(f => f.password).map(f => f.key);
+  }
+  return [];
 }
 
 // Validate deviceId against prototype pollution
@@ -2413,6 +2518,110 @@ app.post('/api/raspberry', authRequired, async (req, res) => {
       raspberryVersions: state.raspberryVersions,
     });
   });
+});
+
+// ── Generic Info Cards (configurable) ──
+
+app.get('/api/info-card/:cardId', authRequired, (req, res) => {
+  const { cardId } = req.params;
+  if (!isValidDeviceId(cardId)) {
+    return res.status(400).json({ error: 'Invalid card ID' });
+  }
+  const cardDef = getInfoCardDefinition(cardId);
+  if (!cardDef) {
+    return res.status(404).json({ error: 'Card not found in config' });
+  }
+  const allData = readInfoCardsData();
+  const cardData = allData[cardId] || {};
+
+  // Decrypt password fields
+  const pwKeys = getPasswordFieldKeys(cardDef);
+  const result = { ...cardData };
+  for (const key of pwKeys) {
+    if (result[key]) result[key] = decryptValue(result[key]);
+  }
+
+  // For table cards, return rows data
+  if (cardDef.type === 'table' && Array.isArray(cardDef.rows)) {
+    if (!result.rows) result.rows = {};
+  }
+
+  res.json(result);
+});
+
+app.post('/api/info-card/:cardId', authRequired, async (req, res) => {
+  const { cardId } = req.params;
+  if (!isValidDeviceId(cardId)) {
+    return res.status(400).json({ error: 'Invalid card ID' });
+  }
+  const cardDef = getInfoCardDefinition(cardId);
+  if (!cardDef) {
+    return res.status(404).json({ error: 'Card not found in config' });
+  }
+
+  const body = req.body || {};
+  const MAX_FIELD_LEN = 512;
+  const pwKeys = getPasswordFieldKeys(cardDef);
+
+  if (cardDef.type === 'info') {
+    // Validate: only allow keys defined in config fields
+    const allowedKeys = (cardDef.fields || []).map(f => f.key);
+    const dataToSave = {};
+
+    for (const key of allowedKeys) {
+      if (body[key] !== undefined) {
+        const val = String(body[key]);
+        if (val.length > MAX_FIELD_LEN) {
+          return res.status(400).json({ error: `Field ${key} too long (max ${MAX_FIELD_LEN})` });
+        }
+        if (pwKeys.includes(key)) {
+          dataToSave[key] = val ? encryptValue(val) : '';
+        } else {
+          dataToSave[key] = val;
+        }
+      }
+    }
+
+    await withStateLock(() => {
+      const allData = readInfoCardsData();
+      allData[cardId] = dataToSave;
+      saveInfoCardsData(allData);
+    });
+
+    // Return decrypted for client
+    const clientData = { ...dataToSave };
+    for (const key of pwKeys) {
+      if (clientData[key]) clientData[key] = decryptValue(clientData[key]);
+    }
+    res.json({ ok: true, data: clientData });
+
+  } else if (cardDef.type === 'table') {
+    // Validate: only allow row IDs defined in config
+    const allowedRowIds = (cardDef.rows || []).map(r => r.id);
+    const rows = body.rows || {};
+    const sanitizedRows = {};
+
+    for (const rowId of allowedRowIds) {
+      if (rows[rowId]) {
+        const row = rows[rowId];
+        sanitizedRows[rowId] = {
+          status: typeof row.status === 'string' ? row.status.slice(0, MAX_FIELD_LEN) : '',
+          color: (typeof row.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(row.color)) ? row.color : '#000000',
+        };
+      }
+    }
+
+    await withStateLock(() => {
+      const allData = readInfoCardsData();
+      allData[cardId] = { rows: sanitizedRows };
+      saveInfoCardsData(allData);
+    });
+
+    res.json({ ok: true, data: { rows: sanitizedRows } });
+
+  } else {
+    return res.status(400).json({ error: 'Unknown card type' });
+  }
 });
 
 app.get('/api/versions', authRequired, (req, res) => {

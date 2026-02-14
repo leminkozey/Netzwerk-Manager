@@ -4,6 +4,7 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 
 ## Features
 
+- **Konfigurierbares Info Center** – Eigene Sektionen, Cards und Felder per Config definieren (Tabellen + Info-Cards mit Passwort-Verschlüsselung, Copy-Buttons und Links)
 - **Port-Dokumentation** – Switch- und Router-Ports beschriften (welches Kabel geht wohin)
 - **PiHole-Infos** – IP, Hostname und URLs deines Pi-hole speichern
 - **Speedport-Infos** – WLAN-Daten und Passwörter dokumentieren
@@ -419,9 +420,197 @@ greetings: {
 
 ### Info Center
 
-#### Cards-Sichtbarkeit (`cards`)
+#### Konfigurierbares Layout (`infoCenter`)
 
-Einzelne Info-Cards im Info Center ein- oder ausblenden.
+Das Info Center kann vollständig über die Config definiert werden. Du bestimmst welche Sektionen, Cards und Felder angezeigt werden – komplett ohne Code-Änderungen.
+
+Wenn `infoCenter` in der Config vorhanden ist, wird das dynamische Rendering verwendet. Ohne `infoCenter` greift das Legacy-Rendering (die alten fest verdrahteten Cards).
+
+##### Aufbau
+
+`infoCenter` ist ein Array von **Sektionen**. Jede Sektion enthält eine Überschrift, ein Layout und ein Array von Cards:
+
+```js
+infoCenter: [
+  {
+    heading: 'Netzwerkgeräte',    // Sektions-Überschrift
+    layout: 'double',             // 'double' = 2 Cards nebeneinander, 'single' = volle Breite
+    cards: [ ... ],               // Array von Card-Definitionen
+  },
+],
+```
+
+##### Sektions-Optionen
+
+| Option | Typ | Beschreibung |
+|--------|-----|--------------|
+| `heading` | `string` | Überschrift der Sektion. |
+| `layout` | `string` | `'double'` = Cards paarweise im 2-Spalten-Grid. `'single'` = jede Card volle Breite. |
+| `cards` | `array` | Array von Card-Definitionen (siehe unten). |
+
+Bei `layout: 'double'` und ungerader Card-Anzahl wird die letzte Card allein (volle Breite) dargestellt.
+
+##### Card-Typen
+
+Es gibt zwei Card-Typen: **Table** und **Info**.
+
+###### Table Card (`type: 'table'`)
+
+Für tabellarische Daten wie Port-Belegungen. Jede Zeile hat ein Text-Eingabefeld und einen Farb-Picker.
+
+```js
+{
+  id: 'switch',                   // Eindeutige ID (lowercase, keine Leerzeichen)
+  title: 'Switch (8 Ports)',      // Anzeigename
+  icon: 'switchColor',            // Icon (eingebaut, URL oder Iconify)
+  type: 'table',
+  columns: {
+    label: 'Port',                // Spaltenname links
+    input: 'Belegung',            // Spaltenname Mitte
+    inputPlaceholder: 'Nicht belegt',  // Platzhalter wenn leer
+    color: 'Farbe',               // Spaltenname rechts
+  },
+  rows: [
+    { id: 'port1', label: 'Port 1' },
+    { id: 'port2', label: 'Port 2' },
+    // ...
+  ],
+}
+```
+
+| Option | Typ | Beschreibung |
+|--------|-----|--------------|
+| `id` | `string` | Eindeutiger Schlüssel für die Datenspeicherung. |
+| `title` | `string` | Überschrift der Card. |
+| `icon` | `string` | Icon-Name (siehe [Icons](#icons)). |
+| `columns` | `object` | Spaltennamen für die Tabelle. |
+| `columns.label` | `string` | Name der linken Spalte (Zeilenbeschriftung). |
+| `columns.input` | `string` | Name der mittleren Spalte (Texteingabe). |
+| `columns.inputPlaceholder` | `string` | Platzhaltertext für leere Eingabefelder. |
+| `columns.color` | `string` | Name der rechten Spalte (Farbauswahl). |
+| `rows` | `array` | Array von Zeilen mit `id` und `label`. |
+
+###### Info Card (`type: 'info'`)
+
+Für Formular-Felder wie IP-Adressen, Passwörter und URLs. Unterstützt Passwort-Verschlüsselung, Copy-Buttons und klickbare Links.
+
+```js
+{
+  id: 'pihole',
+  title: 'PiHole',
+  icon: 'raspberryColor',
+  type: 'info',
+  fields: [
+    { key: 'hostname',    label: 'Hostname' },
+    { key: 'ipAddress',   label: 'LAN IP' },
+    { key: 'sshPassword', label: 'SSH-Passwort', password: true },
+    { key: 'model',       label: 'Modell',       copy: false },
+    { key: 'piholeUrl',   label: 'Admin URL' },
+  ],
+  links: [
+    { label: 'Pi-hole Admin', linkField: 'piholeUrl' },
+  ],
+}
+```
+
+**Feld-Optionen:**
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `key` | `string` | — | Interner Schlüssel für die Datenspeicherung. Muss eindeutig innerhalb der Card sein. |
+| `label` | `string` | — | Anzeigename des Feldes im UI. |
+| `password` | `boolean` | `false` | `true` = Wert wird als Passwort-Feld angezeigt (verdeckt) mit Eye-Toggle. Wird auf dem Server mit AES-256-GCM verschlüsselt gespeichert. |
+| `copy` | `boolean` | `true` | `true` = Copy-Button neben dem Feld anzeigen. `false` = kein Copy-Button. Nützlich für Felder die man selten kopieren muss (z.B. Modell, Notizen). |
+
+**Link-Optionen:**
+
+| Option | Typ | Beschreibung |
+|--------|-----|--------------|
+| `label` | `string` | Button-Text des Links. |
+| `linkField` | `string` | Referenziert ein Feld per `key`. Der eingegebene Wert wird als URL für den Link-Button verwendet. Ist das Feld leer, wird der Button ausgegraut. |
+
+##### Datenspeicherung
+
+Card-Daten werden in `Data/InfoCards.json` gespeichert (nicht in `state.json`). Bei der ersten Aktivierung von `infoCenter` werden bestehende Daten aus `state.json` automatisch migriert (Switch-Ports, Router-Ports, PiHole-Info, Speedport-Info).
+
+##### API-Endpunkte
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|--------------|
+| `GET` | `/api/info-card/:cardId` | Ja | Daten einer Card laden. Passwort-Felder werden entschlüsselt zurückgegeben. |
+| `POST` | `/api/info-card/:cardId` | Ja | Daten einer Card speichern. Passwort-Felder werden verschlüsselt gespeichert. Feld-Keys und Row-IDs werden gegen die Config validiert. |
+
+##### Vollständiges Beispiel
+
+```js
+infoCenter: [
+  {
+    heading: 'Netzwerkgeräte',
+    layout: 'double',
+    cards: [
+      {
+        id: 'switch',
+        title: 'Switch (8 Ports)',
+        icon: 'switchColor',
+        type: 'table',
+        columns: { label: 'Port', input: 'Belegung', inputPlaceholder: 'Nicht belegt', color: 'Farbe' },
+        rows: [
+          { id: 'port1', label: 'Port 1' },
+          { id: 'port2', label: 'Port 2' },
+          { id: 'port3', label: 'Port 3' },
+          { id: 'port4', label: 'Port 4' },
+        ],
+      },
+    ],
+  },
+  {
+    heading: 'Services',
+    layout: 'double',
+    cards: [
+      {
+        id: 'pihole',
+        title: 'PiHole',
+        icon: 'raspberryColor',
+        type: 'info',
+        fields: [
+          { key: 'model',       label: 'Modell',       copy: false },
+          { key: 'hostname',    label: 'Hostname' },
+          { key: 'ipAddress',   label: 'LAN IP' },
+          { key: 'sshPassword', label: 'SSH-Passwort', password: true },
+          { key: 'piholeUrl',   label: 'Admin URL' },
+        ],
+        links: [
+          { label: 'Pi-hole Admin', linkField: 'piholeUrl' },
+        ],
+      },
+    ],
+  },
+  {
+    heading: 'Clients',
+    layout: 'single',
+    cards: [
+      {
+        id: 'windowsPc',
+        title: 'Windows PC',
+        icon: 'windowsColor',
+        type: 'info',
+        fields: [
+          { key: 'hostname',  label: 'Hostname' },
+          { key: 'ipAddress', label: 'IP-Adresse' },
+        ],
+      },
+    ],
+  },
+],
+```
+
+##### Rückwärtskompatibilität
+
+Der `infoCenter`-Block ist **komplett optional**. Ohne `infoCenter` in der Config werden die alten fest verdrahteten Cards (Switch, Router, PiHole, Speedport, Windows PC) unverändert angezeigt. Bestehende Daten werden beim ersten Hinzufügen von `infoCenter` automatisch migriert.
+
+#### Legacy: Cards-Sichtbarkeit (`cards`)
+
+Wenn `infoCenter` **nicht** verwendet wird, können die alten Cards einzeln ein-/ausgeblendet werden:
 
 | Card | Default | Beschreibung |
 |------|---------|--------------|
@@ -481,7 +670,7 @@ Jedes Gerät hat folgende Felder:
 |------|-----|--------------|
 | `id` | `string` | Eindeutiger Schlüssel (lowercase, keine Leerzeichen). |
 | `name` | `string` | Anzeigename im Frontend. |
-| `icon` | `string` | Icon-Name aus `icons.js` (z.B. `'windowsColor'`, `'server'`). |
+| `icon` | `string` | Icon für das Gerät. Unterstützt drei Formate (siehe [Icons](#icons)). |
 | `type` | `string` | SSH-Typ: `'ssh-windows'` oder `'ssh-linux'`. Bestimmt welche Befehle für Shutdown/Restart verwendet werden. |
 | `ip` | `string` | IP-Adresse des Geräts. |
 | `actions` | `array` | Verfügbare Aktionen: `'wake'`, `'restart'`, `'shutdown'`. |
@@ -513,6 +702,46 @@ controlDevices: [
   },
 ],
 ```
+
+#### Icons
+
+Überall wo `icon:` verwendet wird (z.B. in `controlDevices`), werden drei Formate unterstützt:
+
+**1. Eingebaute Icons** – Name aus `icons.js`:
+```js
+icon: 'windowsColor',
+icon: 'raspberryColor',
+icon: 'server',
+```
+
+**2. Direkte URL** – Beliebiges SVG/PNG per Link:
+```js
+icon: 'https://svgl.app/library/raspberry_pi.svg',
+icon: 'https://cdn.simpleicons.org/pihole',
+```
+
+> **Hinweis:** SVGL-URLs (`svgl.app/library/...`) werden automatisch auf die funktionierende CDN-URL umgeleitet – du brauchst nur die kurze URL einzutragen.
+
+**3. Iconify-Format** – `prefix:name` aus dem [Iconify](https://iconify.design/)-Ökosystem:
+```js
+icon: 'logos:raspberry-pi',
+icon: 'devicon:windows11-original',
+icon: 'simple-icons:raspberrypi',
+```
+
+Alle verfügbaren Iconify-Icons findest du unter [icon-sets.iconify.design](https://icon-sets.iconify.design/).
+
+**Icon-Quellen:**
+
+| Quelle | Beschreibung | Link |
+|--------|--------------|------|
+| **Iconify** | 200.000+ Icons aus 150+ Sets, per `prefix:name` nutzbar | [iconify.design](https://iconify.design/) · [Suche](https://icon-sets.iconify.design/) |
+| **SVGL** | Kuratierte Sammlung bunter Brand-SVGs (Tech-Logos) | [svgl.app](https://svgl.app/) · [GitHub](https://github.com/pheralb/svgl) |
+| **Simple Icons** | 3.000+ Marken-Logos als SVG, per CDN mit Farbe | [simpleicons.org](https://simpleicons.org/) · [GitHub](https://github.com/simple-icons/simple-icons) |
+
+> **Tipp:** Für bunte, originalgetreue Logos eignen sich SVGL oder Iconify-Sets wie `logos:` und `devicon:`. Simple Icons liefert einfarbige Logos, die per URL-Parameter eingefärbt werden können (z.B. `https://cdn.simpleicons.org/raspberrypi/red`).
+
+---
 
 ### WOL-Zeitplan (`schedule`)
 

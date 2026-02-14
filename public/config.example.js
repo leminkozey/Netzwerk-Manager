@@ -131,16 +131,137 @@ const siteConfig = {
   // │             INFO CENTER                     │
   // └─────────────────────────────────────────────┘
 
-  // ── Cards Sichtbarkeit ──
-  // Einzelne Info-Cards ein-/ausblenden.
+  // ── Cards Sichtbarkeit (Legacy) ──
+  // Steuert Speedtest und Windows PC Cards (nicht Teil von infoCenter).
   cards: {
-    switch: true,               // Switch (8 Ports) – Netzwerk-Switch-Dokumentation
-    router: true,               // WLAN Router – Router-Port-Dokumentation
-    pihole: true,               // PiHole – Pi-hole DNS-Informationen
-    speedport: true,            // Speedport – Speedport/Router-Zugangsdaten
     speedtest: true,            // Internet Geschwindigkeit – LAN Speed-Test
     windowsPc: true,            // Windows PC – PC-Steuerung (Control Center)
   },
+
+  // ── Info Center Layout (Konfigurierbar) ──
+  // Definiert das komplette Layout des Info Centers.
+  // Wenn vorhanden, ersetzt es die statischen Cards oben.
+  // Zwei Kartentypen: 'table' (Tabelle mit Spalten) und 'info' (Formular-Felder).
+  //
+  // layout: 'double' = 2 Cards nebeneinander | 'single' = volle Breite
+  // icon: Eingebauter Name (z.B. 'switchColor'), URL oder Iconify-Format ('logos:raspberry-pi')
+  // password: true = Feld wird verschlüsselt gespeichert + Eye-Toggle
+  // copy: true/false = Copy-Button anzeigen/verstecken (Standard: true)
+  // linkField: Referenziert ein Feld per Key – der Feldwert wird als URL genutzt
+  infoCenter: [
+    {
+      heading: 'Netzwerkgeräte',
+      layout: 'double',
+      cards: [
+        {
+          id: 'switch',
+          title: 'Switch (8 Ports)',
+          icon: 'switchColor',
+          type: 'table',
+          columns: {
+            label: 'Port',
+            input: 'Belegung',
+            inputPlaceholder: 'Nicht belegt',
+            color: 'Farbe',
+          },
+          rows: [
+            { id: 'port1', label: 'Port 1' },
+            { id: 'port2', label: 'Port 2' },
+            { id: 'port3', label: 'Port 3' },
+            { id: 'port4', label: 'Port 4' },
+            { id: 'port5', label: 'Port 5' },
+            { id: 'port6', label: 'Port 6' },
+            { id: 'port7', label: 'Port 7' },
+            { id: 'port8', label: 'Port 8' },
+          ],
+        },
+        {
+          id: 'router',
+          title: 'WLAN Router',
+          icon: 'routerColor',
+          type: 'table',
+          columns: {
+            label: 'Port',
+            input: 'Belegung',
+            inputPlaceholder: 'Nicht belegt',
+            color: 'Farbe',
+          },
+          rows: [
+            { id: 'dsl', label: 'DSL' },
+            { id: 'lan1', label: 'Link/LAN1' },
+            { id: 'lan2', label: 'LAN2' },
+            { id: 'lan3', label: 'LAN3' },
+            { id: 'lan4', label: 'LAN4' },
+            { id: 'telefon', label: 'Telefon' },
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'Services',
+      layout: 'double',
+      cards: [
+        {
+          id: 'pihole',
+          title: 'PiHole',
+          icon: 'raspberryColor',
+          type: 'info',
+          fields: [
+            { key: 'model',           label: 'Modell',        copy: false },
+            { key: 'hostname',        label: 'Hostname' },
+            { key: 'ipAddress',       label: 'LAN IP' },
+            { key: 'vpnIp',           label: 'VPN IP' },
+            { key: 'macAddress',      label: 'MAC-Adresse' },
+            { key: 'sshUser',         label: 'SSH-Benutzer' },
+            { key: 'sshPassword',     label: 'SSH-Passwort',  password: true },
+            { key: 'piholeUrl',       label: 'Admin URL' },
+            { key: 'piholeRemoteUrl', label: 'VPN Admin URL' },
+          ],
+          links: [
+            { label: 'Pi-hole Admin', linkField: 'piholeUrl' },
+            { label: 'VPN Admin',     linkField: 'piholeRemoteUrl' },
+          ],
+        },
+        {
+          id: 'speedport',
+          title: 'Speedport',
+          icon: 'speedportColor',
+          type: 'info',
+          fields: [
+            { key: 'wifiName',       label: 'WLAN Name' },
+            { key: 'wifiPassword',   label: 'WLAN Passwort',         password: true },
+            { key: 'serialNumber',   label: 'Seriennummer' },
+            { key: 'configuration',  label: 'Konfiguration' },
+            { key: 'remoteUrl',      label: 'VPN URL' },
+            { key: 'devicePassword', label: 'Geräte-Passwort',       password: true },
+            { key: 'modemId',        label: 'Modem Installationscode', copy: false },
+          ],
+          links: [
+            { label: 'VPN Zugang', linkField: 'remoteUrl' },
+          ],
+        },
+      ],
+    },
+    {
+      heading: 'Clients',
+      layout: 'single',
+      cards: [
+        {
+          id: 'windowsPc',
+          title: 'Windows PC',
+          icon: 'windowsColor',
+          type: 'info',
+          fields: [
+            { key: 'hostname',    label: 'Hostname' },
+            { key: 'ipAddress',   label: 'IP-Adresse' },
+            { key: 'macAddress',  label: 'MAC-Adresse' },
+            { key: 'sshUser',     label: 'SSH-Benutzer' },
+            { key: 'sshPassword', label: 'SSH-Passwort', password: true },
+          ],
+        },
+      ],
+    },
+  ],
 
   // ┌─────────────────────────────────────────────┐
   // │             CONTROL CENTER                  │

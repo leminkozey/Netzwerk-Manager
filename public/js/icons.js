@@ -320,11 +320,34 @@ export function iconEl(name, size = 20) {
   span.className = 'icon';
   span.style.cssText = `width:${size}px;height:${size}px;display:inline-flex;align-items:center;justify-content:center`;
   span.setAttribute('aria-hidden', 'true');
-  const svgStr = icons[name] || '';
-  if (svgStr) {
-    const tpl = document.createElement('template');
-    tpl.innerHTML = svgStr;
-    span.appendChild(tpl.content);
+
+  if (typeof name === 'string' && (name.startsWith('http://') || name.startsWith('https://'))) {
+    // Direct URL — auto-rewrite known sources to working CDN URLs
+    let src = name;
+    const svglMatch = name.match(/^https?:\/\/svgl\.app\/library\/(.+\.svg)$/);
+    if (svglMatch) {
+      src = `https://raw.githubusercontent.com/pheralb/svgl/main/static/library/${svglMatch[1]}`;
+    }
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain`;
+    span.appendChild(img);
+  } else if (typeof name === 'string' && name.includes(':') && !name.startsWith('<')) {
+    // Iconify format: "prefix:name" (e.g. "logos:raspberry-pi", "devicon:windows11-original")
+    const img = document.createElement('img');
+    const [prefix, icon] = name.split(':', 2);
+    img.src = `https://api.iconify.design/${prefix}/${icon}.svg`;
+    img.alt = '';
+    img.style.cssText = `width:${size}px;height:${size}px;object-fit:contain`;
+    span.appendChild(img);
+  } else {
+    const svgStr = icons[name] || '';
+    if (svgStr) {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = svgStr;
+      span.appendChild(tpl.content);
+    }
   }
   return span;
 }

@@ -99,6 +99,22 @@ export async function saveRaspberry(info) {
   return res.json();
 }
 
+// ── Info Cards (generic/configurable) ──
+
+export async function getInfoCard(cardId) {
+  const res = await request(`/api/info-card/${encodeURIComponent(cardId)}`);
+  if (!res.ok) throw new Error('Failed to get info card');
+  return res.json();
+}
+
+export async function saveInfoCard(cardId, data) {
+  const res = await request(`/api/info-card/${encodeURIComponent(cardId)}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
 // ── Credentials ──
 
 export async function saveCredentials({ currentPassword, username, password }) {
