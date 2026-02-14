@@ -82,6 +82,32 @@ function buildServiceField(label, value, onChange, opts = {}) {
   return { row, input };
 }
 
+// ── Card link buttons ──
+
+function buildCardLinks(links) {
+  const container = el('div', { className: 'card-links' });
+
+  function render() {
+    container.replaceChildren();
+    for (const link of links) {
+      const url = typeof link.url === 'function' ? link.url() : link.url;
+      const hasUrl = Boolean(url);
+      const btn = el('a', {
+        className: hasUrl ? 'card-link-btn' : 'card-link-btn card-link-disabled',
+        ...(hasUrl ? { href: url, target: '_blank', rel: 'noopener noreferrer' } : {}),
+      }, [
+        iconEl('externalLink', 14),
+        el('span', { textContent: link.label }),
+      ]);
+      if (!hasUrl) btn.addEventListener('click', (e) => e.preventDefault());
+      container.appendChild(btn);
+    }
+  }
+
+  render();
+  return { container, render };
+}
+
 // ── Port table builder (Switch / Router) ─────────────────────────
 
 function buildPortCard(title, colorIconName, ports, group) {
@@ -203,9 +229,15 @@ function buildPiholeCard() {
     }
   }
 
+  const piholeLinks = buildCardLinks([
+    { label: t('pi.openAdmin'), url: () => state.raspberryInfo.piholeUrl },
+    { label: t('pi.openVpn'),   url: () => state.raspberryInfo.piholeRemoteUrl },
+  ]);
+
   renderFields();
   _unsubs.push(on('stateUpdated', () => {
     if (!document.activeElement || !fieldContainer.contains(document.activeElement)) renderFields();
+    piholeLinks.render();
   }));
 
   return el('section', { className: 'card service-card' }, [
@@ -216,6 +248,7 @@ function buildPiholeCard() {
       ]),
     ]),
     fieldContainer,
+    piholeLinks.container,
   ]);
 }
 
@@ -255,9 +288,14 @@ function buildSpeedportCard() {
     }
   }
 
+  const speedportLinks = buildCardLinks([
+    { label: t('speedport.openVpn'), url: () => state.speedportInfo.remoteUrl },
+  ]);
+
   renderFields();
   _unsubs.push(on('stateUpdated', () => {
     if (!document.activeElement || !fieldContainer.contains(document.activeElement)) renderFields();
+    speedportLinks.render();
   }));
 
   return el('section', { className: 'card service-card' }, [
@@ -268,6 +306,7 @@ function buildSpeedportCard() {
       ]),
     ]),
     fieldContainer,
+    speedportLinks.container,
   ]);
 }
 

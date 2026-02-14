@@ -38,6 +38,8 @@ const translations = {
     'pi.sshPassword': 'SSH-Passwort',
     'pi.piholeUrl': 'Pi-hole Admin URL',
     'pi.piholeVpnUrl': 'Pi-hole VPN URL',
+    'pi.openAdmin': 'Pi-hole Admin',
+    'pi.openVpn': 'Pi-hole VPN',
 
     'speedport.wifiName': 'WLAN-Name',
     'speedport.wifiPassword': 'WLAN-Passwort (Schlüssel)',
@@ -46,6 +48,7 @@ const translations = {
     'speedport.vpnUrl': 'Speedport VPN URL',
     'speedport.devicePassword': 'Gerätepasswort',
     'speedport.modemId': 'Modem-ID',
+    'speedport.openVpn': 'Speedport VPN',
 
     'speedtest.download': 'Download',
     'speedtest.upload': 'Upload',
@@ -335,6 +338,8 @@ const translations = {
     'pi.sshPassword': 'SSH Password',
     'pi.piholeUrl': 'Pi-hole Admin URL',
     'pi.piholeVpnUrl': 'Pi-hole VPN URL',
+    'pi.openAdmin': 'Pi-hole Admin',
+    'pi.openVpn': 'Pi-hole VPN',
 
     'speedport.wifiName': 'WiFi Name',
     'speedport.wifiPassword': 'WiFi Password (Key)',
@@ -343,6 +348,7 @@ const translations = {
     'speedport.vpnUrl': 'Speedport VPN URL',
     'speedport.devicePassword': 'Device Password',
     'speedport.modemId': 'Modem ID',
+    'speedport.openVpn': 'Speedport VPN',
 
     'speedtest.download': 'Download',
     'speedtest.upload': 'Upload',

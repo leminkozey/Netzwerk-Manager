@@ -3576,6 +3576,57 @@ label {
   background: var(--accent-subtle);
 }
 
+/* Card link buttons (Info Center hyperlinks) */
+.card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.card-links:empty {
+  display: none;
+}
+
+.card-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.25s ease;
+  cursor: pointer;
+}
+
+.card-link-btn:hover {
+  border-color: var(--border-glow);
+  color: var(--accent);
+  box-shadow: 0 0 calc(12px * var(--glow-strength)) var(--accent-glow);
+  transform: translateY(-2px);
+}
+
+.card-link-btn .icon {
+  flex-shrink: 0;
+}
+
+.card-link-disabled {
+  opacity: 0.35;
+  pointer-events: none;
+  cursor: default;
+}
+
+[data-theme='light'] .card-links {
+  border-top-color: rgba(0, 0, 0, 0.06);
+}
+
 [data-theme='light'] .service-field {
   border-bottom-color: rgba(0, 0, 0, 0.06);
 }
