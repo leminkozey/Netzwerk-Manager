@@ -118,7 +118,8 @@ function decryptValue(stored) {
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
-  } catch {
+  } catch (err) {
+    console.warn('[CRYPTO] Decryption failed:', err.message);
     return '';
   }
 }
@@ -212,6 +213,9 @@ function saveTotpData(data) {
   atomicWriteFileSync(TOTP_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
 }
 
+// TOTP replay protection: track used codes to prevent reuse
+const usedTotpCodes = new Map(); // key: `${username}:${code}:${delta}` -> expiry timestamp
+
 function verifyTotpCode(username, code) {
   if (!OTPAuth) return false;
   const data = readTotpData();
@@ -228,7 +232,15 @@ function verifyTotpCode(username, code) {
     secret: OTPAuth.Secret.fromBase32(secret),
   });
   const delta = totp.validate({ token: String(code), window: 1 });
-  return delta !== null;
+  if (delta === null) return false;
+
+  // Replay protection: reject already-used code+delta combinations
+  const replayKey = `${username}:${code}:${delta}`;
+  if (usedTotpCodes.has(replayKey)) return false;
+
+  // Store with expiry (90 seconds covers window=1 with 30s period)
+  usedTotpCodes.set(replayKey, Date.now() + 90000);
+  return true;
 }
 
 // Terminal rate limiting
@@ -246,6 +258,26 @@ function checkTerminalCommandRateLimit(ip) {
   if (data.count >= TERMINAL_COMMAND_LIMIT_MAX) return false;
   data.count++;
   return true;
+}
+
+// TOTP verification rate limiting (max 5 attempts per minute per IP)
+const totpVerifyLimits = new Map();
+const TOTP_VERIFY_LIMIT_WINDOW = 60000;
+const TOTP_VERIFY_LIMIT_MAX = 5;
+
+function checkTotpRateLimit(ip) {
+  const now = Date.now();
+  const data = totpVerifyLimits.get(ip);
+  if (!data || now - data.windowStart > TOTP_VERIFY_LIMIT_WINDOW) {
+    totpVerifyLimits.set(ip, { windowStart: now, count: 1 });
+    return { allowed: true, retryAfter: 0 };
+  }
+  if (data.count >= TOTP_VERIFY_LIMIT_MAX) {
+    const retryAfter = Math.ceil((data.windowStart + TOTP_VERIFY_LIMIT_WINDOW - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  data.count++;
+  return { allowed: true, retryAfter: 0 };
 }
 
 // Terminal audit logging
@@ -266,7 +298,9 @@ function logTerminalAudit(entry) {
       audit = audit.slice(audit.length - TERMINAL_AUDIT_MAX);
     }
     atomicWriteFileSync(TERMINAL_AUDIT_FILE, JSON.stringify(audit, null, 2), { mode: 0o600 });
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.error('[TERMINAL-AUDIT] Failed to write audit log:', err.message);
+  }
 }
 
 function terminalAuthRequired(req, res, next) {
@@ -398,6 +432,21 @@ function getClientIp(req) {
   }
   // Direct connection - use socket address
   return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+async function getIpLocation(ip) {
+  // Private/lokale IPs → kein Lookup
+  if (!ip || ip === 'unknown' || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|::1|localhost)/.test(ip)) {
+    return { city: 'Lokales Netzwerk', country: '', query: ip };
+  }
+  try {
+    const res = await fetch(`http://ip-api.com/json/${encodeURIComponent(ip)}?fields=status,country,regionName,city,query`);
+    const data = await res.json();
+    if (data.status === 'success') return data;
+    return { city: 'Unbekannt', country: '', query: ip };
+  } catch {
+    return { city: 'Unbekannt', country: '', query: ip };
+  }
 }
 
 function getAttemptData(ip) {
@@ -734,6 +783,41 @@ async function withStateLock(fn) {
     return fn();
   } finally {
     releaseStateLock();
+  }
+}
+
+// Mutex for TOTP file operations to prevent race conditions
+let _totpLocked = false;
+const _totpWaiters = [];
+
+function acquireTotpLock() {
+  return new Promise((resolve, reject) => {
+    if (!_totpLocked) {
+      _totpLocked = true;
+      resolve();
+    } else if (_totpWaiters.length > 50) {
+      reject(new Error('TOTP lock queue full'));
+    } else {
+      _totpWaiters.push(resolve);
+    }
+  });
+}
+
+function releaseTotpLock() {
+  if (_totpWaiters.length > 0) {
+    const next = _totpWaiters.shift();
+    next();
+  } else {
+    _totpLocked = false;
+  }
+}
+
+async function withTotpLock(fn) {
+  await acquireTotpLock();
+  try {
+    return await fn();
+  } finally {
+    releaseTotpLock();
   }
 }
 
@@ -1551,6 +1635,144 @@ async function sendCredentialsChangedEmail(oldUsername, newUsername, clientIp) {
   } catch (err) {
     console.error('[Notification] Credentials-Change E-Mail-Fehler:', err.message);
   }
+}
+
+function buildSecurityEmailHtml({ badge, badgeColor, title, rows, warning }) {
+  const time = escapeHtml(formatTimestamp(Date.now()));
+  const rowsHtml = rows.map((r, i) => {
+    const border = i < rows.length - 1 ? 'border-bottom:1px solid #1e2a3a;' : '';
+    return `<tr><td style="padding:12px 16px;color:#8b949e;font-size:14px;${border}">${escapeHtml(r.label)}</td>
+            <td style="padding:12px 16px;color:${r.color || '#f0f6fc'};font-size:14px;${border}text-align:right;${r.bold ? 'font-weight:600;' : ''}">${escapeHtml(r.value)}</td></tr>`;
+  }).join('');
+  const warningHtml = warning
+    ? `<p style="margin:16px 0 0;color:#f59e0b;font-size:13px;">${escapeHtml(warning)}</p>`
+    : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#06080f;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#06080f;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;overflow:hidden;">
+<tr><td style="padding:24px 32px 16px;border-bottom:1px solid #1e2a3a;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td><span style="display:inline-block;background:${badgeColor};color:#fff;font-size:13px;font-weight:600;padding:4px 12px;border-radius:6px;">${escapeHtml(badge)}</span></td>
+    <td align="right" style="color:#8b949e;font-size:13px;">${time}</td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+  <h2 style="margin:0 0 16px;color:#f0f6fc;font-size:20px;">${title}</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161b22;border:1px solid #1e2a3a;border-radius:8px;">
+    ${rowsHtml}
+  </table>
+  ${warningHtml}
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #1e2a3a;">
+  <p style="margin:0;color:#484f58;font-size:12px;text-align:center;">Diese Nachricht wurde automatisch vom Netzwerk Manager gesendet.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+async function sendSecurityEmail(eventKey, subject, htmlBuilder) {
+  const config = readNotificationConfig();
+  if (!config) return;
+  if (config.events && config.events[eventKey] === false) return;
+
+  const transporter = createMailTransporter(config.smtp);
+  if (!transporter) return;
+
+  const stripCRLF = s => String(s).replace(/[\r\n\0]/g, '');
+  const html = await htmlBuilder();
+
+  try {
+    const safeFrom = stripCRLF(config.from || `"Netzwerk Manager" <${config.smtp.user}>`);
+    const safeTo = stripCRLF(config.to);
+    await transporter.sendMail({ from: safeFrom, to: safeTo, subject, html });
+    console.log(`[Notification] ${eventKey} E-Mail gesendet`);
+  } catch (err) {
+    console.error(`[Notification] ${eventKey} E-Mail-Fehler:`, err.message);
+  }
+}
+
+async function sendTotpEnabledEmail(username, clientIp) {
+  const loc = await getIpLocation(clientIp);
+  const locationStr = loc.city === 'Lokales Netzwerk' ? 'Lokales Netzwerk'
+    : [loc.city, loc.regionName, loc.country].filter(Boolean).join(', ') || 'Unbekannt';
+
+  await sendSecurityEmail('totpEnabled', '\uD83D\uDD10 2FA aktiviert \u2013 Netzwerk Manager', () =>
+    buildSecurityEmailHtml({
+      badge: '2FA AKTIVIERT',
+      badgeColor: '#22c55e',
+      title: '&#128272; 2FA wurde aktiviert',
+      rows: [
+        { label: 'Benutzer', value: username },
+        { label: 'IP-Adresse', value: clientIp || 'Unbekannt' },
+        { label: 'Standort', value: locationStr },
+        { label: 'Zeitpunkt', value: formatTimestamp(Date.now()) },
+      ],
+    })
+  );
+}
+
+async function sendTotpDisabledEmail(username, clientIp) {
+  const loc = await getIpLocation(clientIp);
+  const locationStr = loc.city === 'Lokales Netzwerk' ? 'Lokales Netzwerk'
+    : [loc.city, loc.regionName, loc.country].filter(Boolean).join(', ') || 'Unbekannt';
+
+  await sendSecurityEmail('totpDisabled', '\u26A0\uFE0F 2FA deaktiviert \u2013 Netzwerk Manager', () =>
+    buildSecurityEmailHtml({
+      badge: '2FA DEAKTIVIERT',
+      badgeColor: '#ef4444',
+      title: '&#9888;&#65039; 2FA wurde deaktiviert',
+      rows: [
+        { label: 'Benutzer', value: username },
+        { label: 'IP-Adresse', value: clientIp || 'Unbekannt' },
+        { label: 'Standort', value: locationStr },
+        { label: 'Zeitpunkt', value: formatTimestamp(Date.now()) },
+      ],
+      warning: 'Falls Sie dies nicht veranlasst haben, pr\u00FCfen Sie sofort den Zugang zu Ihrem Netzwerk Manager.',
+    })
+  );
+}
+
+async function sendTerminalAccessEmail(username, clientIp) {
+  const loc = await getIpLocation(clientIp);
+  const locationStr = loc.city === 'Lokales Netzwerk' ? 'Lokales Netzwerk'
+    : [loc.city, loc.regionName, loc.country].filter(Boolean).join(', ') || 'Unbekannt';
+
+  await sendSecurityEmail('terminalAccess', '\uD83D\uDDA5\uFE0F Terminal-Zugriff \u2013 Netzwerk Manager', () =>
+    buildSecurityEmailHtml({
+      badge: 'TERMINAL',
+      badgeColor: '#3b82f6',
+      title: '&#128421;&#65039; Terminal-Zugriff',
+      rows: [
+        { label: 'Benutzer', value: username },
+        { label: 'IP-Adresse', value: clientIp || 'Unbekannt' },
+        { label: 'Standort', value: locationStr },
+        { label: 'Zeitpunkt', value: formatTimestamp(Date.now()) },
+      ],
+    })
+  );
+}
+
+async function sendNewDeviceLoginEmail(username, clientIp, loginDeviceName) {
+  const loc = await getIpLocation(clientIp);
+  const locationStr = loc.city === 'Lokales Netzwerk' ? 'Lokales Netzwerk'
+    : [loc.city, loc.regionName, loc.country].filter(Boolean).join(', ') || 'Unbekannt';
+
+  await sendSecurityEmail('newDeviceLogin', '\uD83C\uDD95 Neuer Ger\u00E4te-Login \u2013 Netzwerk Manager', () =>
+    buildSecurityEmailHtml({
+      badge: 'NEUES GER\u00C4T',
+      badgeColor: '#f59e0b',
+      title: '&#127381; Login von neuem Ger\u00E4t',
+      rows: [
+        { label: 'Benutzer', value: username },
+        { label: 'Ger\u00E4t', value: loginDeviceName || 'Unbekannt' },
+        { label: 'IP-Adresse', value: clientIp || 'Unbekannt' },
+        { label: 'Standort', value: locationStr },
+        { label: 'Zeitpunkt', value: formatTimestamp(Date.now()) },
+      ],
+    })
+  );
 }
 
 // Parse public/config.js and return the siteConfig object (cached with 30s TTL)
@@ -2960,6 +3182,11 @@ app.post('/api/login', (req, res) => {
   const previousSession = runtime.activeSession;
   runtime.activeSession = { token, deviceName: effectiveDeviceName, loginAt, expiresAt };
 
+  // Clear terminal sessions when a new login overwrites the active session (force-logout)
+  if (previousSession) {
+    runtime.terminalSessions.clear();
+  }
+
   // Register device token for auto-login on future visits
   let returnedDeviceToken = deviceToken || null;
   if (!returnedDeviceToken) {
@@ -2974,6 +3201,8 @@ app.post('/api/login', (req, res) => {
       state.deviceTokens = state.deviceTokens.slice(-20);
     }
     saveState(state);
+    const loginDeviceName = sanitizeLogParam(deviceName || 'Unbekannt');
+    sendNewDeviceLoginEmail(username || 'admin', clientIp, loginDeviceName).catch(() => {});
   } else if (needsTokenMigration) {
     // Migrate plaintext tokens to hashed format
     state.deviceTokens = state.deviceTokens.map(t =>
@@ -4759,81 +4988,118 @@ app.post('/api/totp/setup', authRequired, async (req, res) => {
     return res.status(403).json({ error: 'Wrong password' });
   }
 
-  // Reject if TOTP is already confirmed (must disable first)
-  const existingData = readTotpData();
-  if (existingData[result.username]?.confirmed) {
-    return res.status(400).json({ error: 'TOTP already configured. Disable it first.' });
-  }
-
-  // Generate TOTP secret
-  const secret = new OTPAuth.Secret({ size: 20 });
-  const totp = new OTPAuth.TOTP({
-    issuer: 'Netzwerk Manager',
-    label: result.username,
-    algorithm: 'SHA1',
-    digits: 6,
-    period: 30,
-    secret,
-  });
-
-  const otpauthUrl = totp.toString();
-
+  // Generate secret and save under TOTP lock
   try {
-    const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
+    const setupResult = await withTotpLock(async () => {
+      const existingData = readTotpData();
 
-    // Save encrypted secret (not yet confirmed)
-    const data = readTotpData();
-    data[result.username] = {
-      secret: encryptValue(secret.base32),
-      confirmed: false,
-      createdAt: Date.now(),
-    };
-    saveTotpData(data);
+      // Reject if TOTP is already confirmed (must disable first)
+      if (existingData[result.username]?.confirmed) {
+        return { error: 'TOTP already configured. Disable it first.', status: 400 };
+      }
 
-    res.json({ qrDataUrl, secret: secret.base32 });
+      // TTL: reject if unconfirmed entry exists and is less than 30s old
+      const existing = existingData[result.username];
+      if (existing && !existing.confirmed && existing.createdAt && (Date.now() - existing.createdAt < 30000)) {
+        return { error: 'Please wait before requesting a new setup', status: 429 };
+      }
+
+      // Generate TOTP secret
+      const secret = new OTPAuth.Secret({ size: 20 });
+      const totp = new OTPAuth.TOTP({
+        issuer: 'Netzwerk Manager',
+        label: result.username,
+        algorithm: 'SHA1',
+        digits: 6,
+        period: 30,
+        secret,
+      });
+
+      const otpauthUrl = totp.toString();
+      const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+      // Save encrypted secret (not yet confirmed)
+      const data = readTotpData();
+      data[result.username] = {
+        secret: encryptValue(secret.base32),
+        confirmed: false,
+        createdAt: Date.now(),
+      };
+      saveTotpData(data);
+
+      return { qrDataUrl, secret: secret.base32 };
+    });
+
+    if (setupResult.error) {
+      return res.status(setupResult.status).json({ error: setupResult.error });
+    }
+    res.json({ qrDataUrl: setupResult.qrDataUrl, secret: setupResult.secret });
   } catch (err) {
     console.error('[TOTP] Setup error:', err.message);
     res.status(500).json({ error: 'TOTP setup failed' });
   }
 });
 
-app.post('/api/totp/verify', authRequired, (req, res) => {
+app.post('/api/totp/verify', authRequired, async (req, res) => {
   if (!OTPAuth) return res.status(500).json({ error: 'TOTP not available' });
   const { code } = req.body || {};
   if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
     return res.status(400).json({ success: false });
   }
 
-  const state = readState();
-  const username = state.credentials?.username || 'admin';
-  const data = readTotpData();
-  const entry = data[username];
-
-  if (!entry || !entry.secret) {
-    return res.status(400).json({ success: false });
+  // TOTP rate limiting
+  const clientIp = getClientIp(req);
+  const rateCheck = checkTotpRateLimit(clientIp);
+  if (!rateCheck.allowed) {
+    res.set('Retry-After', String(rateCheck.retryAfter));
+    return res.status(429).json({ success: false, error: 'Too many attempts', retryAfter: rateCheck.retryAfter });
   }
 
-  const secret = decryptValue(entry.secret);
-  if (!secret) return res.status(500).json({ success: false });
+  const verifyResult = await withTotpLock(async () => {
+    const state = readState();
+    const username = state.credentials?.username || 'admin';
+    const data = readTotpData();
+    const entry = data[username];
 
-  const totp = new OTPAuth.TOTP({
-    issuer: 'Netzwerk Manager',
-    label: username,
-    algorithm: 'SHA1',
-    digits: 6,
-    period: 30,
-    secret: OTPAuth.Secret.fromBase32(secret),
+    if (!entry || !entry.secret) {
+      return { status: 400, success: false };
+    }
+
+    const secret = decryptValue(entry.secret);
+    if (!secret) return { status: 500, success: false };
+
+    const totp = new OTPAuth.TOTP({
+      issuer: 'Netzwerk Manager',
+      label: username,
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(secret),
+    });
+
+    const delta = totp.validate({ token: code, window: 1 });
+    if (delta !== null) {
+      // Replay protection for setup confirmation
+      const replayKey = `${username}:${code}:${delta}`;
+      if (usedTotpCodes.has(replayKey)) return { success: false };
+      usedTotpCodes.set(replayKey, Date.now() + 90000);
+
+      data[username].confirmed = true;
+      saveTotpData(data);
+      console.log(`[TOTP] 2FA confirmed for user ${sanitizeLogParam(username)}`);
+      return { success: true, username };
+    }
+
+    return { success: false };
   });
 
-  const delta = totp.validate({ token: code, window: 1 });
-  if (delta !== null) {
-    data[username].confirmed = true;
-    saveTotpData(data);
-    console.log(`[TOTP] 2FA confirmed for user ${sanitizeLogParam(username)}`);
-    return res.json({ success: true });
+  if (verifyResult.status) {
+    return res.status(verifyResult.status).json({ success: verifyResult.success });
   }
-
-  res.json({ success: false });
+  if (verifyResult.success) {
+    sendTotpEnabledEmail(verifyResult.username, clientIp).catch(() => {});
+  }
+  res.json({ success: verifyResult.success });
 });
 
 app.post('/api/totp/disable', authRequired, async (req, res) => {
@@ -4866,17 +5132,24 @@ app.post('/api/totp/disable', authRequired, async (req, res) => {
     return res.status(403).json({ error: 'Wrong password' });
   }
 
-  // Verify TOTP code
-  if (!verifyTotpCode(result.username, code)) {
-    return res.status(403).json({ error: 'Invalid code' });
+  // Verify TOTP code and delete entry under lock
+  const disableResult = await withTotpLock(async () => {
+    if (!verifyTotpCode(result.username, code)) {
+      return { error: 'Invalid code', status: 403 };
+    }
+
+    const data = readTotpData();
+    delete data[result.username];
+    saveTotpData(data);
+    console.log(`[TOTP] 2FA disabled for user ${sanitizeLogParam(result.username)}`);
+    return { ok: true };
+  });
+
+  if (disableResult.error) {
+    return res.status(disableResult.status).json({ error: disableResult.error });
   }
-
-  // Delete TOTP entry
-  const data = readTotpData();
-  delete data[result.username];
-  saveTotpData(data);
-  console.log(`[TOTP] 2FA disabled for user ${sanitizeLogParam(result.username)}`);
-
+  const clientIpDisable = getClientIp(req);
+  sendTotpDisabledEmail(result.username, clientIpDisable).catch(() => {});
   res.json({ ok: true });
 });
 
@@ -4888,6 +5161,14 @@ app.post('/api/terminal/auth', authRequired, (req, res) => {
   const { code } = req.body || {};
   if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
     return res.status(400).json({ success: false });
+  }
+
+  // TOTP rate limiting
+  const clientIp = getClientIp(req);
+  const rateCheck = checkTotpRateLimit(clientIp);
+  if (!rateCheck.allowed) {
+    res.set('Retry-After', String(rateCheck.retryAfter));
+    return res.status(429).json({ success: false, error: 'Too many attempts', retryAfter: rateCheck.retryAfter });
   }
 
   const cfg = readSiteConfig();
@@ -4924,10 +5205,10 @@ app.post('/api/terminal/auth', authRequired, (req, res) => {
   const token = randomUUID();
   const timeoutMin = Math.max(1, Math.min(60, Number(cfg.terminal.totpTimeout) || 5));
   const expiresAt = Date.now() + timeoutMin * 60 * 1000;
-  const clientIp = getClientIp(req);
 
   runtime.terminalSessions.set(token, { expiresAt, ip: clientIp, username });
   console.log(`[TERMINAL] Session created for ${sanitizeLogParam(username)} from ${sanitizeLogParam(clientIp)} (${timeoutMin}min)`);
+  sendTerminalAccessEmail(username, clientIp).catch(() => {});
 
   res.json({ success: true, terminalToken: token, expiresAt });
 });
@@ -4996,6 +5277,12 @@ app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req
   if (isDangerous) {
     if (!totpCode || !/^\d{6}$/.test(totpCode)) {
       return res.json({ success: false, dangerous: true, error: 'Dangerous command requires TOTP confirmation' });
+    }
+    // TOTP rate limiting for dangerous command confirmation
+    const dangerousRateCheck = checkTotpRateLimit(clientIp);
+    if (!dangerousRateCheck.allowed) {
+      res.set('Retry-After', String(dangerousRateCheck.retryAfter));
+      return res.status(429).json({ success: false, error: 'Too many TOTP attempts', retryAfter: dangerousRateCheck.retryAfter });
     }
     if (!verifyTotpCode(req.terminalSession.username, totpCode)) {
       return res.json({ success: false, dangerous: true, error: 'Invalid TOTP code' });
@@ -5195,6 +5482,33 @@ function startServer() {
         terminalCommandLimits.delete(ip);
       }
     }
+
+    // Cleanup TOTP verification rate limits
+    for (const [ip, data] of totpVerifyLimits.entries()) {
+      if (data.windowStart < oneHourAgo) {
+        totpVerifyLimits.delete(ip);
+      }
+    }
+
+    // Cleanup expired used TOTP codes (replay protection)
+    for (const [key, expiry] of usedTotpCodes.entries()) {
+      if (now > expiry) {
+        usedTotpCodes.delete(key);
+      }
+    }
+
+    // Cleanup unconfirmed TOTP entries older than 10 minutes
+    try {
+      const totpData = readTotpData();
+      let totpChanged = false;
+      for (const [username, entry] of Object.entries(totpData)) {
+        if (entry && !entry.confirmed && entry.createdAt && (now - entry.createdAt > 600000)) {
+          delete totpData[username];
+          totpChanged = true;
+        }
+      }
+      if (totpChanged) saveTotpData(totpData);
+    } catch { /* ignore */ }
   }, 900000); // Every 15 minutes
 
   // Flush monitoring caches to disk every 5 minutes (instead of every cycle)

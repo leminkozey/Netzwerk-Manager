@@ -778,13 +778,11 @@ function showTotpVerifyStep(container, data) {
     pattern: '[0-9]{6}',
   });
   const statusMsg = el('div', { className: 'totp-status-msg' });
-  const verifyBtn = el('button', { className: 'btn', textContent: t('settings.totpVerify') });
 
   async function doVerify() {
     const code = codeInput.value.trim();
     if (!/^\d{6}$/.test(code)) return;
-    verifyBtn.disabled = true;
-    verifyBtn.classList.add('loading');
+    codeInput.disabled = true;
     statusMsg.textContent = '';
     statusMsg.className = 'totp-status-msg';
 
@@ -795,6 +793,12 @@ function showTotpVerifyStep(container, data) {
         statusMsg.textContent = t('settings.totpSuccess');
         statusMsg.className = 'totp-status-msg success';
         showToast(t('settings.totpSuccess'));
+        // Clear secret data from closure and DOM
+        data.secret = '***';
+        data.qrDataUrl = '';
+        qrImg.src = '';
+        qrImg.removeAttribute('src');
+        secretDisplay.textContent = '';
         setTimeout(() => loadTotpSection(container), 600);
       } else {
         codeInput.classList.add('shake');
@@ -802,20 +806,16 @@ function showTotpVerifyStep(container, data) {
         statusMsg.className = 'totp-status-msg error';
         setTimeout(() => codeInput.classList.remove('shake'), 500);
         codeInput.value = '';
+        codeInput.disabled = false;
         codeInput.focus();
-        verifyBtn.disabled = false;
-        verifyBtn.classList.remove('loading');
       }
     } catch {
       statusMsg.textContent = t('settings.totpError');
       statusMsg.className = 'totp-status-msg error';
-      verifyBtn.disabled = false;
-      verifyBtn.classList.remove('loading');
+      codeInput.disabled = false;
     }
   }
 
-  verifyBtn.addEventListener('click', doVerify);
-  codeInput.addEventListener('keyup', e => { if (e.key === 'Enter') doVerify(); });
   codeInput.addEventListener('input', () => {
     codeInput.value = codeInput.value.replace(/\D/g, '');
     if (codeInput.value.length === 6) doVerify();
@@ -830,10 +830,7 @@ function showTotpVerifyStep(container, data) {
       secretDisplay,
     ]),
     el('p', { textContent: t('settings.totpEnterCode'), style: { marginTop: '16px' } }),
-    el('div', { className: 'totp-form' }, [
-      codeInput,
-      verifyBtn,
-    ]),
+    codeInput,
     statusMsg,
   ]));
 
@@ -915,7 +912,7 @@ function createCreditsPanel() {
     el('img', { className: 'credits-avatar', src: 'https://github.com/leminkozey.png', alt: 'leminkozey' }),
     el('span', { className: 'credits-label', textContent: 'made by' }),
     el('a', { className: 'credits-name', href: 'https://github.com/leminkozey', target: '_blank', rel: 'noopener', textContent: 'leminkozey' }),
-    el('span', { className: 'credits-version', textContent: 'v3.7.0' }),
+    el('span', { className: 'credits-version', textContent: 'v5.0.0' }),
   ];
 
   if (updateEnabled) {

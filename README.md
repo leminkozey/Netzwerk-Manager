@@ -28,11 +28,14 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Remote Update** – Automatisches Aktualisieren direkt über die Einstellungen (Credits-Tab) mit konfigurierbaren Befehlen
 - **Responsive Outages** – Ausfälle-Card passt sich automatisch an mobile Bildschirme an
 - **E-Mail Benachrichtigungen** – Automatische E-Mails bei Geräte-Ausfällen (Offline/Online) via SMTP
+- **Web Terminal** – SSH-Befehle direkt im Browser auf konfigurierten Geräten ausführen (TOTP-2FA Pflicht)
+- **TOTP 2-Faktor-Authentifizierung** – Einrichtbar in den Einstellungen, Pflicht für das Web Terminal, mit QR-Code-Setup und Replay-Schutz
 
 ## Voraussetzungen
 
 - [Node.js](https://nodejs.org/) (Version 18 oder höher)
 - Ein Webbrowser
+- `sshpass` auf dem Server installiert (nur für Web Terminal und SSH-basierte Features nötig)
 
 ## Installation
 
@@ -41,6 +44,7 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
    ```bash
    npm install
    ```
+   Für das Web Terminal werden zusätzlich `otpauth` und `qrcode` benötigt (sind in `package.json` enthalten und werden mit `npm install` automatisch installiert).
 3. Konfiguration erstellen:
    ```bash
    cp public/config.example.js public/config.js
@@ -1172,7 +1176,7 @@ pingMonitor: {
 
 ### E-Mail Benachrichtigungen (`notifications`)
 
-Sendet automatisch E-Mails wenn ein überwachtes Gerät (aus `uptimeDevices`) offline geht oder wieder online kommt. Nutzt SMTP – funktioniert mit Gmail, Outlook oder jedem anderen SMTP-Server.
+Sendet automatisch E-Mails bei Geräte-Ausfällen, Sicherheits-Events und verdächtigen Aktivitäten. Nutzt SMTP – funktioniert mit Gmail, Outlook oder jedem anderen SMTP-Server. Jedes Event kann einzeln aktiviert oder deaktiviert werden.
 
 | Option | Typ | Default | Beschreibung |
 |--------|-----|---------|--------------|
@@ -1193,11 +1197,24 @@ Sendet automatisch E-Mails wenn ein überwachtes Gerät (aus `uptimeDevices`) of
 
 #### Event-Filter (`notifications.events`)
 
+Jedes Event kann mit `true` aktiviert oder `false` deaktiviert werden. So lassen sich z.B. nur Sicherheits-Mails aktivieren und Uptime-Mails abschalten.
+
+**Geräte-Monitoring:**
+
 | Option | Typ | Default | Beschreibung |
 |--------|-----|---------|--------------|
-| `offline` | `boolean` | `true` | E-Mail senden wenn ein Gerät offline geht. |
-| `online` | `boolean` | `true` | E-Mail senden wenn ein Gerät wieder online kommt (inkl. Ausfallzeit). |
-| `credentialsChanged` | `boolean` | `true` | E-Mail senden wenn Benutzername oder Passwort geändert werden (inkl. IP-Adresse des Auslösers). |
+| `offline` | `boolean` | `true` | E-Mail wenn ein Gerät offline geht. |
+| `online` | `boolean` | `true` | E-Mail wenn ein Gerät wieder online kommt (inkl. Ausfallzeit). |
+
+**Sicherheits-Events:**
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `credentialsChanged` | `boolean` | `true` | E-Mail wenn Benutzername oder Passwort geändert werden (inkl. IP-Adresse). |
+| `totpEnabled` | `boolean` | `true` | E-Mail wenn 2FA (TOTP) aktiviert wird (inkl. IP + Standort). |
+| `totpDisabled` | `boolean` | `true` | E-Mail wenn 2FA (TOTP) deaktiviert wird (inkl. IP + Standort). |
+| `terminalAccess` | `boolean` | `true` | E-Mail bei Terminal-Zugriff (inkl. IP + Standort). |
+| `newDeviceLogin` | `boolean` | `true` | E-Mail bei Login von neuem Gerät ohne Device-Token (inkl. IP + Standort). |
 
 ```js
 notifications: {
@@ -1213,16 +1230,124 @@ notifications: {
   from: '"Netzwerk Manager" <deine.email@gmail.com>',
   to: 'empfaenger@example.com',
   events: {
-    offline: true,
-    online: true,
-    credentialsChanged: true,
+    // Geräte-Monitoring
+    offline: true,                  // Gerät offline → E-Mail
+    online: true,                   // Gerät wieder online → E-Mail
+
+    // Sicherheits-Events
+    credentialsChanged: true,       // Zugangsdaten geändert
+    totpEnabled: true,              // 2FA aktiviert
+    totpDisabled: true,             // 2FA deaktiviert
+    terminalAccess: true,           // Terminal geöffnet
+    newDeviceLogin: true,           // Login von neuem Gerät
   },
 },
 ```
 
+> **IP-Standort:** Für die Sicherheits-Events (`totpEnabled`, `totpDisabled`, `terminalAccess`, `newDeviceLogin`) wird der ungefähre Standort der IP-Adresse über `ip-api.com` ermittelt (kostenlos, kein API-Key, max 45 Requests/Minute). Private/lokale IPs (z.B. `192.168.x.x`, `10.x.x.x`) werden als "Lokales Netzwerk" angezeigt – es wird kein externer API-Call gemacht.
+
 > **Sicherheit:** SMTP-Zugangsdaten (`host`, `port`, `user`, `pass`, `secure`) werden vom Server automatisch aus der öffentlichen `/config.js`-Route entfernt und sind im Frontend nicht sichtbar.
 
 > **Gmail:** Erstelle ein [App-Passwort](https://myaccount.google.com/apppasswords) unter Google-Konto → Sicherheit → App-Passwörter. Das normale Gmail-Passwort funktioniert nicht mit SMTP.
+
+---
+
+### Web Terminal (`terminal`)
+
+Ermöglicht die Ausführung von SSH-Befehlen direkt im Browser auf konfigurierten Geräten. Das Terminal ist durch TOTP-2FA abgesichert – ohne eingerichteten TOTP kann das Terminal nicht genutzt werden.
+
+> **Achtung:** Das Web Terminal erlaubt beliebige SSH-Befehle auf den konfigurierten Geräten. Nur aktivieren, wenn du weißt was du tust! Jeder Befehl wird im Audit-Log protokolliert.
+
+#### Voraussetzungen
+
+| Voraussetzung | Beschreibung |
+|---------------|-------------|
+| `sshpass` | Muss auf dem Server installiert sein (`apt install sshpass` bzw. `brew install sshpass`) |
+| `otpauth` + `qrcode` | npm-Pakete, werden mit `npm install` automatisch installiert |
+| TOTP-2FA | Muss in den Einstellungen (User-Tab) eingerichtet sein, bevor das Terminal nutzbar ist |
+| SSH-Credentials | Geräte müssen in `controlDevices` konfiguriert und SSH-Zugangsdaten in den Einstellungen hinterlegt sein |
+
+#### Konfiguration
+
+| Option | Typ | Default | Beschreibung |
+|--------|-----|---------|--------------|
+| `enabled` | `boolean` | `false` | Master-Schalter. Bei `true` erscheint der Terminal-Button auf der Landing Page. |
+| `totpTimeout` | `number` | `5` | Minuten bis eine erneute TOTP-Eingabe nötig ist (1–60). |
+| `devices` | `array` | `[]` | Liste von `controlDevice`-IDs die im Terminal verfügbar sind. Leer = alle Geräte aus `controlDevices`. |
+| `commandTimeout` | `number` | `30` | Timeout pro Befehl in Sekunden. |
+| `dangerousCommands` | `array` | `[...]` | Befehlsmuster die eine Extra-TOTP-Bestätigung erfordern. |
+
+```js
+terminal: {
+  enabled: true,               // Terminal aktivieren
+  totpTimeout: 5,              // TOTP-Session: 5 Minuten
+  devices: [],                 // Leer = alle controlDevices
+  commandTimeout: 30,          // 30s Timeout pro Befehl
+  dangerousCommands: [         // Muster die Extra-TOTP brauchen
+    'rm -rf', 'rm -r', 'mkfs', 'dd if=', 'shutdown', 'reboot',
+    'halt', 'poweroff', 'chmod -R 777', 'iptables -F',
+    'systemctl stop', 'kill -9', 'pkill', 'wipefs',
+  ],
+},
+```
+
+#### Geräte einschränken
+
+Standardmäßig (`devices: []`) sind alle Geräte aus `controlDevices` im Terminal verfügbar. Um nur bestimmte Geräte freizugeben:
+
+```js
+terminal: {
+  enabled: true,
+  devices: ['piholeControl', 'nas'],  // Nur diese beiden Geräte
+},
+```
+
+#### Dangerous Commands
+
+Befehle die eines der `dangerousCommands`-Muster enthalten, lösen eine zusätzliche TOTP-Abfrage aus bevor sie ausgeführt werden. Dies dient als Schutz vor versehentlichen destruktiven Aktionen.
+
+#### Setup-Anleitung
+
+1. **Terminal aktivieren:** In `config.js` setze `terminal.enabled: true`
+2. **TOTP einrichten:** Einstellungen → User-Tab → "2FA einrichten"
+   - Aktuelles Passwort eingeben
+   - QR-Code mit einer Authenticator-App scannen (Google Authenticator, Authy, etc.)
+   - 6-stelligen Code zur Bestätigung eingeben
+3. **Terminal nutzen:** Landing Page → "Web Terminal" klicken
+   - TOTP-Code eingeben → Gerät auswählen → Befehle ausführen
+   - Die TOTP-Session läuft nach `totpTimeout` Minuten ab
+
+#### Sicherheitsmaßnahmen
+
+| Maßnahme | Detail |
+|----------|--------|
+| TOTP Pflicht | Terminal nur mit konfiguriertem + bestätigtem TOTP nutzbar |
+| TOTP Rate-Limiting | Max. 5 Versuche/Minute pro IP auf allen TOTP-Endpoints |
+| TOTP Replay-Schutz | Jeder Code kann nur einmal verwendet werden (90s Sperre) |
+| Secret verschlüsselt | AES-256-GCM via `encryptValue()` in `Data/totp.json` |
+| Terminal-Token kurzlebig | Konfigurierbar (Standard 5 Min), nur in Server-Memory |
+| IP-Binding | Terminal-Sessions sind an die IP gebunden |
+| Dangerous Commands | Konfigurierbare Pattern-Liste, Extra-TOTP bei Match |
+| Rate-Limiting | 20 Commands/Minute/IP |
+| Audit-Log | Jeder Befehl geloggt (Konsole + `Data/terminal-audit.json`) mit IP, User, Device, Command |
+| Max. 3 Sessions | Maximal 3 gleichzeitige Terminal-Sessions pro User |
+| Output-Limit | SSH-Ausgabe auf 1 MB begrenzt |
+
+#### API-Endpunkte
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|--------------|
+| `GET` | `/api/totp/status` | Ja | TOTP-Status abfragen (`{ configured: true/false }`). |
+| `POST` | `/api/totp/setup` | Ja | TOTP einrichten. Body: `{ currentPassword }`. Gibt QR-Code + Secret zurück. |
+| `POST` | `/api/totp/verify` | Ja | TOTP-Setup bestätigen. Body: `{ code }`. |
+| `POST` | `/api/totp/disable` | Ja | TOTP deaktivieren. Body: `{ currentPassword, code }`. |
+| `POST` | `/api/terminal/auth` | Ja | Terminal-Session starten. Body: `{ code }`. Gibt `terminalToken` zurück. |
+| `GET` | `/api/terminal/devices` | Ja + Terminal | Verfügbare Geräte auflisten. Header: `X-Terminal-Token`. |
+| `POST` | `/api/terminal/execute` | Ja + Terminal | Befehl ausführen. Body: `{ deviceId, command, totpCode? }`. Header: `X-Terminal-Token`. |
+
+#### Rückwärtskompatibilität
+
+Der `terminal`-Block ist **komplett optional**. Ohne `terminal` in der Config (oder mit `enabled: false`) ist das Web Terminal deaktiviert und der Button auf der Landing Page wird nicht angezeigt. Bestehende Konfigurationen funktionieren ohne Änderung.
 
 ---
 
@@ -1259,12 +1384,15 @@ node -e "console.log(require('crypto').randomUUID())"
 ## Sicherheit
 
 - **Rate-Limiting** – Nach 5 falschen Login-Versuchen wird die IP gesperrt (5 Min, dann eskalierend)
-- **Verschlüsselung** – SSH-Passwörter werden mit AES-256-GCM verschlüsselt gespeichert
-- **SSH-Allowlist** – Nur vordefinierte Befehle können per SSH ausgeführt werden
+- **Verschlüsselung** – SSH-Passwörter und TOTP-Secrets werden mit AES-256-GCM verschlüsselt gespeichert
+- **TOTP 2FA** – Pflicht für Web Terminal, mit Replay-Schutz und Rate-Limiting (5 Versuche/Min)
+- **Terminal Audit-Log** – Jeder SSH-Befehl wird mit IP, User, Device und Timestamp protokolliert
+- **Terminal IP-Binding** – Terminal-Sessions sind an die IP-Adresse gebunden
+- **SSH-Allowlist** – Nur vordefinierte Befehle können per SSH ausgeführt werden (Control Center)
 - **Stats-Allowlist** – Nur vordefinierte Read-Only-Befehle für Device Stats erlaubt (`cat /proc/loadavg`, `nproc`, etc.)
 - **Service-Name Validierung** – Service-Namen gegen `/^[a-zA-Z0-9_.-]{1,100}$/` validiert, keine Shell-Injection möglich
 - **Service-Audit-Logging** – Jede Service-Aktion wird mit IP, Service-ID und Ergebnis geloggt
-- **Stdout-Limit** – SSH-Ausgaben für Stats auf 512 KB begrenzt (DoS-Schutz)
+- **Stdout-Limit** – SSH-Ausgaben für Stats auf 512 KB, Terminal auf 1 MB begrenzt (DoS-Schutz)
 - **Session-Timeout** – Automatisches Ausloggen nach Inaktivität (konfigurierbar)
 - **Config-Sandbox** – `config.js` wird serverseitig in einer isolierten VM geparst
 - **Pi-hole Proxy** – API-Calls laufen serverseitig, Passwort ist im Frontend nie sichtbar

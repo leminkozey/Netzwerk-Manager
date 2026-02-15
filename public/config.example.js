@@ -495,12 +495,15 @@ const siteConfig = {
   // │             E-MAIL BENACHRICHTIGUNGEN       │
   // └─────────────────────────────────────────────┘
 
-  // ── Benachrichtigungen bei Geräte-Ausfällen ──
-  // Sendet automatisch E-Mails wenn ein überwachtes Gerät offline geht
-  // oder wieder online kommt. Nutzt SMTP (z.B. Gmail, Outlook).
+  // ── E-Mail Benachrichtigungen ──
+  // Sendet automatisch E-Mails bei Geräte-Ausfällen, Sicherheits-Events
+  // und verdächtigen Aktivitäten. Nutzt SMTP (z.B. Gmail, Outlook).
   //
   // Für Gmail: App-Passwort unter https://myaccount.google.com/apppasswords erstellen
   // und als 'pass' eintragen (nicht das normale Gmail-Passwort).
+  //
+  // Jedes Event kann einzeln mit true/false aktiviert oder deaktiviert werden.
+  // So lassen sich z.B. nur Sicherheits-Mails aktivieren und Uptime-Mails abschalten.
   notifications: {
     enabled: false,                 // true = E-Mail-Benachrichtigungen aktivieren
     cooldownMinutes: 5,             // Mindestabstand zwischen E-Mails pro Gerät/Event
@@ -518,11 +521,19 @@ const siteConfig = {
     from: '"Netzwerk Manager" <deine.email@gmail.com>',
     to: 'empfaenger@example.com',   // Empfänger-Adresse
 
-    // Welche Events eine E-Mail auslösen
+    // ── Welche Events eine E-Mail auslösen ──
+    // Jedes Event kann einzeln aktiviert (true) oder deaktiviert (false) werden.
     events: {
-      offline: true,                // E-Mail wenn Gerät offline geht
-      online: true,                 // E-Mail wenn Gerät wieder online kommt
-      credentialsChanged: true,     // E-Mail wenn Zugangsdaten geändert werden
+      // Geräte-Monitoring
+      offline: true,                // Gerät offline → E-Mail
+      online: true,                 // Gerät wieder online → E-Mail (mit Ausfallzeit)
+
+      // Sicherheits-Events
+      credentialsChanged: true,     // Benutzername oder Passwort geändert
+      totpEnabled: true,            // 2FA (TOTP) wurde aktiviert
+      totpDisabled: true,           // 2FA (TOTP) wurde deaktiviert
+      terminalAccess: true,         // Web Terminal wurde geöffnet (mit IP + Standort)
+      newDeviceLogin: true,         // Login von neuem Gerät ohne Device-Token (mit IP + Standort)
     },
   },
 };

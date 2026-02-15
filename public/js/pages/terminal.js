@@ -102,19 +102,12 @@ function showTotpInput(page) {
   });
 
   const statusMsg = el('div', { className: 'totp-status' });
-  const verifyBtn = el('button', {
-    className: 'btn',
-    textContent: t('terminal.verify'),
-  });
 
   const form = el('div', { className: 'terminal-totp-gate' }, [
     el('span', { className: 'terminal-warning-icon' }, [iconEl('shield', 48)]),
     el('h2', { textContent: t('terminal.totpTitle') }),
     el('p', { textContent: t('terminal.totpHint') }),
-    el('div', { className: 'totp-form' }, [
-      codeInput,
-      verifyBtn,
-    ]),
+    codeInput,
     statusMsg,
   ]);
 
@@ -124,8 +117,7 @@ function showTotpInput(page) {
     const code = codeInput.value.trim();
     if (!/^\d{6}$/.test(code) || isVerifying) return;
     isVerifying = true;
-    verifyBtn.classList.add('loading');
-    verifyBtn.disabled = true;
+    codeInput.disabled = true;
     statusMsg.textContent = '';
     statusMsg.className = 'totp-status';
 
@@ -138,6 +130,7 @@ function showTotpInput(page) {
         terminalToken = result.terminalToken;
         tokenExpiresAt = result.expiresAt;
         setTimeout(() => showDeviceSelection(page), 350);
+        return;
       } else {
         // Error feedback with shake
         codeInput.classList.add('shake');
@@ -145,21 +138,17 @@ function showTotpInput(page) {
         statusMsg.className = 'totp-status error';
         setTimeout(() => codeInput.classList.remove('shake'), 500);
         codeInput.value = '';
+        codeInput.disabled = false;
         codeInput.focus();
       }
     } catch {
       statusMsg.textContent = t('msg.error');
       statusMsg.className = 'totp-status error';
     }
-    verifyBtn.classList.remove('loading');
-    verifyBtn.disabled = false;
+    codeInput.disabled = false;
     isVerifying = false;
   }
 
-  verifyBtn.addEventListener('click', doVerify);
-  codeInput.addEventListener('keyup', e => {
-    if (e.key === 'Enter') doVerify();
-  });
   // Auto-submit when 6 digits entered
   codeInput.addEventListener('input', () => {
     codeInput.value = codeInput.value.replace(/\D/g, '');
@@ -327,43 +316,46 @@ function showTerminalView(page, device) {
 
     isExecuting = true;
 
-    // Add to history
-    commandHistory.push(command);
-    historyIndex = commandHistory.length;
-    cmdInput.value = '';
+    try {
+      // Add to history
+      commandHistory.push(command);
+      if (commandHistory.length > 500) commandHistory.shift();
+      historyIndex = commandHistory.length;
+      cmdInput.value = '';
 
-    // Check token expiry
-    if (Date.now() > tokenExpiresAt) {
-      showSessionExpired(page);
-      isExecuting = false;
-      return;
-    }
-
-    // Show command in output
-    const cmdLine = el('div', { className: 'terminal-line' }, [
-      el('span', { className: 'terminal-line-prompt', textContent: `${device.name}:~$ ` }),
-      el('span', { className: 'terminal-line-cmd', textContent: command }),
-    ]);
-    output.appendChild(cmdLine);
-
-    // Check if dangerous
-    const cfg = getConfig();
-    const dangerousPatterns = cfg?.terminal?.dangerousCommands || [];
-    const isDangerous = dangerousPatterns.some(pattern => command.includes(pattern));
-
-    if (isDangerous) {
-      await handleDangerousCommand(output, device, command, cmdInput);
-    } else {
-      const result = await runCommand(output, device, command);
-      // Backend detected dangerous command that frontend missed (config drift)
-      if (result === 'needs-totp') {
-        await handleDangerousCommand(output, device, command, cmdInput);
+      // Check token expiry
+      if (Date.now() > tokenExpiresAt) {
+        showSessionExpired(page);
+        return;
       }
-    }
 
-    scrollToBottom(output);
-    cmdInput.focus();
-    isExecuting = false;
+      // Show command in output
+      const cmdLine = el('div', { className: 'terminal-line' }, [
+        el('span', { className: 'terminal-line-prompt', textContent: `${device.name}:~$ ` }),
+        el('span', { className: 'terminal-line-cmd', textContent: command }),
+      ]);
+      output.appendChild(cmdLine);
+
+      // Check if dangerous
+      const cfg = getConfig();
+      const dangerousPatterns = cfg?.terminal?.dangerousCommands || [];
+      const isDangerous = dangerousPatterns.some(pattern => command.includes(pattern));
+
+      if (isDangerous) {
+        await handleDangerousCommand(output, device, command, cmdInput);
+      } else {
+        const result = await runCommand(output, device, command);
+        // Backend detected dangerous command that frontend missed (config drift)
+        if (result === 'needs-totp') {
+          await handleDangerousCommand(output, device, command, cmdInput);
+        }
+      }
+
+      scrollToBottom(output);
+      cmdInput.focus();
+    } finally {
+      isExecuting = false;
+    }
   }
 
   cmdInput.addEventListener('keydown', (e) => {
@@ -505,9 +497,11 @@ async function handleDangerousCommand(output, device, command, cmdInput) {
       resolve();
     });
 
+    let isConfirming = false;
     async function doConfirm() {
       const code = codeInput.value.trim();
-      if (!/^\d{6}$/.test(code)) return;
+      if (!/^\d{6}$/.test(code) || isConfirming) return;
+      isConfirming = true;
       confirmBtn.disabled = true;
       confirmBtn.classList.add('loading');
       statusMsg.textContent = '';

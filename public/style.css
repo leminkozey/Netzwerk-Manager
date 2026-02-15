@@ -4300,6 +4300,17 @@ label {
   50%      { opacity: 0; }
 }
 
+@keyframes termShieldPulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0px rgb(var(--accent-rgb) / 0));
+  }
+  50% {
+    transform: scale(1.08);
+    filter: drop-shadow(0 0 8px rgb(var(--accent-rgb) / 0.4));
+  }
+}
+
 @keyframes termStepLine {
   from { transform: scaleX(0); }
   to   { transform: scaleX(1); }
@@ -4362,11 +4373,12 @@ label {
 
 .totp-input {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 1.8rem;
-  letter-spacing: 0.5em;
+  font-size: 1.4rem;
+  letter-spacing: 0.4em;
   text-align: center;
-  padding: 14px 20px;
-  width: 240px;
+  padding: 10px 16px;
+  width: 100%;
+  box-sizing: border-box;
   background: var(--surface);
   border: 2px solid var(--border);
   border-radius: var(--radius-md);
@@ -4390,8 +4402,7 @@ input.shake {
 }
 .totp-input.small {
   font-size: 1.2rem;
-  width: 190px;
-  padding: 10px 16px;
+  padding: 8px 14px;
 }
 
 .totp-qr-container {
@@ -4637,6 +4648,12 @@ input.shake {
   opacity: 0.7;
   transform: scale(1.05);
 }
+.terminal-totp-gate .terminal-warning-icon {
+  color: var(--accent);
+  opacity: 1;
+  animation: termShieldPulse 2.5s ease-in-out infinite;
+  margin-bottom: 8px;
+}
 .terminal-warning h2 {
   margin: 0;
   font-size: 1.3rem;
@@ -4687,12 +4704,12 @@ input.shake {
   line-height: 1.5;
 }
 
-/* TOTP input glow effect in terminal gate */
+/* TOTP input in terminal gate */
 .terminal-totp-gate .totp-input {
-  font-size: 2rem;
-  width: 260px;
-  padding: 16px 24px;
-  letter-spacing: 0.6em;
+  font-size: 1.8rem;
+  width: 240px;
+  padding: 14px 20px;
+  letter-spacing: 0.45em;
 }
 
 /* Device Selection */
@@ -4706,17 +4723,18 @@ input.shake {
 }
 
 .terminal-device-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
   width: 100%;
 }
-
 .terminal-device-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  width: 190px;
   padding: 28px 18px;
   background: var(--surface);
   backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
@@ -4934,7 +4952,7 @@ input.shake {
   animation: termSlideUp 0.3s var(--ease-out-expo) both;
 }
 .terminal-welcome-text {
-  color: #3fb950;
+  color: var(--accent);
   font-size: 0.82rem;
 }
 .terminal-welcome-info {
@@ -4949,13 +4967,13 @@ input.shake {
   align-items: center;
   padding: 10px 18px 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(13, 17, 23, 0.95);
+  background: #0d1117;
   flex-shrink: 0;
 }
 .terminal-prompt-label {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.85rem;
-  color: #3fb950;
+  color: var(--accent);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -5046,20 +5064,112 @@ input.shake {
   .terminal-header-right {
     flex-wrap: wrap;
   }
-  .terminal-device-grid {
-    grid-template-columns: 1fr;
+  .terminal-device-card {
+    width: 100%;
   }
   .totp-input {
-    font-size: 1.4rem;
-    width: 190px;
+    font-size: 1.2rem;
   }
   .terminal-totp-gate .totp-input {
-    font-size: 1.6rem;
-    width: 210px;
+    font-size: 1.4rem;
+    width: 200px;
   }
   .terminal-totp-gate {
     padding: 36px 20px;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Terminal – Light Mode
+   ═══════════════════════════════════════════════════════════════════ */
+
+[data-theme='light'] .terminal-container {
+  background: #f6f8fa;
+  border-color: rgba(0, 20, 60, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 20, 60, 0.1);
+}
+[data-theme='light'] .terminal-header {
+  background: #e8ecf0;
+  border-bottom-color: rgba(0, 20, 60, 0.08);
+}
+[data-theme='light'] .terminal-header-title {
+  color: #57606a;
+}
+[data-theme='light'] .terminal-timer {
+  color: #57606a;
+  background: rgba(0, 20, 60, 0.06);
+}
+[data-theme='light'] .terminal-timer.warn {
+  background: rgba(249, 115, 22, 0.1);
+}
+[data-theme='light'] .terminal-timer.critical {
+  background: rgba(239, 68, 68, 0.1);
+}
+[data-theme='light'] .terminal-header-btn {
+  background: rgba(0, 20, 60, 0.06);
+  color: #24292f;
+  border-color: rgba(0, 20, 60, 0.08);
+}
+[data-theme='light'] .terminal-header-btn:hover {
+  background: rgba(0, 20, 60, 0.1);
+  border-color: rgba(0, 20, 60, 0.15);
+}
+[data-theme='light'] .terminal-header-btn.danger {
+  color: #cf222e;
+  border-color: rgba(207, 34, 46, 0.15);
+}
+[data-theme='light'] .terminal-header-btn.danger:hover {
+  background: rgba(207, 34, 46, 0.08);
+}
+[data-theme='light'] .terminal-output {
+  color: #24292f;
+  scrollbar-color: rgba(0, 20, 60, 0.12) transparent;
+}
+[data-theme='light'] .terminal-output::-webkit-scrollbar-thumb {
+  background: rgba(0, 20, 60, 0.12);
+}
+[data-theme='light'] .terminal-output::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 20, 60, 0.2);
+}
+[data-theme='light'] .terminal-line-prompt {
+  color: var(--accent);
+}
+[data-theme='light'] .terminal-line-cmd {
+  color: #24292f;
+}
+[data-theme='light'] .terminal-line.stdout {
+  color: #24292f;
+}
+[data-theme='light'] .terminal-line.stderr {
+  color: #cf222e;
+}
+[data-theme='light'] .terminal-line.error {
+  color: #cf222e;
+}
+[data-theme='light'] .terminal-line.loading {
+  color: #57606a;
+}
+[data-theme='light'] .terminal-welcome {
+  border-bottom-color: rgba(0, 20, 60, 0.06);
+}
+[data-theme='light'] .terminal-welcome-info {
+  color: #57606a;
+}
+[data-theme='light'] .terminal-input-line {
+  background: #f6f8fa;
+  border-top-color: rgba(0, 20, 60, 0.08);
+}
+[data-theme='light'] .terminal-cmd-input {
+  color: #24292f;
+  caret-color: var(--accent);
+}
+[data-theme='light'] .dangerous-overlay {
+  background: rgba(255, 255, 255, 0.7);
+}
+[data-theme='light'] .dangerous-command {
+  background: rgba(207, 34, 46, 0.06);
+  border-color: rgba(207, 34, 46, 0.15);
+  color: #cf222e;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
