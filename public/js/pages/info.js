@@ -592,7 +592,9 @@ function renderDynamic(page) {
             : buildGenericInfoCard(cardDef)
         );
 
-        page.appendChild(el('div', { className: 'grid two equal-height' }, gridChildren));
+        const gridEl = el('div', { className: 'grid two equal-height' }, gridChildren);
+        if (i > 0) gridEl.style.marginTop = '16px';
+        page.appendChild(gridEl);
       }
     }
   }
