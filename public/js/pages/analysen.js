@@ -1759,7 +1759,7 @@ export function renderAnalysen(container) {
   // Uptime (third column)
   let uptimeGrid = null;
   if (showUptime) {
-    const uptimeCol = el('div');
+    const uptimeCol = el('div', { className: 'uptime-col' });
     uptimeCol.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
       el('div', { className: 'section-header' }, [
         el('span', { className: 'icon-badge icon-green', 'data-icon': 'uptime' }, [iconEl('uptime', 22)]),

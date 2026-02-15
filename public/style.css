@@ -883,7 +883,8 @@ label {
 }
 
 .card:hover .icon-badge,
-.section-title:hover .icon-badge {
+.section-title:hover .icon-badge,
+.uptime-col:has(.card:hover) > .section-title .icon-badge {
   transform: scale(1.08);
   box-shadow: 0 0 calc(14px * var(--glow-strength)) var(--accent-glow);
 }
@@ -895,7 +896,8 @@ label {
   color: #22c55e;
 }
 .card:hover .icon-green,
-.section-title:hover .icon-green {
+.section-title:hover .icon-green,
+.uptime-col:has(.card:hover) > .section-title .icon-green {
   background: rgba(34, 197, 94, 0.25);
   box-shadow: 0 0 calc(14px * var(--glow-strength)) rgba(34, 197, 94, 0.4);
 }
@@ -984,7 +986,8 @@ label {
   transition: transform 0.3s ease;
 }
 .card:hover .icon-badge[data-icon="uptime"] svg .clock-hand,
-.section-title:hover .icon-badge[data-icon="uptime"] svg .clock-hand {
+.section-title:hover .icon-badge[data-icon="uptime"] svg .clock-hand,
+.uptime-col:has(.card:hover) > .section-title .icon-badge[data-icon="uptime"] svg .clock-hand {
   animation: clock-spin 2s linear infinite;
 }
 
