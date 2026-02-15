@@ -11,6 +11,7 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **Speed-Test** – Download, Upload und Ping im lokalen Netzwerk messen
 - **Geräte Info / Uptime Monitoring** – Geräte per Ping überwachen mit Live-Status, optional CPU-Last, RAM und Temperatur per SSH oder lokal
 - **Control Center** – Geräte per Wake-on-LAN, SSH-Shutdown und SSH-Restart steuern
+- **Service / Container Management** – systemd-Dienste, PM2-Prozesse und Docker-Container starten, stoppen und neu starten (lokal und remote per SSH)
 - **WOL-Zeitplan** – Automatisches Hochfahren und Herunterfahren von Geräten nach konfigurierbarem Zeitplan (Cron-basiert)
 - **Pi-hole DNS Analytics** – Statistiken, Top-Domains und Query-Verlauf direkt im Dashboard
 - **Pi-hole Blocking Toggle** – DNS-Blocking per Knopfdruck pausieren und fortsetzen
@@ -634,6 +635,8 @@ cards: {
 
 ### Control Center
 
+Das Control Center bietet Fernsteuerung von Geräten (Wake-on-LAN, Shutdown, Restart), Service/Container-Management (systemd, PM2, Docker) und Pi-hole DNS-Blocking-Toggle. Alle Funktionen werden über die `config.js` konfiguriert.
+
 ### Geräte Info / Uptime Monitoring (`uptimeDevices`, `uptimeInterval`, `statsInterval`)
 
 Überwacht Geräte im Netzwerk per ICMP-Ping und zeigt den Live-Status im Frontend. Optional können CPU-Last, RAM-Auslastung und Temperatur pro Gerät angezeigt werden.
@@ -722,6 +725,7 @@ Jedes Gerät hat folgende Felder:
 | `type` | `string` | SSH-Typ: `'ssh-windows'` oder `'ssh-linux'`. Bestimmt welche Befehle für Shutdown/Restart verwendet werden. |
 | `ip` | `string` | IP-Adresse des Geräts. |
 | `actions` | `array` | Verfügbare Aktionen: `'wake'`, `'restart'`, `'shutdown'`. |
+| `show` | `boolean` | **Optional.** `true` (Standard) = Tile im Control Center anzeigen. `false` = Gerät wird im UI versteckt, bleibt aber als SSH-Quelle für Remote-Services (`credentialsFrom`) nutzbar. |
 
 **SSH-Befehle nach Typ:**
 
@@ -748,8 +752,20 @@ controlDevices: [
     ip: '192.168.1.200',
     actions: ['wake', 'shutdown'],
   },
+  // Nur als SSH-Quelle für Remote-Services – keine Tile im Control Center
+  {
+    id: 'piholeControl',
+    name: 'Pi-hole Server',
+    icon: 'raspberryColor',
+    type: 'ssh-linux',
+    ip: '192.168.1.100',
+    actions: ['shutdown'],
+    show: false,
+  },
 ],
 ```
+
+> **Tipp:** Mit `show: false` kannst du ein Gerät als reine SSH-Credential-Quelle verwenden, ohne dass es als Tile im Control Center erscheint. Die SSH-Zugangsdaten werden trotzdem in den Einstellungen konfiguriert und können von Remote-Services über `credentialsFrom` referenziert werden.
 
 #### Icons
 
@@ -885,6 +901,158 @@ Geräte ohne Zeitplan erscheinen nicht in der Response.
 #### Rückwärtskompatibilität
 
 Der `schedule`-Block ist **komplett optional**. Bestehende Konfigurationen ohne `schedule` funktionieren weiterhin ohne Änderung.
+
+---
+
+### Service / Container Management (`services`)
+
+Ermöglicht das Starten, Stoppen und Neu-Starten von Diensten direkt über das Control Center. Unterstützt drei Service-Typen:
+
+| Typ | Tool | Beispiel |
+|-----|------|----------|
+| `systemd` | `systemctl` | Linux-Systemdienste (nginx, netzwerk-manager, etc.) |
+| `pm2` | `pm2` | Node.js-Prozesse die mit PM2 verwaltet werden |
+| `docker` | `docker` | Docker-Container |
+
+Services können **lokal** oder **remote per SSH** gesteuert werden.
+
+#### Konfiguration
+
+Jeder Service hat folgende Felder:
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `id` | `string` | Eindeutiger Schlüssel (lowercase, keine Leerzeichen). |
+| `name` | `string` | Anzeigename im Frontend. |
+| `icon` | `string` | Icon für den Service (siehe [Icons](#icons)). |
+| `type` | `string` | Service-Typ: `'systemd'`, `'pm2'` oder `'docker'`. |
+| `service` | `string` | Exakter Name des systemd-Units / PM2-Prozesses / Docker-Containers. |
+| `host` | `string \| object` | `'local'` für lokale Ausführung oder `{ credentialsFrom: '<id>' }` für Remote-Ausführung per SSH. |
+
+#### Lokal vs. Remote
+
+**Lokale Services** (`host: 'local'`):
+- Befehle werden direkt auf dem Server ausgeführt (kein SSH)
+- Voraussetzung: Das entsprechende Tool muss installiert sein (`systemctl`, `pm2` oder `docker`)
+
+**Remote Services** (`host: { credentialsFrom: '<id>' }`):
+- Befehle werden per SSH auf einem entfernten Gerät ausgeführt
+- `credentialsFrom` referenziert die `id` eines Eintrags in `controlDevices`
+- Die SSH-Zugangsdaten (Benutzer, Passwort, Port) und die IP-Adresse werden aus dem referenzierten Control-Device übernommen
+- Das Control-Device muss in den Einstellungen konfigurierte SSH-Credentials haben
+- Das Tool (`systemctl`, `pm2`, `docker`) muss auf dem Remote-Gerät installiert sein
+
+> **Tipp:** Wenn du das Remote-Gerät nicht als Tile im Control Center sehen willst, setze `show: false` im `controlDevices`-Eintrag. Das Gerät dient dann nur als SSH-Credential-Quelle.
+
+#### Beispiel
+
+```js
+services: [
+  // Lokaler systemd-Dienst
+  {
+    id: 'netzwerk-manager',
+    name: 'Netzwerk Manager',
+    icon: 'serverColor',
+    type: 'systemd',
+    service: 'netzwerk-manager',
+    host: 'local',
+  },
+  // PM2-Prozess auf Remote-Server (SSH-Daten aus controlDevices)
+  {
+    id: 'lemin-kanban',
+    name: 'Lemin Kanban',
+    icon: 'serverColor',
+    type: 'pm2',
+    service: 'lemin-kanban',
+    host: { credentialsFrom: 'piholeControl' },
+  },
+  // Docker-Container auf Remote-Server
+  {
+    id: 'pihole-docker',
+    name: 'Pi-hole',
+    icon: 'piholeDnsColor',
+    type: 'docker',
+    service: 'pihole',
+    host: { credentialsFrom: 'piholeControl' },
+  },
+],
+```
+
+#### Service-Befehle
+
+Je nach `type` werden folgende Befehle ausgeführt:
+
+**systemd:**
+
+| Aktion | Befehl |
+|--------|--------|
+| Start | `sudo systemctl start <service>` |
+| Stop | `sudo systemctl stop <service>` |
+| Restart | `sudo systemctl restart <service>` |
+| Status | `systemctl is-active <service>` |
+
+**pm2:**
+
+| Aktion | Befehl |
+|--------|--------|
+| Start | `pm2 start <service>` |
+| Stop | `pm2 stop <service>` |
+| Restart | `pm2 restart <service>` |
+| Status | `pm2 jlist` (JSON-Ausgabe, Prozess wird nach Name gesucht) |
+
+**docker:**
+
+| Aktion | Befehl |
+|--------|--------|
+| Start | `docker start <service>` |
+| Stop | `docker stop <service>` |
+| Restart | `docker restart <service>` |
+| Status | `docker inspect -f '{{.State.Status}}' <service>` |
+
+#### Frontend
+
+Im Control Center werden Services als Tiles mit drei Buttons angezeigt:
+
+- **Start** (grün) – Service starten
+- **Restart** (Akzentfarbe) – Service neu starten
+- **Shutdown** (rot) – Service stoppen
+
+Ein Status-Badge zeigt den aktuellen Zustand:
+- **Aktiv** (grün) – Service läuft
+- **Gestoppt** (rot) – Service ist gestoppt
+- **Fehler** (rot) – Service ist in einem Fehlerzustand
+- **Unbekannt** (grau) – Status konnte nicht abgefragt werden (z.B. Host offline)
+
+Der Status wird automatisch alle 10 Sekunden aktualisiert. Nach einer Aktion (Start/Stop/Restart) wird der Status nach 1,5 Sekunden erneut abgefragt.
+
+Ein Typ-Badge (`systemd`, `pm2`, `docker`) zeigt den Service-Typ an.
+
+#### Voraussetzungen
+
+| Ort | Voraussetzung |
+|-----|---------------|
+| Lokal | Das Tool (`systemctl`, `pm2`, `docker`) muss auf dem Server installiert sein. Für systemd-Dienste muss der Server-Prozess `sudo`-Rechte haben (oder passwortloses `sudo` für `systemctl`). |
+| Remote | SSH-Zugangsdaten müssen in den Einstellungen für das referenzierte Control-Device konfiguriert sein. Das Tool muss auf dem Remote-Gerät installiert sein. `sshpass` muss auf dem Server installiert sein. |
+
+#### Sicherheit
+
+- **Service-Name Validierung**: Service-Namen werden gegen `/^[a-zA-Z0-9_.-]{1,100}$/` validiert – Shell-Metazeichen sind nicht möglich
+- **Command Templates**: Befehle werden aus festen Templates generiert, nicht aus User-Input zusammengebaut
+- **Config-Sanitisierung**: `service` und `credentialsFrom` werden aus der öffentlichen Config entfernt
+- **Rate Limiting**: Maximal 10 Aktionen pro Minute und 120 Status-Abfragen pro Minute pro IP
+- **Auth Required**: Alle Endpoints erfordern Login
+- **Audit Logging**: Jede Aktion wird mit `[SERVICE-AUDIT]` geloggt (IP, Service-ID, Aktion, Ergebnis)
+
+#### API-Endpunkte
+
+| Methode | Pfad | Auth | Beschreibung |
+|---------|------|------|--------------|
+| `GET` | `/api/services/:serviceId/status` | Ja | Status eines Services abfragen. Gibt `{ status: 'running'\|'stopped'\|'error'\|'unknown' }` zurück. |
+| `POST` | `/api/services/:serviceId/:action` | Ja | Aktion ausführen (`start`, `stop`, `restart`). Gibt `{ success: true/false, message }` zurück. |
+
+#### Rückwärtskompatibilität
+
+Der `services`-Block ist **komplett optional**. Ohne `services` in der Config wird der Platzhalter "Container & Services" im Control Center angezeigt. Bestehende Konfigurationen funktionieren ohne Änderung.
 
 ---
 
@@ -1094,6 +1262,8 @@ node -e "console.log(require('crypto').randomUUID())"
 - **Verschlüsselung** – SSH-Passwörter werden mit AES-256-GCM verschlüsselt gespeichert
 - **SSH-Allowlist** – Nur vordefinierte Befehle können per SSH ausgeführt werden
 - **Stats-Allowlist** – Nur vordefinierte Read-Only-Befehle für Device Stats erlaubt (`cat /proc/loadavg`, `nproc`, etc.)
+- **Service-Name Validierung** – Service-Namen gegen `/^[a-zA-Z0-9_.-]{1,100}$/` validiert, keine Shell-Injection möglich
+- **Service-Audit-Logging** – Jede Service-Aktion wird mit IP, Service-ID und Ergebnis geloggt
 - **Stdout-Limit** – SSH-Ausgaben für Stats auf 512 KB begrenzt (DoS-Schutz)
 - **Session-Timeout** – Automatisches Ausloggen nach Inaktivität (konfigurierbar)
 - **Config-Sandbox** – `config.js` wird serverseitig in einer isolierten VM geparst

@@ -3853,6 +3853,20 @@ label {
   height: 32px;
 }
 
+/* ── Service Type Badge ── */
+.service-type-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  line-height: 1.4;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    Confirm Dialog
    ═══════════════════════════════════════════════════════════════════ */

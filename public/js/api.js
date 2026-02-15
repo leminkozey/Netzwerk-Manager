@@ -332,6 +332,25 @@ export async function runUpdate() {
   return res.json();
 }
 
+// ── Services ──
+
+export async function getServiceStatus(serviceId) {
+  const res = await request(`/api/services/${encodeURIComponent(serviceId)}/status`);
+  if (!res.ok) return { status: 'unknown' };
+  return res.json();
+}
+
+export async function serviceAction(serviceId, action) {
+  const res = await request(`/api/services/${encodeURIComponent(serviceId)}/${encodeURIComponent(action)}`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    return { success: false, message: data.message || 'Service action failed' };
+  }
+  return res.json();
+}
+
 // ── Logout ──
 
 export async function logout() {

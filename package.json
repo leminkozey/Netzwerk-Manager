@@ -1,6 +1,6 @@
 {
   "name": "ports-belegunng",
-  "version": "3.1.0",
+  "version": "3.7.0",
   "description": "Switch/Router port dashboard with auth, theming, and versioning",
   "main": "server.js",
   "scripts": {

@@ -277,6 +277,9 @@ const siteConfig = {
   // type:    'ssh-windows' | 'ssh-linux' – bestimmt die SSH-Befehle
   // ip:      IP-Adresse des Geräts
   // actions: Array von Aktionen: 'wake', 'restart', 'shutdown'
+  // show:    true/false – Tile im Control Center anzeigen (Standard: true)
+  //          Mit show: false wird das Gerät versteckt, bleibt aber als
+  //          SSH-Quelle für Remote-Services (credentialsFrom) nutzbar.
   //
   // SSH-Zugangsdaten werden pro Gerät in den Einstellungen konfiguriert
   // und verschlüsselt auf dem Server gespeichert.
@@ -339,6 +342,47 @@ const siteConfig = {
     //       time: '22:00',
     //     },
     //   },
+    // },
+  ],
+
+  // ── Service / Container Management ──
+  // Services die über das Control Center gesteuert werden können.
+  // Unterstützt systemd-Dienste, PM2-Prozesse und Docker-Container.
+  //
+  // id:      eindeutiger Schlüssel (lowercase, keine Leerzeichen)
+  // name:    Anzeigename im Frontend
+  // icon:    Icon-Name aus icons.js (z.B. 'serverColor')
+  // type:    'systemd' | 'pm2' | 'docker'
+  // service: exakter Unit-/Prozess-/Container-Name
+  // host:    'local' für lokale Ausführung, oder
+  //          { credentialsFrom: '<controlDevice-id>' } für SSH-Remote-Ausführung
+  services: [
+    // Beispiel: Lokaler systemd-Dienst
+    // {
+    //   id: 'netzwerk-manager',
+    //   name: 'Netzwerk Manager',
+    //   icon: 'serverColor',
+    //   type: 'systemd',
+    //   service: 'netzwerk-manager',
+    //   host: 'local',
+    // },
+    // Beispiel: PM2-Prozess auf Remote-Server
+    // {
+    //   id: 'lemin-kanban',
+    //   name: 'Lemin Kanban',
+    //   icon: 'serverColor',
+    //   type: 'pm2',
+    //   service: 'lemin-kanban',
+    //   host: { credentialsFrom: 'piholeControl' },
+    // },
+    // Beispiel: Docker-Container auf Remote-Server
+    // {
+    //   id: 'pihole-docker',
+    //   name: 'Pi-hole',
+    //   icon: 'piholeDnsColor',
+    //   type: 'docker',
+    //   service: 'pihole',
+    //   host: { credentialsFrom: 'piholeControl' },
     // },
   ],
 

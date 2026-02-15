@@ -211,6 +211,118 @@ function buildPlaceholderSection() {
   ]);
 }
 
+// ── Service Status Helpers ──
+
+function serviceStatusClass(status) {
+  if (status === 'running') return 'online';
+  if (status === 'stopped') return 'offline';
+  if (status === 'error') return 'offline';
+  return 'unknown';
+}
+
+function serviceStatusLabel(status) {
+  if (status === 'running') return t('service.status.running');
+  if (status === 'stopped') return t('service.status.stopped');
+  if (status === 'error') return t('service.status.error');
+  return t('service.status.unknown');
+}
+
+function serviceStatusIconNode(status) {
+  if (status === 'running') return iconEl('online', 14);
+  if (status === 'stopped' || status === 'error') return iconEl('offline', 14);
+  return iconEl('unknown', 14);
+}
+
+const SERVICE_ACTION_SUCCESS_KEYS = {
+  start: 'service.startSuccess',
+  stop: 'service.shutdownSuccess',
+  restart: 'service.restartSuccess',
+};
+
+// Reuse device control button classes + icons for consistent look & animations
+const SERVICE_ACTION_CONFIG = {
+  start:   { icon: 'wake',     btnClass: 'wake-btn',     label: 'service.start' },
+  restart: { icon: 'restart',  btnClass: 'restart-btn',  label: 'service.restart' },
+  stop:    { icon: 'shutdown', btnClass: 'shutdown-btn',  label: 'service.shutdown' },
+};
+
+// ── Service Tile ──
+
+function buildServiceTile(service, isDestroyed) {
+  const statusText = el('span', { className: 'status-text', textContent: serviceStatusLabel('unknown') });
+  const statusIconSpan = el('span', { className: 'status-icon-wrap' }, [serviceStatusIconNode('unknown')]);
+
+  const statusContainer = el('div', {
+    className: 'device-tile-status device-status',
+  }, [statusIconSpan, statusText]);
+
+  // Type badge
+  const typeBadge = el('span', {
+    className: 'service-type-badge',
+    textContent: service.type || '',
+  });
+
+  const actionButtons = ['start', 'restart', 'stop'].map(action => {
+    const cfg = SERVICE_ACTION_CONFIG[action];
+    const btn = el('button', {
+      className: `action-circle ${cfg.btnClass}`,
+      onClick: async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          const result = await api.serviceAction(service.id, action);
+          if (result.success) {
+            showToast(t(SERVICE_ACTION_SUCCESS_KEYS[action] || 'msg.success'));
+          } else {
+            showToast(result.message || t('service.connectionError'), true);
+          }
+        } catch {
+          showToast(t('service.connectionError'), true);
+        } finally {
+          btn.disabled = false;
+        }
+        // Re-poll status after action with delay
+        setTimeout(() => {
+          if (isDestroyed()) return;
+          api.getServiceStatus(service.id).then(data => {
+            if (isDestroyed()) return;
+            if (data) updateStatus(data.status || 'unknown');
+          }).catch(() => {});
+        }, 1500);
+      },
+    }, [iconEl(cfg.icon, 32), el('span', { textContent: t(cfg.label) })]);
+    return btn;
+  });
+
+  const actionsRow = el('div', { className: 'device-tile-actions' }, actionButtons);
+
+  const tileHeader = el('div', {
+    className: 'device-tile-header section-title',
+    style: { flexWrap: 'wrap', gap: '12px' },
+  }, [
+    el('div', { className: 'section-header', style: { gap: '10px' } }, [
+      el('span', { className: 'icon-badge' }, [iconEl(service.icon || 'serverColor', 22)]),
+      el('h3', { textContent: service.name }),
+      typeBadge,
+    ]),
+    statusContainer,
+  ]);
+
+  const tile = el('div', { className: 'device-tile card' }, [
+    tileHeader,
+    actionsRow,
+  ]);
+
+  function updateStatus(status) {
+    const cls = serviceStatusClass(status);
+    statusContainer.className = `device-tile-status device-status ${cls}`;
+    statusText.textContent = serviceStatusLabel(status);
+    statusIconSpan.replaceChildren(serviceStatusIconNode(status));
+  }
+
+  return { tile, updateStatus, serviceId: service.id };
+}
+
 // ── Main Render ──
 
 export function renderStart(container) {
@@ -222,10 +334,10 @@ export function renderStart(container) {
   // Section: Gerätesteuerung
   page.appendChild(buildSectionTitle(t('section.control')));
 
-  // Build tiles from config
+  // Build tiles from config (show !== false → default visible)
   const cfg = getConfig();
   const devices = cfg?.controlDevices && Array.isArray(cfg.controlDevices)
-    ? cfg.controlDevices
+    ? cfg.controlDevices.filter(d => d.show !== false)
     : [];
 
   const tiles = [];
@@ -365,14 +477,27 @@ export function renderStart(container) {
     });
   }).catch(err => { console.error('[Pi-hole tile]', err); });
 
-  // Placeholder section
+  // ── Services Section ──
+  const services = cfg?.services && Array.isArray(cfg.services) ? cfg.services : [];
+  const serviceTiles = [];
+
   page.appendChild(el('div', { style: { marginTop: '32px' } }));
   page.appendChild(buildSectionTitle(t('section.containerServices')));
-  page.appendChild(buildPlaceholderSection());
+
+  if (services.length === 0) {
+    page.appendChild(buildPlaceholderSection());
+  } else {
+    const isDestroyed = () => destroyed;
+    for (const service of services) {
+      const { tile, updateStatus, serviceId } = buildServiceTile(service, isDestroyed);
+      serviceTiles.push({ updateStatus, serviceId });
+      page.appendChild(tile);
+    }
+  }
 
   container.appendChild(page);
 
-  // ── Status polling ──
+  // ── Status polling (devices) ──
   async function pollStatus() {
     if (destroyed || tiles.length === 0) return;
 
@@ -393,6 +518,32 @@ export function renderStart(container) {
 
   pollStatus();
   pollInterval = setInterval(pollStatus, 5000);
+
+  // ── Status polling (services) ──
+  let servicePollInterval = null;
+
+  async function pollServiceStatus() {
+    if (destroyed || serviceTiles.length === 0) return;
+
+    const results = await Promise.allSettled(
+      serviceTiles.map(st => api.getServiceStatus(st.serviceId))
+    );
+
+    for (let i = 0; i < serviceTiles.length; i++) {
+      if (destroyed) return;
+      const result = results[i];
+      if (result.status === 'fulfilled') {
+        serviceTiles[i].updateStatus(result.value.status || 'unknown');
+      } else {
+        serviceTiles[i].updateStatus('unknown');
+      }
+    }
+  }
+
+  if (serviceTiles.length > 0) {
+    pollServiceStatus();
+    servicePollInterval = setInterval(pollServiceStatus, 10000);
+  }
 
   // ── Zeitplan-Polling ──
   let scheduleInterval = null;
@@ -417,6 +568,7 @@ export function renderStart(container) {
       if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
       if (piholePollInterval) { clearInterval(piholePollInterval); piholePollInterval = null; }
       if (scheduleInterval) { clearInterval(scheduleInterval); scheduleInterval = null; }
+      if (servicePollInterval) { clearInterval(servicePollInterval); servicePollInterval = null; }
     } else {
       if (!pollInterval) { pollStatus(); pollInterval = setInterval(pollStatus, 5000); }
       if (!scheduleInterval) { pollSchedules(); scheduleInterval = setInterval(pollSchedules, 60000); }
@@ -431,6 +583,10 @@ export function renderStart(container) {
             }
           }).catch(() => {});
         }, 15000);
+      }
+      if (!servicePollInterval && serviceTiles.length > 0) {
+        pollServiceStatus();
+        servicePollInterval = setInterval(pollServiceStatus, 10000);
       }
     }
   };
@@ -450,6 +606,10 @@ export function renderStart(container) {
     if (scheduleInterval) {
       clearInterval(scheduleInterval);
       scheduleInterval = null;
+    }
+    if (servicePollInterval) {
+      clearInterval(servicePollInterval);
+      servicePollInterval = null;
     }
     document.removeEventListener('visibilitychange', onVisibilityChange);
   };

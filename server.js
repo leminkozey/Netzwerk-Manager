@@ -359,6 +359,15 @@ app.get('/config.js', (req, res) => {
       }
     }
   }
+  // Strip sensitive fields from services
+  if (Array.isArray(safe.services)) {
+    for (const s of safe.services) {
+      delete s.service;
+      if (s.host && typeof s.host === 'object') {
+        delete s.host.credentialsFrom;
+      }
+    }
+  }
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
   res.send(`const siteConfig = ${JSON.stringify(safe, null, 2)};\n`);
@@ -2199,6 +2208,281 @@ function logControlAction(deviceId, action, ip, success, details = '') {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// Service / Container Management
+// ═══════════════════════════════════════════════════════════════════
+
+const SERVICE_NAME_PATTERN = /^[a-zA-Z0-9_.-]{1,100}$/;
+const VALID_SERVICE_TYPES = new Set(['systemd', 'pm2', 'docker']);
+const VALID_SERVICE_ACTIONS = new Set(['start', 'stop', 'restart']);
+
+const SERVICE_COMMANDS = {
+  systemd: {
+    start:   name => `sudo systemctl start ${name}`,
+    stop:    name => `sudo systemctl stop ${name}`,
+    restart: name => `sudo systemctl restart ${name}`,
+    status:  name => `systemctl is-active ${name}`,
+  },
+  pm2: {
+    start:   name => `pm2 start ${name}`,
+    stop:    name => `pm2 stop ${name}`,
+    restart: name => `pm2 restart ${name}`,
+    status:  () => `pm2 jlist`,
+  },
+  docker: {
+    start:   name => `docker start ${name}`,
+    stop:    name => `docker stop ${name}`,
+    restart: name => `docker restart ${name}`,
+    status:  name => `docker inspect -f '{{.State.Status}}' ${name}`,
+  },
+};
+
+function buildServiceCommand(type, action, serviceName) {
+  if (!SERVICE_NAME_PATTERN.test(serviceName)) return null;
+  const template = SERVICE_COMMANDS[type]?.[action];
+  if (!template) return null;
+  return template(serviceName);
+}
+
+function localCommandWithOutput(command) {
+  return new Promise((resolve) => {
+    const child = spawn('sh', ['-c', command], { env: process.env });
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+    const MAX_OUTPUT = 512 * 1024;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        child.kill();
+        resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code: -1 });
+      }
+    }, 15000);
+
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+      if (stdout.length > MAX_OUTPUT && !settled) {
+        settled = true; clearTimeout(timer); child.kill();
+        resolve({ stdout: stdout.trim(), stderr: 'Output too large', code: -1 });
+      }
+    });
+    child.stderr.on('data', (data) => {
+      if (stderr.length < MAX_OUTPUT) stderr += data.toString();
+    });
+
+    child.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code: code ?? -1 });
+    });
+
+    child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.kill();
+      resolve({ stdout: '', stderr: err.message, code: -1 });
+    });
+  });
+}
+
+function sshServiceCommandWithOutput(config, command) {
+  return new Promise((resolve) => {
+    const { ipAddress, sshUser, sshPort } = config;
+    const sshPassword = config._sshPasswordDecrypted || decryptValue(config.sshPassword);
+
+    if (!VALIDATION.ipAddress.test(ipAddress)) return resolve({ stdout: '', stderr: 'Invalid IP', code: -1 });
+    if (!VALIDATION.sshUser.test(sshUser)) return resolve({ stdout: '', stderr: 'Invalid SSH user', code: -1 });
+    if (!VALIDATION.sshPort(sshPort)) return resolve({ stdout: '', stderr: 'Invalid SSH port', code: -1 });
+    if (typeof sshPassword !== 'string' || sshPassword.length === 0) return resolve({ stdout: '', stderr: 'SSH password missing', code: -1 });
+
+    const sshArgs = [
+      '-o', 'StrictHostKeyChecking=accept-new',
+      '-o', 'ConnectTimeout=5',
+      '-o', 'BatchMode=no',
+      '-p', String(sshPort),
+      `${sshUser}@${ipAddress}`,
+      command,
+    ];
+
+    const sshpass = spawn('sshpass', ['-e', 'ssh', ...sshArgs], {
+      env: { ...process.env, SSHPASS: sshPassword },
+    });
+
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+    const MAX_OUTPUT = 512 * 1024;
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        sshpass.kill();
+        resolve({ stdout: stdout.trim(), stderr: 'SSH timeout', code: -1 });
+      }
+    }, 15000);
+
+    sshpass.stdout.on('data', (data) => {
+      stdout += data.toString();
+      if (stdout.length > MAX_OUTPUT && !settled) {
+        settled = true; clearTimeout(timer); sshpass.kill();
+        resolve({ stdout: stdout.trim(), stderr: 'Output too large', code: -1 });
+      }
+    });
+    sshpass.stderr.on('data', (data) => {
+      if (stderr.length < MAX_OUTPUT) stderr += data.toString();
+    });
+
+    sshpass.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code: code ?? -1 });
+    });
+
+    sshpass.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sshpass.kill();
+      resolve({ stdout: '', stderr: err.code === 'ENOENT' ? 'sshpass not installed' : 'SSH connection failed', code: -1 });
+    });
+  });
+}
+
+function parseServiceStatus(type, serviceName, result) {
+  if (result.code === -1 && (result.stderr.includes('timeout') || result.stderr.includes('connection') || result.stderr.includes('SSH'))) {
+    return 'unknown';
+  }
+
+  if (type === 'systemd') {
+    const out = result.stdout.toLowerCase().trim();
+    if (out === 'active') return 'running';
+    if (out === 'inactive' || out === 'dead') return 'stopped';
+    if (out === 'failed') return 'error';
+    // is-active returns non-zero for inactive/failed, that's normal
+    if (result.code !== 0 && !out) return 'unknown';
+    return out === 'activating' ? 'running' : 'stopped';
+  }
+
+  if (type === 'pm2') {
+    try {
+      const processes = JSON.parse(result.stdout);
+      const proc = processes.find(p => p.name === serviceName);
+      if (!proc) return 'stopped';
+      const status = proc.pm2_env?.status || '';
+      if (status === 'online') return 'running';
+      if (status === 'stopped' || status === 'errored') return status === 'errored' ? 'error' : 'stopped';
+      return 'stopped';
+    } catch {
+      return 'unknown';
+    }
+  }
+
+  if (type === 'docker') {
+    const out = result.stdout.toLowerCase().trim();
+    if (out === 'running') return 'running';
+    if (out === 'exited' || out === 'created' || out === 'dead') return 'stopped';
+    if (out === 'restarting') return 'running';
+    if (out === 'paused') return 'stopped';
+    if (result.code !== 0) return 'unknown';
+    return 'stopped';
+  }
+
+  return 'unknown';
+}
+
+function readServicesFromConfig() {
+  const cfg = readSiteConfig();
+  const services = cfg?.services;
+  if (!Array.isArray(services)) return [];
+  return services.filter(s => {
+    if (!s || typeof s.id !== 'string' || !s.id.length) return false;
+    if (typeof s.name !== 'string' || !s.name.length) return false;
+    if (!VALID_SERVICE_TYPES.has(s.type)) {
+      console.warn(`[Service] Skipping service '${sanitizeLogParam(s.id)}': invalid type '${sanitizeLogParam(s.type)}'`);
+      return false;
+    }
+    if (!SERVICE_NAME_PATTERN.test(s.service)) {
+      console.warn(`[Service] Skipping service '${sanitizeLogParam(s.id)}': invalid service name '${sanitizeLogParam(s.service)}'`);
+      return false;
+    }
+    if (s.host !== 'local' && (!s.host || typeof s.host.credentialsFrom !== 'string' || !isValidDeviceId(s.host.credentialsFrom))) {
+      console.warn(`[Service] Skipping service '${sanitizeLogParam(s.id)}': invalid host config`);
+      return false;
+    }
+    return true;
+  });
+}
+
+async function executeServiceCommand(serviceConfig, action) {
+  const command = buildServiceCommand(serviceConfig.type, action, serviceConfig.service);
+  if (!command) return { stdout: '', stderr: 'Invalid command', code: -1 };
+
+  if (serviceConfig.host === 'local') {
+    return localCommandWithOutput(command);
+  }
+
+  // Remote via SSH
+  const credId = serviceConfig.host.credentialsFrom;
+  const creds = readControlDeviceCredentials(credId);
+  const controlDevices = readControlDevicesFromConfig();
+  const controlDevice = controlDevices.find(d => d.id === credId);
+
+  if (!controlDevice || !creds.sshUser || !creds.sshPassword) {
+    return { stdout: '', stderr: 'SSH credentials not configured', code: -1 };
+  }
+
+  const sshConfig = {
+    ipAddress: controlDevice.ip,
+    sshUser: creds.sshUser,
+    sshPassword: creds.sshPassword,
+    sshPort: creds.sshPort || 22,
+  };
+
+  return sshServiceCommandWithOutput(sshConfig, command);
+}
+
+// Rate limiting for service actions
+const serviceActionLimits = new Map();
+const SERVICE_ACTION_LIMIT_WINDOW = 60000;
+const SERVICE_ACTION_LIMIT_MAX = 10;
+
+function checkServiceActionRateLimit(ip) {
+  const now = Date.now();
+  const data = serviceActionLimits.get(ip);
+  if (!data || now - data.windowStart > SERVICE_ACTION_LIMIT_WINDOW) {
+    serviceActionLimits.set(ip, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (data.count >= SERVICE_ACTION_LIMIT_MAX) return false;
+  data.count++;
+  return true;
+}
+
+const serviceStatusLimits = new Map();
+const SERVICE_STATUS_LIMIT_WINDOW = 60000;
+const SERVICE_STATUS_LIMIT_MAX = 120;
+
+function checkServiceStatusRateLimit(ip) {
+  const now = Date.now();
+  const data = serviceStatusLimits.get(ip);
+  if (!data || now - data.windowStart > SERVICE_STATUS_LIMIT_WINDOW) {
+    serviceStatusLimits.set(ip, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (data.count >= SERVICE_STATUS_LIMIT_MAX) return false;
+  data.count++;
+  return true;
+}
+
+function logServiceAction(serviceId, action, ip, success, details = '') {
+  const timestamp = new Date().toISOString();
+  console.log(`[SERVICE-AUDIT] ${timestamp} | ${sanitizeLogParam(serviceId)} | ${sanitizeLogParam(action)} | IP: ${sanitizeLogParam(ip)} | Success: ${success} | ${sanitizeLogParam(details)}`);
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // WOL-Zeitplan (Schedule) – Automatisches Wake/Shutdown per Cron
 // ═══════════════════════════════════════════════════════════════════
 
@@ -3658,6 +3942,73 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
     res.json({ success: true, message: `${action} command sent` });
   } catch {
     logControlAction(deviceId, action.toUpperCase(), clientIp, false, 'SSH failed');
+    res.status(500).json({ success: false, message: `${action} failed` });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Service / Container Management – API Endpoints
+// ═══════════════════════════════════════════════════════════════════
+
+app.get('/api/services/:serviceId/status', authRequired, async (req, res) => {
+  const clientIp = getClientIp(req);
+  if (!checkServiceStatusRateLimit(clientIp)) {
+    return res.status(429).json({ status: 'unknown' });
+  }
+
+  const serviceId = req.params.serviceId;
+  if (!isValidDeviceId(serviceId)) {
+    return res.status(400).json({ status: 'unknown' });
+  }
+
+  const services = readServicesFromConfig();
+  const svc = services.find(s => s.id === serviceId);
+  if (!svc) {
+    return res.status(404).json({ status: 'unknown' });
+  }
+
+  try {
+    const result = await executeServiceCommand(svc, 'status');
+    const status = parseServiceStatus(svc.type, svc.service, result);
+    res.json({ status });
+  } catch {
+    res.json({ status: 'unknown' });
+  }
+});
+
+app.post('/api/services/:serviceId/:action', authRequired, async (req, res) => {
+  const clientIp = getClientIp(req);
+  if (!checkServiceActionRateLimit(clientIp)) {
+    return res.status(429).json({ success: false, message: 'Too many requests' });
+  }
+
+  const { serviceId, action } = req.params;
+  if (!isValidDeviceId(serviceId)) {
+    return res.status(400).json({ success: false, message: 'Invalid service ID' });
+  }
+  if (!VALID_SERVICE_ACTIONS.has(action)) {
+    return res.status(400).json({ success: false, message: 'Invalid action' });
+  }
+
+  const services = readServicesFromConfig();
+  const svc = services.find(s => s.id === serviceId);
+  if (!svc) {
+    logServiceAction(serviceId, action, clientIp, false, 'Service not found');
+    return res.status(404).json({ success: false, message: 'Service not found' });
+  }
+
+  try {
+    const result = await executeServiceCommand(svc, action);
+    const success = result.code === 0;
+    logServiceAction(serviceId, action.toUpperCase(), clientIp, success, `Exit: ${result.code}`);
+    if (success) {
+      res.json({ success: true, message: `${action} command sent` });
+    } else {
+      console.error(`[Service] ${sanitizeLogParam(action)} failed for ${sanitizeLogParam(serviceId)}: ${sanitizeLogParam(result.stderr)}`);
+      res.status(500).json({ success: false, message: `${action} failed` });
+    }
+  } catch {
+    logServiceAction(serviceId, action.toUpperCase(), clientIp, false, 'Execution error');
     res.status(500).json({ success: false, message: `${action} failed` });
   }
 });

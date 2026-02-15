@@ -98,6 +98,19 @@ const translations = {
     'control.connectionError': 'Verbindungsfehler',
     'control.noDevices': 'Keine Geräte konfiguriert',
 
+    // Services
+    'service.start': 'Start',
+    'service.shutdown': 'Shutdown',
+    'service.restart': 'Restart',
+    'service.startSuccess': 'Start-Befehl gesendet!',
+    'service.shutdownSuccess': 'Shutdown-Befehl gesendet!',
+    'service.restartSuccess': 'Restart-Befehl gesendet!',
+    'service.status.running': 'Aktiv',
+    'service.status.stopped': 'Gestoppt',
+    'service.status.error': 'Fehler',
+    'service.status.unknown': 'Unbekannt',
+    'service.connectionError': 'Verbindungsfehler',
+
     // Zeitplan (Schedule)
     'schedule.nextWake': 'Nächstes Hochfahren',
     'schedule.nextShutdown': 'Nächste Abschaltung',
@@ -402,6 +415,19 @@ const translations = {
     'control.restartSuccess': 'Restart command sent!',
     'control.connectionError': 'Connection error',
     'control.noDevices': 'No devices configured',
+
+    // Services
+    'service.start': 'Start',
+    'service.shutdown': 'Shutdown',
+    'service.restart': 'Restart',
+    'service.startSuccess': 'Start command sent!',
+    'service.shutdownSuccess': 'Shutdown command sent!',
+    'service.restartSuccess': 'Restart command sent!',
+    'service.status.running': 'Running',
+    'service.status.stopped': 'Stopped',
+    'service.status.error': 'Error',
+    'service.status.unknown': 'Unknown',
+    'service.connectionError': 'Connection error',
 
     // Schedule
     'schedule.nextWake': 'Next wake-up',
