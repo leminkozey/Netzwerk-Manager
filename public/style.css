@@ -884,7 +884,7 @@ label {
 
 .card:hover .icon-badge,
 .section-title:hover .icon-badge,
-.uptime-col:has(.card:hover) > .section-title .icon-badge {
+.device-info-col:has(.card:hover) > .section-title .icon-badge {
   transform: scale(1.08);
   box-shadow: 0 0 calc(14px * var(--glow-strength)) var(--accent-glow);
 }
@@ -897,7 +897,7 @@ label {
 }
 .card:hover .icon-green,
 .section-title:hover .icon-green,
-.uptime-col:has(.card:hover) > .section-title .icon-green {
+.device-info-col:has(.card:hover) > .section-title .icon-green {
   background: rgba(34, 197, 94, 0.25);
   box-shadow: 0 0 calc(14px * var(--glow-strength)) rgba(34, 197, 94, 0.4);
 }
@@ -987,8 +987,24 @@ label {
 }
 .card:hover .icon-badge[data-icon="uptime"] svg .clock-hand,
 .section-title:hover .icon-badge[data-icon="uptime"] svg .clock-hand,
-.uptime-col:has(.card:hover) > .section-title .icon-badge[data-icon="uptime"] svg .clock-hand {
+.device-info-col:has(.card:hover) > .section-title .icon-badge[data-icon="uptime"] svg .clock-hand {
   animation: clock-spin 2s linear infinite;
+}
+
+/* --- Device Info: Puls-Linie animiert sich --- */
+@keyframes pulse-draw {
+  from { stroke-dashoffset: 40; }
+  to   { stroke-dashoffset: 0; }
+}
+.icon-badge svg .pulse-line {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.card:hover .icon-badge[data-icon="deviceInfo"] svg .pulse-line,
+.section-title:hover .icon-badge[data-icon="deviceInfo"] svg .pulse-line,
+.device-info-col:has(.card:hover) > .section-title .icon-badge[data-icon="deviceInfo"] svg .pulse-line {
+  animation: pulse-draw 1.5s ease-in-out infinite;
 }
 
 /* --- Speedtest: Tachonadel schwingt --- */

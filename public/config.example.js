@@ -350,18 +350,45 @@ const siteConfig = {
   analysen: {
     speedtest: true,            // Internet-Geschwindigkeit (Speed-Test)
     outages: true,              // Ausfälle-Card
-    uptime: true,               // Uptime-Monitoring-Cards
+    uptime: true,               // Geräte Info / Uptime-Monitoring-Cards
     pingMonitor: true,          // Ping-Monitor (Latenz-Messung)
     pihole: true,               // Pi-hole DNS Analytics
   },
 
-  // ── Uptime Monitoring ──
+  // ── Geräte Info / Uptime Monitoring ──
   // Ping-Intervall und Geräte für die Uptime-Überwachung.
+  // Optional: stats-Property für CPU, RAM, Temperatur pro Gerät.
+  //   stats.type: 'local' (lokaler Server) oder 'ssh-linux' (per SSH)
+  //   stats.credentialsFrom: ID eines Control-Devices (SSH-Daten wiederverwenden)
+  //   stats.credentials: { sshUser, sshPassword, sshPort } (Inline, wird beim Start verschlüsselt)
   uptimeInterval: 10,           // Intervall in Sekunden (Minimum: 10)
   uptimeDevices: [
+    // Gerät ohne Stats → zeigt 24h/7d Uptime-Balken
     { id: 'router',    name: 'Router',     ip: '192.168.1.1' },
+
+    // Gerät mit Stats via SSH (Credentials aus Control Center)
+    // {
+    //   id: 'pihole', name: 'PiHole', ip: '192.168.1.100',
+    //   stats: {
+    //     type: 'ssh-linux',
+    //     credentialsFrom: 'piholeControl',
+    //   },
+    // },
+
+    // Gerät mit Stats via SSH (eigene Credentials)
+    // {
+    //   id: 'nas', name: 'NAS', ip: '192.168.1.200',
+    //   stats: {
+    //     type: 'ssh-linux',
+    //     credentials: { sshUser: 'admin', sshPassword: 'password', sshPort: 22 },
+    //   },
+    // },
+
     { id: 'pihole',    name: 'PiHole',     ip: '192.168.1.100' },
     { id: 'windowspc', name: 'Windows PC', ip: '192.168.1.50' },
+
+    // Lokaler Server (der Pi selbst)
+    // { id: 'localhost', name: 'Pi Server', ip: '127.0.0.1', stats: { type: 'local' } },
   ],
 
   // ── Pi-hole v6 DNS Analytics ──

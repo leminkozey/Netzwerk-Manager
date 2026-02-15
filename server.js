@@ -9,7 +9,7 @@ const crypto = require('crypto');
 const { randomUUID } = crypto;
 const WebSocket = require('ws');
 const dgram = require('dgram');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const cron = require('node-cron');
 let nodemailer;
 try { nodemailer = require('nodemailer'); } catch { nodemailer = null; }
@@ -185,6 +185,9 @@ const runtime = {
   sockets: new Map(), // token -> WebSocket
 };
 
+// In-memory device stats cache (deviceId → stats object), NOT persisted
+const deviceStatsCache = new Map();
+
 function broadcastToAll(type, data) {
   if (runtime.sockets.size === 0) return;
   if (!isSessionValid()) return;
@@ -346,6 +349,15 @@ app.get('/config.js', (req, res) => {
   }
   if (safe.notifications) {
     safe.notifications = { enabled: !!safe.notifications.enabled };
+  }
+  // Strip stats credentials from uptimeDevices
+  if (Array.isArray(safe.uptimeDevices)) {
+    for (const d of safe.uptimeDevices) {
+      if (d.stats) {
+        delete d.stats.credentials;
+        delete d.stats.credentialsFrom;
+      }
+    }
   }
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
@@ -1396,19 +1408,29 @@ function readSiteConfig() {
 // Read uptimeDevices from public/config.js
 function isUptimeEnabled() {
   const cfg = readSiteConfig();
+  // Support both old 'uptime' and new 'deviceInfo' config keys
+  if (cfg?.analysen?.deviceInfo === false) return false;
   return cfg?.analysen?.uptime !== false;
 }
 
 function readUptimeDevicesFromConfig() {
   const cfg = readSiteConfig();
-  if (cfg?.analysen?.uptime === false) return [];
+  if (cfg?.analysen?.uptime === false && cfg?.analysen?.deviceInfo === false) return [];
   const devices = cfg?.uptimeDevices;
   if (!Array.isArray(devices)) return [];
   return devices.filter(d =>
     d && typeof d.id === 'string' && d.id.length > 0
       && typeof d.name === 'string' && d.name.length > 0
       && typeof d.ip === 'string' && VALIDATION.ipAddress.test(d.ip)
-  );
+  ).map(d => {
+    const base = { id: d.id, name: d.name, ip: d.ip };
+    const VALID_STATS_TYPES = new Set(['local', 'ssh-linux']);
+    if (d.stats && typeof d.stats === 'object' && VALID_STATS_TYPES.has(d.stats.type)) {
+      base.stats = { ...d.stats };
+      if (base.stats.credentials) base.stats.credentials = { ...base.stats.credentials };
+    }
+    return base;
+  });
 }
 
 // Read uptimeInterval (seconds) from config, minimum 10s, default 60s
@@ -1493,6 +1515,23 @@ async function runUptimePingCycle() {
   }
 
   saveUptimeData(data);
+
+  // Collect device stats (in parallel) for online devices with stats config
+  const statsDevices = configDevices.filter((cd, i) => cd.stats && pingResults[i]);
+  if (statsDevices.length > 0) {
+    const statsResults = await Promise.all(
+      statsDevices.map(cd => collectDeviceStats(cd).catch(() => null))
+    );
+    for (let i = 0; i < statsDevices.length; i++) {
+      deviceStatsCache.set(statsDevices[i].id, statsResults[i]);
+    }
+  }
+  // Clear stats for offline devices
+  for (let i = 0; i < configDevices.length; i++) {
+    if (!pingResults[i] && configDevices[i].stats) {
+      deviceStatsCache.set(configDevices[i].id, null);
+    }
+  }
 }
 
 function buildUptimeResponse() {
@@ -1521,6 +1560,9 @@ function buildUptimeResponse() {
       : 0;
     const onlineSince = effectiveDuration > 0 ? formatDuration(effectiveDuration) : null;
 
+    const hasStats = !!(cd.stats);
+    const stats = hasStats ? (deviceStatsCache.get(cd.id) || null) : undefined;
+
     return {
       id: cd.id,
       name: cd.name,
@@ -1531,6 +1573,8 @@ function buildUptimeResponse() {
       onlineSince,
       onlineSinceTs,
       pausedAtTs,
+      hasStats,
+      stats,
     };
   });
 
@@ -1823,7 +1867,7 @@ function sshCommand(config, command) {
     }, 15000);
 
     sshpass.stderr.on('data', (data) => {
-      stderr += data.toString();
+      if (stderr.length < 65536) stderr += data.toString();
     });
 
     sshpass.on('close', (code) => {
@@ -1850,6 +1894,211 @@ function sshCommand(config, command) {
       }
     });
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Device Stats Collection (CPU, RAM, Temperature)
+// ═══════════════════════════════════════════════════════════════════
+
+const ALLOWED_STATS_COMMANDS = new Set([
+  'cat /proc/loadavg',
+  'nproc',
+  'cat /sys/class/thermal/thermal_zone0/temp',
+  'cat /proc/meminfo',
+]);
+
+function sshCommandWithOutput(config, command) {
+  return new Promise((resolve, reject) => {
+    if (!ALLOWED_STATS_COMMANDS.has(command)) {
+      return reject(new Error('Stats command not allowed'));
+    }
+
+    const { ipAddress, sshUser, sshPort } = config;
+    const sshPassword = config._sshPasswordDecrypted || decryptValue(config.sshPassword);
+
+    if (!VALIDATION.ipAddress.test(ipAddress)) return reject(new Error('Invalid IP address'));
+    if (!VALIDATION.sshUser.test(sshUser)) return reject(new Error('Invalid SSH username'));
+    if (!VALIDATION.sshPort(sshPort)) return reject(new Error('Invalid SSH port'));
+    if (typeof sshPassword !== 'string' || sshPassword.length === 0) return reject(new Error('SSH password missing'));
+
+    const sshArgs = [
+      '-o', 'StrictHostKeyChecking=accept-new',
+      '-o', 'ConnectTimeout=5',
+      '-o', 'BatchMode=no',
+      '-p', String(sshPort),
+      `${sshUser}@${ipAddress}`,
+      command,
+    ];
+
+    const sshpass = spawn('sshpass', ['-e', 'ssh', ...sshArgs], {
+      env: { ...process.env, SSHPASS: sshPassword },
+    });
+
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        sshpass.kill();
+        reject(new Error('SSH stats timeout'));
+      }
+    }, 10000);
+
+    const MAX_OUTPUT = 512 * 1024; // 512 KB
+    sshpass.stdout.on('data', (data) => {
+      stdout += data.toString();
+      if (stdout.length > MAX_OUTPUT && !settled) {
+        settled = true; clearTimeout(timer); sshpass.kill();
+        reject(new Error('SSH output too large'));
+      }
+    });
+    sshpass.stderr.on('data', (data) => {
+      if (stderr.length < MAX_OUTPUT) stderr += data.toString();
+    });
+
+    sshpass.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (code === 0) {
+        resolve(stdout.trim());
+      } else {
+        reject(new Error(`Stats command failed (code ${code})`));
+      }
+    });
+
+    sshpass.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sshpass.kill();
+      reject(new Error(err.code === 'ENOENT' ? 'sshpass not installed' : 'SSH connection failed'));
+    });
+  });
+}
+
+function parseLinuxStats(loadavgStr, nprocStr, tempStr, meminfoStr) {
+  const result = {
+    cpuLoad: null, cpuCores: null, cpuLoadPercent: null,
+    temperature: null,
+    ramUsedBytes: null, ramTotalBytes: null, ramUsedPercent: null,
+  };
+
+  // Parse load average (1-min)
+  if (loadavgStr) {
+    const load1 = parseFloat(loadavgStr.split(' ')[0]);
+    if (!isNaN(load1)) result.cpuLoad = Math.round(load1 * 100) / 100;
+  }
+
+  // Parse core count
+  if (nprocStr) {
+    const cores = parseInt(nprocStr, 10);
+    if (!isNaN(cores) && cores > 0) result.cpuCores = cores;
+  }
+
+  // Calculate load percent
+  if (result.cpuLoad !== null && result.cpuCores !== null) {
+    result.cpuLoadPercent = Math.round((result.cpuLoad / result.cpuCores) * 10000) / 100;
+  }
+
+  // Parse temperature (millidegrees → °C)
+  if (tempStr) {
+    const raw = parseInt(tempStr, 10);
+    if (!isNaN(raw)) result.temperature = Math.round(raw / 100) / 10;
+  }
+
+  // Parse meminfo
+  if (meminfoStr) {
+    const lines = meminfoStr.split('\n');
+    let memTotal = null, memAvailable = null;
+    for (const line of lines) {
+      const match = line.match(/^(\w+):\s+(\d+)\s+kB/);
+      if (!match) continue;
+      if (match[1] === 'MemTotal') memTotal = parseInt(match[2], 10) * 1024;
+      if (match[1] === 'MemAvailable') memAvailable = parseInt(match[2], 10) * 1024;
+    }
+    if (memTotal !== null && memAvailable !== null) {
+      result.ramTotalBytes = memTotal;
+      result.ramUsedBytes = memTotal - memAvailable;
+      result.ramUsedPercent = Math.round((result.ramUsedBytes / memTotal) * 10000) / 100;
+    }
+  }
+
+  return result;
+}
+
+function readLocalStats() {
+  try {
+    const loadavgStr = fs.readFileSync('/proc/loadavg', 'utf-8').trim();
+    let nprocStr = null;
+    try {
+      nprocStr = execSync('nproc', { timeout: 2000, encoding: 'utf-8' }).trim();
+    } catch { /* ignore */ }
+    let tempStr = null;
+    try {
+      tempStr = fs.readFileSync('/sys/class/thermal/thermal_zone0/temp', 'utf-8').trim();
+    } catch { /* ignore — not all Linux systems have thermal zones */ }
+    const meminfoStr = fs.readFileSync('/proc/meminfo', 'utf-8');
+    return parseLinuxStats(loadavgStr, nprocStr, tempStr, meminfoStr);
+  } catch {
+    return null;
+  }
+}
+
+async function collectDeviceStats(deviceConfig) {
+  const { stats } = deviceConfig;
+  if (!stats) return null;
+
+  try {
+    if (stats.type === 'local') {
+      return readLocalStats();
+    }
+
+    if (stats.type === 'ssh-linux') {
+      // Resolve SSH credentials
+      let sshConfig;
+      if (stats.credentialsFrom) {
+        if (typeof stats.credentialsFrom !== 'string' || !/^[a-zA-Z0-9_-]{1,50}$/.test(stats.credentialsFrom)) return null;
+        const creds = readControlDeviceCredentials(stats.credentialsFrom);
+        if (!creds.sshUser || !creds.sshPassword) return null;
+        sshConfig = {
+          ipAddress: deviceConfig.ip,
+          sshUser: creds.sshUser,
+          sshPassword: creds.sshPassword,
+          _sshPasswordDecrypted: creds._sshPasswordDecrypted,
+          sshPort: creds.sshPort || 22,
+        };
+      } else if (stats.credentials) {
+        const pw = stats.credentials.sshPassword;
+        sshConfig = {
+          ipAddress: deviceConfig.ip,
+          sshUser: stats.credentials.sshUser,
+          sshPassword: pw,
+          _sshPasswordDecrypted: decryptValue(pw),
+          sshPort: stats.credentials.sshPort || 22,
+        };
+      } else {
+        return null;
+      }
+
+      // Run 4 SSH commands in parallel
+      const [loadavgStr, nprocStr, tempStr, meminfoStr] = await Promise.all([
+        sshCommandWithOutput(sshConfig, 'cat /proc/loadavg').catch(() => null),
+        sshCommandWithOutput(sshConfig, 'nproc').catch(() => null),
+        sshCommandWithOutput(sshConfig, 'cat /sys/class/thermal/thermal_zone0/temp').catch(() => null),
+        sshCommandWithOutput(sshConfig, 'cat /proc/meminfo').catch(() => null),
+      ]);
+
+      return parseLinuxStats(loadavgStr, nprocStr, tempStr, meminfoStr);
+    }
+
+    return null;
+  } catch (err) {
+    console.error(`[Stats] Error collecting stats for ${deviceConfig.id}:`, err.message);
+    return null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3974,6 +4223,37 @@ function startServer() {
   setInterval(() => {
     initScheduler();
   }, 60000);
+
+  // Encrypt inline stats credentials on startup (if plaintext)
+  try {
+    const cfgPath = path.join(__dirname, 'public', 'config.js');
+    if (fs.existsSync(cfgPath)) {
+      let cfgSrc = fs.readFileSync(cfgPath, 'utf-8');
+      let changed = false;
+      const cfg = readSiteConfig();
+      const devices = cfg?.uptimeDevices;
+      if (Array.isArray(devices)) {
+        for (const d of devices) {
+          if (d?.stats?.credentials?.sshPassword && !d.stats.credentials.sshPassword.startsWith('enc:')) {
+            const plain = d.stats.credentials.sshPassword;
+            const encrypted = encryptValue(plain);
+            // Context-aware replacement: match sshPassword property assignment
+            const escaped = plain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(sshPassword\\s*:\\s*['"])${escaped}(['"])`, 'g');
+            cfgSrc = cfgSrc.replace(regex, `$1${encrypted}$2`);
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        fs.writeFileSync(cfgPath, cfgSrc, 'utf-8');
+        _siteConfigCache = null; // Invalidate config cache
+        console.log('[Stats] Inline credentials encrypted in config.js');
+      }
+    }
+  } catch (err) {
+    console.error('[Stats] Failed to encrypt inline credentials:', err.message);
+  }
 
   // Uptime monitoring: first ping after 5s, then recursive setTimeout (re-reads interval each cycle)
   if (isUptimeEnabled()) {

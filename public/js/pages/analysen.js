@@ -25,6 +25,7 @@ const iconColors = {
   speedtest: 'icon-orange',
   speedtestColor: '',
   uptime: 'icon-green',
+  deviceInfo: 'icon-green',
   traffic: 'icon-cyan',
   linkSpeed: 'icon-yellow',
   outage: 'icon-red',
@@ -691,7 +692,7 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
 
   const animItems = []; // { barFill, numEl, pct, idx }
 
-  function uptimeBar(label, pct, barColor, idx) {
+  function uptimeBar(label, pct, barColor, idx, customValue) {
     const barFill = el('div', {
       style: {
         height: '100%', width: '0%', borderRadius: '3px',
@@ -699,7 +700,8 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
         transition: 'width 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
       },
     });
-    const numEl = createScrollNumber(pct + '%');
+    const displayValue = customValue || (Math.round(pct * 10) / 10 + '%');
+    const numEl = createScrollNumber(displayValue);
     numEl.style.minWidth = '42px';
     numEl.style.textAlign = 'right';
     numEl.style.fontSize = '0.8rem';
@@ -727,6 +729,61 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
       }, [barFill]),
       numEl,
     ]);
+  }
+
+  // Build content area based on stats availability
+  const contentChildren = [];
+
+  if (d.hasStats && d.stats) {
+    // Stats mode: CPU Load bar + RAM bar + Temperature
+    const cpuPct = d.stats.cpuLoadPercent ?? 0;
+    const cpuColor = cpuPct < 60 ? '#22c55e' : cpuPct < 85 ? '#f59e0b' : '#ef4444';
+    const cpuLabel = `${t('analysen.cpuLoad')}`;
+    contentChildren.push(uptimeBar(cpuLabel, Math.min(cpuPct, 100), cpuColor, 0));
+
+    const ramPct = d.stats.ramUsedPercent ?? 0;
+    const ramColor = ramPct < 70 ? '#22c55e' : ramPct < 85 ? '#f59e0b' : '#ef4444';
+    // Format RAM values as GB
+    const ramUsedGB = d.stats.ramUsedBytes ? (d.stats.ramUsedBytes / (1024 ** 3)).toFixed(1) : '?';
+    const ramTotalGB = d.stats.ramTotalBytes ? (d.stats.ramTotalBytes / (1024 ** 3)).toFixed(1) : '?';
+    contentChildren.push(uptimeBar(`${t('analysen.ram')}`, Math.min(ramPct, 100), ramColor, 1, `${ramUsedGB}/${ramTotalGB} GB`));
+
+    // Temperature display
+    if (d.stats.temperature !== null && d.stats.temperature !== undefined) {
+      const temp = d.stats.temperature;
+      const tempColor = temp < 60 ? '#22c55e' : temp < 75 ? '#f59e0b' : '#ef4444';
+      contentChildren.push(el('div', {
+        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' },
+      }, [
+        el('span', {
+          textContent: t('analysen.temperature'),
+          style: {
+            fontSize: '0.7rem', fontWeight: '600',
+            color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em',
+          },
+        }),
+        el('span', {
+          textContent: `${temp}°C`,
+          style: {
+            fontSize: '0.8rem', fontWeight: '700',
+            fontFamily: "'JetBrains Mono', monospace", color: tempColor,
+          },
+        }),
+      ]));
+    }
+  } else if (d.hasStats && !d.stats) {
+    // Stats configured but not available (offline or error)
+    contentChildren.push(el('div', {
+      textContent: t('analysen.statsUnavailable'),
+      style: {
+        padding: '8px 0', fontSize: '0.78rem', color: 'var(--text-muted)',
+        fontStyle: 'italic', textAlign: 'center',
+      },
+    }));
+  } else {
+    // Classic mode: 24h/7d uptime bars
+    contentChildren.push(uptimeBar('24h', pct24, barColor24, 0));
+    contentChildren.push(uptimeBar('7d', pct7d, barColor7d, 1));
   }
 
   const card = el('div', { className: 'card', style: { marginBottom: '0' } }, [
@@ -767,9 +824,8 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
     }),
     // Live timer
     timerEl,
-    // Bars
-    uptimeBar('24h', pct24, barColor24, 0),
-    uptimeBar('7d', pct7d, barColor7d, 1),
+    // Content (stats or bars)
+    ...contentChildren,
   ]);
 
   const animKey = 'uptime-' + d.name;
@@ -1759,11 +1815,11 @@ export function renderAnalysen(container) {
   // Uptime (third column)
   let uptimeGrid = null;
   if (showUptime) {
-    const uptimeCol = el('div', { className: 'uptime-col' });
+    const uptimeCol = el('div', { className: 'device-info-col' });
     uptimeCol.appendChild(el('div', { className: 'section-title', style: { marginBottom: '12px' } }, [
       el('div', { className: 'section-header' }, [
-        el('span', { className: 'icon-badge icon-green', 'data-icon': 'uptime' }, [iconEl('uptime', 22)]),
-        el('h3', { textContent: t('analysen.uptime') }),
+        el('span', { className: 'icon-badge icon-green', 'data-icon': 'deviceInfo' }, [iconEl('deviceInfo', 22)]),
+        el('h3', { textContent: t('analysen.deviceInfo') }),
       ]),
     ]));
 

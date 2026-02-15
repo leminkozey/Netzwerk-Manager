@@ -227,6 +227,13 @@ export const icons = {
     <polyline class="clock-hand" points="12 6 12 12 16 14"/>
   </svg>`,
 
+  deviceInfo: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect class="monitor-frame" x="2" y="3" width="20" height="14" rx="2"/>
+    <polyline class="pulse-line" points="6 10 9 7 11 12 13 8 15 11 18 10"/>
+    <line x1="8" y1="21" x2="16" y2="21"/>
+    <line x1="12" y1="17" x2="12" y2="21"/>
+  </svg>`,
+
   traffic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 2v20"/>
     <path class="traffic-up" d="M8 6l4-4 4 4"/>

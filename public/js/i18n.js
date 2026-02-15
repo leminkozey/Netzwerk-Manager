@@ -250,6 +250,11 @@ const translations = {
     // Analysen
     'analysen.speedtest': 'Internet-Geschwindigkeit',
     'analysen.uptime': 'Uptime',
+    'analysen.deviceInfo': 'Geräte Info',
+    'analysen.cpuLoad': 'CPU-Last',
+    'analysen.temperature': 'Temperatur',
+    'analysen.ram': 'RAM',
+    'analysen.statsUnavailable': 'Stats nicht verfügbar',
     'analysen.traffic': 'Datenverkehr',
     'analysen.linkspeed': 'Link-Geschwindigkeit',
     'analysen.outages': 'Ausfälle',
@@ -547,6 +552,11 @@ const translations = {
 
     'analysen.speedtest': 'Internet Speed',
     'analysen.uptime': 'Uptime',
+    'analysen.deviceInfo': 'Device Info',
+    'analysen.cpuLoad': 'CPU Load',
+    'analysen.temperature': 'Temperature',
+    'analysen.ram': 'RAM',
+    'analysen.statsUnavailable': 'Stats unavailable',
     'analysen.traffic': 'Data Traffic',
     'analysen.linkspeed': 'Link Speed',
     'analysen.outages': 'Outages',
