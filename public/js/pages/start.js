@@ -281,14 +281,16 @@ function buildServiceTile(service, isDestroyed) {
         } finally {
           btn.disabled = false;
         }
-        // Re-poll status after action with delay
-        setTimeout(() => {
-          if (isDestroyed()) return;
-          api.getServiceStatus(service.id).then(data => {
+        // Re-poll status after action with retry sequence
+        for (const delay of [1500, 4000, 8000]) {
+          setTimeout(() => {
             if (isDestroyed()) return;
-            if (data) updateStatus(data.status || 'unknown');
-          }).catch(() => {});
-        }, 1500);
+            api.getServiceStatus(service.id).then(data => {
+              if (isDestroyed()) return;
+              if (data) updateStatus(data.status || 'unknown');
+            }).catch(() => {});
+          }, delay);
+        }
       },
     }, [iconEl(cfg.icon, 32), el('span', { textContent: t(cfg.label) })]);
     return btn;
@@ -525,17 +527,16 @@ export function renderStart(container) {
   async function pollServiceStatus() {
     if (destroyed || serviceTiles.length === 0) return;
 
-    const results = await Promise.allSettled(
-      serviceTiles.map(st => api.getServiceStatus(st.serviceId))
-    );
-
-    for (let i = 0; i < serviceTiles.length; i++) {
+    try {
+      const statuses = await api.getAllServiceStatuses();
       if (destroyed) return;
-      const result = results[i];
-      if (result.status === 'fulfilled') {
-        serviceTiles[i].updateStatus(result.value.status || 'unknown');
-      } else {
-        serviceTiles[i].updateStatus('unknown');
+      for (const st of serviceTiles) {
+        st.updateStatus(statuses[st.serviceId] || 'unknown');
+      }
+    } catch {
+      if (destroyed) return;
+      for (const st of serviceTiles) {
+        st.updateStatus('unknown');
       }
     }
   }

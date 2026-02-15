@@ -340,6 +340,12 @@ export async function getServiceStatus(serviceId) {
   return res.json();
 }
 
+export async function getAllServiceStatuses() {
+  const res = await request('/api/services/status');
+  if (!res.ok) return {};
+  return res.json();
+}
+
 export async function serviceAction(serviceId, action) {
   const res = await request(`/api/services/${encodeURIComponent(serviceId)}/${encodeURIComponent(action)}`, {
     method: 'POST',

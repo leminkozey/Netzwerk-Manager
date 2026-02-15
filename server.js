@@ -2223,10 +2223,16 @@ const SERVICE_COMMANDS = {
     status:  name => `systemctl is-active ${name}`,
   },
   pm2: {
-    start:   name => `pm2 start ${name}`,
-    stop:    name => `pm2 stop ${name}`,
-    restart: name => `pm2 restart ${name}`,
-    status:  () => `pm2 resurrect 2>/dev/null; pm2 jlist`,
+    start:   (name, hostType) => hostType === 'ssh-windows'
+      ? `pm2 resurrect 2>nul & pm2 start ${name}`
+      : `pm2 resurrect 2>/dev/null; pm2 start ${name}`,
+    stop:    (name, hostType) => hostType === 'ssh-windows'
+      ? `pm2 resurrect 2>nul & pm2 stop ${name}`
+      : `pm2 resurrect 2>/dev/null; pm2 stop ${name}`,
+    restart: (name, hostType) => hostType === 'ssh-windows'
+      ? `pm2 resurrect 2>nul & pm2 restart ${name}`
+      : `pm2 resurrect 2>/dev/null; pm2 restart ${name}`,
+    status:  () => `pm2 jlist`,
   },
   docker: {
     start:   name => `docker start ${name}`,
@@ -2236,11 +2242,11 @@ const SERVICE_COMMANDS = {
   },
 };
 
-function buildServiceCommand(type, action, serviceName) {
+function buildServiceCommand(type, action, serviceName, hostType) {
   if (!SERVICE_NAME_PATTERN.test(serviceName)) return null;
   const template = SERVICE_COMMANDS[type]?.[action];
   if (!template) return null;
-  return template(serviceName);
+  return template(serviceName, hostType);
 }
 
 function localCommandWithOutput(command) {
@@ -2338,6 +2344,10 @@ function sshServiceCommandWithOutput(config, command) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      // Log when SSH accepts a new host key (MITM-relevant first-connection event)
+      if (stderr.includes('Permanently added')) {
+        console.warn(`[Service-SSH] New host key accepted for ${sanitizeLogParam(ipAddress)} — verify this is expected`);
+      }
       resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code: code ?? -1 });
     });
 
@@ -2393,11 +2403,18 @@ function parseServiceStatus(type, serviceName, result) {
   return 'unknown';
 }
 
+let _servicesCache = null;
+let _servicesCacheTime = 0;
+
 function readServicesFromConfig() {
+  const now = Date.now();
+  if (_servicesCache !== null && (now - _servicesCacheTime) < SITE_CONFIG_TTL) {
+    return _servicesCache;
+  }
   const cfg = readSiteConfig();
   const services = cfg?.services;
-  if (!Array.isArray(services)) return [];
-  return services.filter(s => {
+  if (!Array.isArray(services)) { _servicesCache = []; _servicesCacheTime = now; return []; }
+  const result = services.filter(s => {
     if (!s || typeof s.id !== 'string' || !s.id.length) return false;
     if (typeof s.name !== 'string' || !s.name.length) return false;
     if (!VALID_SERVICE_TYPES.has(s.type)) {
@@ -2414,13 +2431,16 @@ function readServicesFromConfig() {
     }
     return true;
   });
+  _servicesCache = result;
+  _servicesCacheTime = now;
+  return result;
 }
 
 async function executeServiceCommand(serviceConfig, action) {
-  const command = buildServiceCommand(serviceConfig.type, action, serviceConfig.service);
-  if (!command) return { stdout: '', stderr: 'Invalid command', code: -1 };
-
   if (serviceConfig.host === 'local') {
+    const localHostType = process.platform === 'win32' ? 'ssh-windows' : 'ssh-linux';
+    const command = buildServiceCommand(serviceConfig.type, action, serviceConfig.service, localHostType);
+    if (!command) return { stdout: '', stderr: 'Invalid command', code: -1 };
     return localCommandWithOutput(command);
   }
 
@@ -2434,10 +2454,14 @@ async function executeServiceCommand(serviceConfig, action) {
     return { stdout: '', stderr: 'SSH credentials not configured', code: -1 };
   }
 
+  const command = buildServiceCommand(serviceConfig.type, action, serviceConfig.service, controlDevice.type);
+  if (!command) return { stdout: '', stderr: 'Invalid command', code: -1 };
+
   const sshConfig = {
     ipAddress: controlDevice.ip,
     sshUser: creds.sshUser,
     sshPassword: creds.sshPassword,
+    _sshPasswordDecrypted: creds._sshPasswordDecrypted,
     sshPort: creds.sshPort || 22,
   };
 
@@ -3950,6 +3974,86 @@ app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
 // Service / Container Management – API Endpoints
 // ═══════════════════════════════════════════════════════════════════
 
+// Batch status endpoint — MUST be registered before :serviceId routes
+app.get('/api/services/status', authRequired, async (req, res) => {
+  const clientIp = getClientIp(req);
+  if (!checkServiceStatusRateLimit(clientIp)) {
+    return res.status(429).json({});
+  }
+
+  const services = readServicesFromConfig();
+  if (services.length === 0) return res.json({});
+
+  // Group services by host key to deduplicate SSH sessions
+  const hostGroups = new Map();
+  for (const svc of services) {
+    const hostKey = svc.host === 'local' ? '_local' : svc.host.credentialsFrom;
+    if (!hostGroups.has(hostKey)) {
+      hostGroups.set(hostKey, { services: [] });
+    }
+    hostGroups.get(hostKey).services.push(svc);
+  }
+
+  const statuses = {};
+
+  // Process each host group in parallel
+  await Promise.allSettled([...hostGroups.entries()].map(async ([hostKey, group]) => {
+    const byType = new Map();
+    for (const svc of group.services) {
+      if (!byType.has(svc.type)) byType.set(svc.type, []);
+      byType.get(svc.type).push(svc);
+    }
+
+    for (const [type, svcs] of byType) {
+      // PM2: one `pm2 jlist` returns all processes — run once, parse for each service
+      if (type === 'pm2') {
+        try {
+          const statusCmd = buildServiceCommand('pm2', 'status', svcs[0].service, hostKey === '_local'
+            ? (process.platform === 'win32' ? 'ssh-windows' : 'ssh-linux')
+            : undefined);
+          let result;
+          if (hostKey === '_local') {
+            result = await localCommandWithOutput(statusCmd);
+          } else {
+            const creds = readControlDeviceCredentials(hostKey);
+            const controlDevices = readControlDevicesFromConfig();
+            const controlDevice = controlDevices.find(d => d.id === hostKey);
+            if (!controlDevice || !creds.sshUser || !creds.sshPassword) {
+              for (const svc of svcs) statuses[svc.id] = 'unknown';
+              continue;
+            }
+            const sshConfig = {
+              ipAddress: controlDevice.ip,
+              sshUser: creds.sshUser,
+              sshPassword: creds.sshPassword,
+              _sshPasswordDecrypted: creds._sshPasswordDecrypted,
+              sshPort: creds.sshPort || 22,
+            };
+            result = await sshServiceCommandWithOutput(sshConfig, statusCmd);
+          }
+          for (const svc of svcs) {
+            statuses[svc.id] = parseServiceStatus('pm2', svc.service, result);
+          }
+        } catch {
+          for (const svc of svcs) statuses[svc.id] = 'unknown';
+        }
+      } else {
+        // systemd / docker: one command per service (can't batch)
+        await Promise.allSettled(svcs.map(async (svc) => {
+          try {
+            const result = await executeServiceCommand(svc, 'status');
+            statuses[svc.id] = parseServiceStatus(svc.type, svc.service, result);
+          } catch {
+            statuses[svc.id] = 'unknown';
+          }
+        }));
+      }
+    }
+  }));
+
+  res.json(statuses);
+});
+
 app.get('/api/services/:serviceId/status', authRequired, async (req, res) => {
   const clientIp = getClientIp(req);
   if (!checkServiceStatusRateLimit(clientIp)) {
@@ -4004,7 +4108,7 @@ app.post('/api/services/:serviceId/:action', authRequired, async (req, res) => {
     if (success) {
       res.json({ success: true, message: `${action} command sent` });
     } else {
-      console.error(`[Service] ${sanitizeLogParam(action)} failed for ${sanitizeLogParam(serviceId)}: ${sanitizeLogParam(result.stderr)}`);
+      console.error(`[Service] ${sanitizeLogParam(action)} failed for ${sanitizeLogParam(serviceId)}: ${sanitizeLogParam(result.stderr.slice(0, 200))}`);
       res.status(500).json({ success: false, message: `${action} failed` });
     }
   } catch {
@@ -4573,6 +4677,18 @@ function startServer() {
       }
     }
 
+    // Cleanup service rate limits
+    for (const [ip, data] of serviceActionLimits.entries()) {
+      if (data.windowStart < oneHourAgo) {
+        serviceActionLimits.delete(ip);
+      }
+    }
+    for (const [ip, data] of serviceStatusLimits.entries()) {
+      if (data.windowStart < oneHourAgo) {
+        serviceStatusLimits.delete(ip);
+      }
+    }
+
     // Cleanup notification cooldowns (older than 1 hour)
     for (const [key, ts] of _notificationCooldowns.entries()) {
       if (ts < oneHourAgo) {
@@ -4617,6 +4733,7 @@ function startServer() {
       if (changed) {
         fs.writeFileSync(cfgPath, cfgSrc, 'utf-8');
         _siteConfigCache = null; // Invalidate config cache
+        _servicesCache = null;  // Invalidate services cache
         console.log('[Stats] Inline credentials encrypted in config.js');
       }
     }
