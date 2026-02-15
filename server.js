@@ -13,6 +13,10 @@ const { spawn, execSync } = require('child_process');
 const cron = require('node-cron');
 let nodemailer;
 try { nodemailer = require('nodemailer'); } catch { nodemailer = null; }
+let OTPAuth;
+try { OTPAuth = require('otpauth'); } catch { OTPAuth = null; }
+let QRCode;
+try { QRCode = require('qrcode'); } catch { QRCode = null; }
 
 // ═══════════════════════════════════════════════════════════════════
 // Security Utilities
@@ -187,6 +191,169 @@ const runtime = {
 
 // In-memory device stats cache (deviceId → stats object), NOT persisted
 const deviceStatsCache = new Map();
+
+// ── TOTP + Terminal ──
+runtime.terminalSessions = new Map(); // token -> { expiresAt, ip, username }
+
+const TOTP_FILE = path.join(__dirname, 'Data', 'totp.json');
+
+function readTotpData() {
+  try {
+    if (fs.existsSync(TOTP_FILE)) {
+      return JSON.parse(fs.readFileSync(TOTP_FILE, 'utf-8'));
+    }
+  } catch (err) {
+    console.error('[TOTP] Failed to read totp.json:', err.message);
+  }
+  return {};
+}
+
+function saveTotpData(data) {
+  atomicWriteFileSync(TOTP_FILE, JSON.stringify(data, null, 2), { mode: 0o600 });
+}
+
+function verifyTotpCode(username, code) {
+  if (!OTPAuth) return false;
+  const data = readTotpData();
+  const entry = data[username];
+  if (!entry || !entry.secret || !entry.confirmed) return false;
+  const secret = decryptValue(entry.secret);
+  if (!secret) return false;
+  const totp = new OTPAuth.TOTP({
+    issuer: 'Netzwerk Manager',
+    label: username,
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secret),
+  });
+  const delta = totp.validate({ token: String(code), window: 1 });
+  return delta !== null;
+}
+
+// Terminal rate limiting
+const terminalCommandLimits = new Map();
+const TERMINAL_COMMAND_LIMIT_WINDOW = 60000;
+const TERMINAL_COMMAND_LIMIT_MAX = 20;
+
+function checkTerminalCommandRateLimit(ip) {
+  const now = Date.now();
+  const data = terminalCommandLimits.get(ip);
+  if (!data || now - data.windowStart > TERMINAL_COMMAND_LIMIT_WINDOW) {
+    terminalCommandLimits.set(ip, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (data.count >= TERMINAL_COMMAND_LIMIT_MAX) return false;
+  data.count++;
+  return true;
+}
+
+// Terminal audit logging
+const TERMINAL_AUDIT_FILE = path.join(__dirname, 'Data', 'terminal-audit.json');
+const TERMINAL_AUDIT_MAX = 1000;
+
+function logTerminalAudit(entry) {
+  const timestamp = new Date().toISOString();
+  console.log(`[TERMINAL-AUDIT] ${timestamp} | User: ${sanitizeLogParam(entry.username)} | Device: ${sanitizeLogParam(entry.deviceId)} | IP: ${sanitizeLogParam(entry.ip)} | Command: ${sanitizeLogParam(entry.command)} | Exit: ${entry.exitCode}`);
+  try {
+    let audit = [];
+    if (fs.existsSync(TERMINAL_AUDIT_FILE)) {
+      audit = JSON.parse(fs.readFileSync(TERMINAL_AUDIT_FILE, 'utf-8'));
+      if (!Array.isArray(audit)) audit = [];
+    }
+    audit.push({ ...entry, timestamp });
+    if (audit.length > TERMINAL_AUDIT_MAX) {
+      audit = audit.slice(audit.length - TERMINAL_AUDIT_MAX);
+    }
+    atomicWriteFileSync(TERMINAL_AUDIT_FILE, JSON.stringify(audit, null, 2), { mode: 0o600 });
+  } catch { /* ignore */ }
+}
+
+function terminalAuthRequired(req, res, next) {
+  const token = req.headers['x-terminal-token'];
+  if (!token) return res.status(401).json({ expired: true });
+  const session = runtime.terminalSessions.get(token);
+  if (!session || Date.now() > session.expiresAt) {
+    if (session) runtime.terminalSessions.delete(token);
+    return res.status(401).json({ expired: true });
+  }
+  // Bind session to original IP
+  const clientIp = getClientIp(req);
+  if (session.ip !== clientIp) {
+    runtime.terminalSessions.delete(token);
+    console.warn(`[TERMINAL] Token IP mismatch: session=${sanitizeLogParam(session.ip)} request=${sanitizeLogParam(clientIp)}`);
+    return res.status(401).json({ expired: true });
+  }
+  req.terminalSession = session;
+  next();
+}
+
+function sshTerminalCommand(config, command, timeoutSec) {
+  return new Promise((resolve) => {
+    const { ipAddress, sshUser, sshPort } = config;
+    const sshPassword = config._sshPasswordDecrypted || decryptValue(config.sshPassword);
+
+    if (!VALIDATION.ipAddress.test(ipAddress)) return resolve({ stdout: '', stderr: 'Invalid IP', code: -1 });
+    if (!VALIDATION.sshUser.test(sshUser)) return resolve({ stdout: '', stderr: 'Invalid SSH user', code: -1 });
+    if (!VALIDATION.sshPort(sshPort)) return resolve({ stdout: '', stderr: 'Invalid SSH port', code: -1 });
+    if (typeof sshPassword !== 'string' || sshPassword.length === 0) return resolve({ stdout: '', stderr: 'SSH password missing', code: -1 });
+
+    const sshArgs = [
+      '-o', 'StrictHostKeyChecking=accept-new',
+      '-o', 'ConnectTimeout=5',
+      '-o', 'BatchMode=no',
+      '-p', String(sshPort),
+      `${sshUser}@${ipAddress}`,
+      command,
+    ];
+
+    const sshpass = spawn('sshpass', ['-e', 'ssh', ...sshArgs], {
+      env: { ...process.env, SSHPASS: sshPassword },
+    });
+
+    let settled = false;
+    let stdout = '';
+    let stderr = '';
+    const MAX_OUTPUT = 1024 * 1024; // 1MB
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        sshpass.kill();
+        resolve({ stdout: stdout.trim(), stderr: 'Command timeout', code: -1 });
+      }
+    }, (timeoutSec || 30) * 1000);
+
+    sshpass.stdout.on('data', (data) => {
+      stdout += data.toString();
+      if (stdout.length > MAX_OUTPUT && !settled) {
+        settled = true; clearTimeout(timer); sshpass.kill();
+        resolve({ stdout: stdout.substring(0, MAX_OUTPUT).trim(), stderr: 'Output too large', code: -1 });
+      }
+    });
+    sshpass.stderr.on('data', (data) => {
+      if (stderr.length < MAX_OUTPUT) stderr += data.toString();
+    });
+
+    sshpass.on('close', (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (stderr.includes('Permanently added')) {
+        console.warn(`[Terminal-SSH] New host key accepted for ${sanitizeLogParam(ipAddress)}`);
+      }
+      resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code: code ?? -1 });
+    });
+
+    sshpass.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      sshpass.kill();
+      resolve({ stdout: '', stderr: err.code === 'ENOENT' ? 'sshpass not installed' : 'SSH connection failed', code: -1 });
+    });
+  });
+}
 
 function broadcastToAll(type, data) {
   if (runtime.sockets.size === 0) return;
@@ -2842,6 +3009,8 @@ app.post('/api/logout', authRequired, (req, res) => {
     try { ws.close(4000, 'Logged out'); } catch { /* already closed */ }
   }
   runtime.sockets = new Map();
+  // Invalidate all terminal sessions
+  runtime.terminalSessions.clear();
   res.json({ ok: true });
 });
 
@@ -4548,6 +4717,326 @@ app.get('/api/ping-monitor', authRequired, (req, res) => {
   res.json(buildPingMonitorResponse());
 });
 
+// ═══════════════════════════════════════════════════════════════════
+// TOTP 2FA Endpoints
+// ═══════════════════════════════════════════════════════════════════
+
+app.get('/api/totp/status', authRequired, (req, res) => {
+  const state = readState();
+  const username = state.credentials?.username || 'admin';
+  const data = readTotpData();
+  const entry = data[username];
+  res.json({ configured: !!(entry && entry.confirmed) });
+});
+
+app.post('/api/totp/setup', authRequired, async (req, res) => {
+  if (!OTPAuth || !QRCode) {
+    return res.status(500).json({ error: 'TOTP dependencies not installed' });
+  }
+  const { currentPassword } = req.body || {};
+  if (!currentPassword || typeof currentPassword !== 'string') {
+    return res.status(400).json({ error: 'Current password required' });
+  }
+
+  // Verify password
+  const result = await withStateLock(() => {
+    const state = readState();
+    const fileCredentials = readCredentialsFile();
+    if (fileCredentials) {
+      state.credentials = { ...state.credentials, ...fileCredentials };
+    }
+    const storedPw = state.credentials.password;
+    let valid = false;
+    if (isHashedPassword(storedPw)) {
+      valid = verifyPassword(currentPassword, storedPw);
+    } else {
+      valid = timingSafeEqual(currentPassword, storedPw || '');
+    }
+    return { valid, username: state.credentials.username || 'admin' };
+  });
+
+  if (!result.valid) {
+    return res.status(403).json({ error: 'Wrong password' });
+  }
+
+  // Reject if TOTP is already confirmed (must disable first)
+  const existingData = readTotpData();
+  if (existingData[result.username]?.confirmed) {
+    return res.status(400).json({ error: 'TOTP already configured. Disable it first.' });
+  }
+
+  // Generate TOTP secret
+  const secret = new OTPAuth.Secret({ size: 20 });
+  const totp = new OTPAuth.TOTP({
+    issuer: 'Netzwerk Manager',
+    label: result.username,
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+    secret,
+  });
+
+  const otpauthUrl = totp.toString();
+
+  try {
+    const qrDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+    // Save encrypted secret (not yet confirmed)
+    const data = readTotpData();
+    data[result.username] = {
+      secret: encryptValue(secret.base32),
+      confirmed: false,
+      createdAt: Date.now(),
+    };
+    saveTotpData(data);
+
+    res.json({ qrDataUrl, secret: secret.base32 });
+  } catch (err) {
+    console.error('[TOTP] Setup error:', err.message);
+    res.status(500).json({ error: 'TOTP setup failed' });
+  }
+});
+
+app.post('/api/totp/verify', authRequired, (req, res) => {
+  if (!OTPAuth) return res.status(500).json({ error: 'TOTP not available' });
+  const { code } = req.body || {};
+  if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+    return res.status(400).json({ success: false });
+  }
+
+  const state = readState();
+  const username = state.credentials?.username || 'admin';
+  const data = readTotpData();
+  const entry = data[username];
+
+  if (!entry || !entry.secret) {
+    return res.status(400).json({ success: false });
+  }
+
+  const secret = decryptValue(entry.secret);
+  if (!secret) return res.status(500).json({ success: false });
+
+  const totp = new OTPAuth.TOTP({
+    issuer: 'Netzwerk Manager',
+    label: username,
+    algorithm: 'SHA1',
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secret),
+  });
+
+  const delta = totp.validate({ token: code, window: 1 });
+  if (delta !== null) {
+    data[username].confirmed = true;
+    saveTotpData(data);
+    console.log(`[TOTP] 2FA confirmed for user ${sanitizeLogParam(username)}`);
+    return res.json({ success: true });
+  }
+
+  res.json({ success: false });
+});
+
+app.post('/api/totp/disable', authRequired, async (req, res) => {
+  const { currentPassword, code } = req.body || {};
+  if (!currentPassword || typeof currentPassword !== 'string') {
+    return res.status(400).json({ error: 'Password required' });
+  }
+  if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+    return res.status(400).json({ error: 'Invalid code' });
+  }
+
+  // Verify password
+  const result = await withStateLock(() => {
+    const state = readState();
+    const fileCredentials = readCredentialsFile();
+    if (fileCredentials) {
+      state.credentials = { ...state.credentials, ...fileCredentials };
+    }
+    const storedPw = state.credentials.password;
+    let valid = false;
+    if (isHashedPassword(storedPw)) {
+      valid = verifyPassword(currentPassword, storedPw);
+    } else {
+      valid = timingSafeEqual(currentPassword, storedPw || '');
+    }
+    return { valid, username: state.credentials.username || 'admin' };
+  });
+
+  if (!result.valid) {
+    return res.status(403).json({ error: 'Wrong password' });
+  }
+
+  // Verify TOTP code
+  if (!verifyTotpCode(result.username, code)) {
+    return res.status(403).json({ error: 'Invalid code' });
+  }
+
+  // Delete TOTP entry
+  const data = readTotpData();
+  delete data[result.username];
+  saveTotpData(data);
+  console.log(`[TOTP] 2FA disabled for user ${sanitizeLogParam(result.username)}`);
+
+  res.json({ ok: true });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// Terminal Endpoints
+// ═══════════════════════════════════════════════════════════════════
+
+app.post('/api/terminal/auth', authRequired, (req, res) => {
+  const { code } = req.body || {};
+  if (!code || typeof code !== 'string' || !/^\d{6}$/.test(code)) {
+    return res.status(400).json({ success: false });
+  }
+
+  const cfg = readSiteConfig();
+  if (!cfg?.terminal?.enabled) {
+    return res.status(403).json({ success: false, error: 'Terminal not enabled' });
+  }
+
+  const state = readState();
+  const username = state.credentials?.username || 'admin';
+
+  if (!verifyTotpCode(username, code)) {
+    return res.json({ success: false });
+  }
+
+  // Limit: max 3 active terminal sessions per user
+  const MAX_TERMINAL_SESSIONS = 3;
+  let userSessionCount = 0;
+  for (const [, s] of runtime.terminalSessions) {
+    if (s.username === username && Date.now() <= s.expiresAt) userSessionCount++;
+  }
+  if (userSessionCount >= MAX_TERMINAL_SESSIONS) {
+    // Evict oldest session for this user
+    let oldestToken = null, oldestTime = Infinity;
+    for (const [tok, s] of runtime.terminalSessions) {
+      if (s.username === username && s.expiresAt < oldestTime) {
+        oldestToken = tok;
+        oldestTime = s.expiresAt;
+      }
+    }
+    if (oldestToken) runtime.terminalSessions.delete(oldestToken);
+  }
+
+  // Create terminal token
+  const token = randomUUID();
+  const timeoutMin = Math.max(1, Math.min(60, Number(cfg.terminal.totpTimeout) || 5));
+  const expiresAt = Date.now() + timeoutMin * 60 * 1000;
+  const clientIp = getClientIp(req);
+
+  runtime.terminalSessions.set(token, { expiresAt, ip: clientIp, username });
+  console.log(`[TERMINAL] Session created for ${sanitizeLogParam(username)} from ${sanitizeLogParam(clientIp)} (${timeoutMin}min)`);
+
+  res.json({ success: true, terminalToken: token, expiresAt });
+});
+
+app.get('/api/terminal/devices', authRequired, terminalAuthRequired, (req, res) => {
+  const cfg = readSiteConfig();
+  const configDevices = cfg?.controlDevices;
+  if (!Array.isArray(configDevices)) return res.json({ devices: [] });
+
+  const allowedIds = Array.isArray(cfg?.terminal?.devices) && cfg.terminal.devices.length > 0
+    ? new Set(cfg.terminal.devices)
+    : null;
+
+  const devices = configDevices
+    .filter(d => {
+      if (!d || !d.id || !d.ip) return false;
+      if (d.show === false) return false;
+      if (allowedIds && !allowedIds.has(d.id)) return false;
+      return true;
+    })
+    .map(d => ({
+      id: d.id,
+      name: d.name,
+      icon: d.icon || 'server',
+      ip: d.ip,
+    }));
+
+  res.json({ devices });
+});
+
+app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req, res) => {
+  const { deviceId, command, totpCode } = req.body || {};
+  const clientIp = getClientIp(req);
+
+  // Validate inputs
+  if (!deviceId || typeof deviceId !== 'string' || !isValidDeviceId(deviceId)) {
+    return res.status(400).json({ success: false, error: 'Invalid device ID' });
+  }
+  if (!command || typeof command !== 'string' || command.length > 2000) {
+    return res.status(400).json({ success: false, error: 'Invalid command' });
+  }
+
+  // Rate limit
+  if (!checkTerminalCommandRateLimit(clientIp)) {
+    return res.status(429).json({ success: false, rateLimited: true, error: 'Rate limited' });
+  }
+
+  const cfg = readSiteConfig();
+  if (!cfg?.terminal?.enabled) {
+    return res.status(403).json({ success: false, error: 'Terminal not enabled' });
+  }
+
+  // Check device is allowed
+  const configDevices = cfg.controlDevices || [];
+  const allowedIds = Array.isArray(cfg.terminal?.devices) && cfg.terminal.devices.length > 0
+    ? new Set(cfg.terminal.devices)
+    : null;
+  const device = configDevices.find(d => d.id === deviceId);
+  if (!device || (allowedIds && !allowedIds.has(deviceId))) {
+    return res.status(404).json({ success: false, error: 'Device not found or not allowed' });
+  }
+
+  // Check dangerous commands
+  const dangerousPatterns = cfg.terminal?.dangerousCommands || [];
+  const isDangerous = dangerousPatterns.some(pattern => command.includes(pattern));
+  if (isDangerous) {
+    if (!totpCode || !/^\d{6}$/.test(totpCode)) {
+      return res.json({ success: false, dangerous: true, error: 'Dangerous command requires TOTP confirmation' });
+    }
+    if (!verifyTotpCode(req.terminalSession.username, totpCode)) {
+      return res.json({ success: false, dangerous: true, error: 'Invalid TOTP code' });
+    }
+  }
+
+  // Get device credentials
+  const creds = readControlDeviceCredentials(deviceId);
+  if (!creds.sshUser || !creds.sshPassword) {
+    return res.status(400).json({ success: false, error: 'SSH credentials not configured for this device' });
+  }
+
+  const sshConfig = {
+    ipAddress: device.ip,
+    sshUser: creds.sshUser,
+    sshPassword: creds.sshPassword,
+    sshPort: creds.sshPort || 22,
+  };
+
+  const timeoutSec = Math.max(5, Math.min(120, Number(cfg.terminal.commandTimeout) || 30));
+  const result = await sshTerminalCommand(sshConfig, command, timeoutSec);
+
+  // Audit log
+  logTerminalAudit({
+    username: req.terminalSession.username,
+    ip: clientIp,
+    deviceId,
+    command: command.substring(0, 500),
+    exitCode: result.code,
+    dangerous: isDangerous,
+  });
+
+  res.json({
+    success: result.code === 0,
+    stdout: result.stdout,
+    stderr: result.stderr,
+    exitCode: result.code,
+    dangerous: isDangerous,
+  });
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -4690,6 +5179,20 @@ function startServer() {
     for (const [key, ts] of _notificationCooldowns.entries()) {
       if (ts < oneHourAgo) {
         _notificationCooldowns.delete(key);
+      }
+    }
+
+    // Cleanup expired terminal sessions
+    for (const [token, session] of runtime.terminalSessions.entries()) {
+      if (now > session.expiresAt) {
+        runtime.terminalSessions.delete(token);
+      }
+    }
+
+    // Cleanup terminal command rate limits
+    for (const [ip, data] of terminalCommandLimits.entries()) {
+      if (data.windowStart < oneHourAgo) {
+        terminalCommandLimits.delete(ip);
       }
     }
   }, 900000); // Every 15 minutes

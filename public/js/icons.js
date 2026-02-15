@@ -318,6 +318,16 @@ export const icons = {
     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
     <line x1="12" y1="17" x2="12.01" y2="17"/>
   </svg>`,
+
+  terminal: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <polyline class="terminal-prompt" points="4 17 10 11 4 5"/>
+    <line x1="12" y1="19" x2="20" y2="19"/>
+  </svg>`,
+
+  shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2L3 7v6c0 5.25 3.82 10.13 9 11 5.18-.87 9-5.75 9-11V7l-9-5z"/>
+    <polyline points="9 12 11 14 15 10"/>
+  </svg>`,
 };
 
 Object.freeze(icons);

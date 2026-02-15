@@ -624,9 +624,16 @@ function createUserPanel() {
     }
   });
 
+  // TOTP 2FA section
+  const totpSection = el('div', { className: 'totp-section', id: 'totpSection' });
+  loadTotpSection(totpSection);
+
   return el('div', { className: 'settings-panel', id: 'panel-user' }, [
     el('h4', { textContent: t('settings.userPassword'), 'data-i18n': 'settings.userPassword' }),
     form,
+    el('hr', { className: 'settings-divider' }),
+    el('h4', { textContent: t('settings.totp2fa') }),
+    totpSection,
     el('hr', { className: 'settings-divider' }),
     el('button', {
       className: 'btn logout-btn',
@@ -638,6 +645,209 @@ function createUserPanel() {
       },
     }),
   ]);
+}
+
+async function loadTotpSection(container) {
+  try {
+    const status = await api.getTotpStatus();
+    container.replaceChildren();
+
+    if (status.configured) {
+      // TOTP is active - show status + disable button
+      container.appendChild(el('div', { className: 'totp-status-row' }, [
+        el('span', { className: 'totp-badge active', textContent: t('settings.totpEnabled') }),
+        el('button', {
+          className: 'btn danger',
+          textContent: t('settings.totpDisable'),
+          onClick: () => showTotpDisableForm(container),
+        }),
+      ]));
+    } else {
+      // TOTP not configured - show setup button
+      container.appendChild(el('div', { className: 'totp-status-row' }, [
+        el('span', { className: 'totp-badge inactive', textContent: t('settings.totpNotConfigured') }),
+        el('button', {
+          className: 'btn',
+          textContent: t('settings.totpSetup'),
+          onClick: () => showTotpSetupForm(container),
+        }),
+      ]));
+    }
+  } catch {
+    container.replaceChildren();
+    container.appendChild(el('span', { className: 'muted', textContent: t('msg.error') }));
+  }
+}
+
+function showTotpSetupForm(container) {
+  container.replaceChildren();
+
+  const pwInput = el('input', { type: 'password', placeholder: t('settings.currentPassword'), autocomplete: 'current-password' });
+  const statusMsg = el('div', { className: 'totp-status-msg' });
+  const setupBtn = el('button', { className: 'btn', textContent: t('settings.totpSetup') });
+
+  async function doSetup() {
+    const pw = pwInput.value;
+    if (!pw) return;
+    setupBtn.disabled = true;
+    statusMsg.textContent = '';
+
+    try {
+      const result = await api.setupTotp(pw);
+      if (result.error) {
+        statusMsg.textContent = result.error === 'Wrong password' ? t('settings.totpWrongPassword') : t('settings.totpError');
+        statusMsg.className = 'totp-status-msg error';
+        setupBtn.disabled = false;
+        return;
+      }
+
+      // Show QR code + verification
+      container.replaceChildren();
+      showTotpVerifyStep(container, result);
+    } catch {
+      statusMsg.textContent = t('settings.totpError');
+      statusMsg.className = 'totp-status-msg error';
+      setupBtn.disabled = false;
+    }
+  }
+
+  setupBtn.addEventListener('click', doSetup);
+  pwInput.addEventListener('keyup', e => { if (e.key === 'Enter') doSetup(); });
+
+  container.appendChild(el('div', { className: 'totp-setup-form' }, [
+    el('div', { className: 'input-row' }, [
+      el('label', { textContent: t('settings.currentPassword') }),
+      pwInput,
+    ]),
+    setupBtn,
+    statusMsg,
+  ]));
+}
+
+function showTotpVerifyStep(container, data) {
+  const qrImg = el('img', { src: data.qrDataUrl, className: 'totp-qr-img', alt: 'TOTP QR Code' });
+  const secretDisplay = el('code', { className: 'totp-secret-code', textContent: data.secret });
+  const codeInput = el('input', {
+    type: 'text',
+    className: 'totp-input',
+    maxLength: '6',
+    placeholder: '000000',
+    autocomplete: 'one-time-code',
+    inputMode: 'numeric',
+    pattern: '[0-9]{6}',
+  });
+  const statusMsg = el('div', { className: 'totp-status-msg' });
+  const verifyBtn = el('button', { className: 'btn', textContent: t('settings.totpVerify') });
+
+  async function doVerify() {
+    const code = codeInput.value.trim();
+    if (!/^\d{6}$/.test(code)) return;
+    verifyBtn.disabled = true;
+    statusMsg.textContent = '';
+
+    try {
+      const result = await api.verifyTotp(code);
+      if (result.success) {
+        showToast(t('settings.totpSuccess'));
+        loadTotpSection(container);
+      } else {
+        statusMsg.textContent = t('settings.totpWrongCode');
+        statusMsg.className = 'totp-status-msg error';
+        codeInput.value = '';
+        codeInput.focus();
+      }
+    } catch {
+      statusMsg.textContent = t('settings.totpError');
+      statusMsg.className = 'totp-status-msg error';
+    }
+    verifyBtn.disabled = false;
+  }
+
+  verifyBtn.addEventListener('click', doVerify);
+  codeInput.addEventListener('keyup', e => { if (e.key === 'Enter') doVerify(); });
+  codeInput.addEventListener('input', () => {
+    codeInput.value = codeInput.value.replace(/\D/g, '');
+    if (codeInput.value.length === 6) doVerify();
+  });
+
+  container.appendChild(el('div', { className: 'totp-verify-step' }, [
+    el('p', { textContent: t('settings.totpScanQr') }),
+    el('div', { className: 'totp-qr-container' }, [qrImg]),
+    el('p', { className: 'totp-manual-key' }, [
+      el('span', { textContent: t('settings.totpManualKey') + ' ' }),
+      secretDisplay,
+    ]),
+    el('p', { textContent: t('settings.totpEnterCode'), style: { marginTop: '16px' } }),
+    el('div', { className: 'totp-form' }, [
+      codeInput,
+      verifyBtn,
+    ]),
+    statusMsg,
+  ]));
+
+  setTimeout(() => codeInput.focus(), 50);
+}
+
+function showTotpDisableForm(container) {
+  container.replaceChildren();
+
+  const pwInput = el('input', { type: 'password', placeholder: t('settings.currentPassword'), autocomplete: 'current-password' });
+  const codeInput = el('input', {
+    type: 'text',
+    className: 'totp-input small',
+    maxLength: '6',
+    placeholder: '000000',
+    autocomplete: 'one-time-code',
+    inputMode: 'numeric',
+  });
+  const statusMsg = el('div', { className: 'totp-status-msg' });
+  const disableBtn = el('button', { className: 'btn danger', textContent: t('settings.totpDisable') });
+  const cancelBtn = el('button', { className: 'btn secondary', textContent: t('ui.cancel') });
+
+  cancelBtn.addEventListener('click', () => loadTotpSection(container));
+
+  async function doDisable() {
+    const pw = pwInput.value;
+    const code = codeInput.value.trim();
+    if (!pw || !/^\d{6}$/.test(code)) return;
+    disableBtn.disabled = true;
+    statusMsg.textContent = '';
+
+    try {
+      const result = await api.disableTotp(pw, code);
+      if (result.error) {
+        const msg = result.error === 'Wrong password' ? t('settings.totpWrongPassword') :
+                     result.error === 'Invalid code' ? t('settings.totpWrongCode') :
+                     t('settings.totpError');
+        statusMsg.textContent = msg;
+        statusMsg.className = 'totp-status-msg error';
+        disableBtn.disabled = false;
+        return;
+      }
+      showToast(t('settings.totpDisabled'));
+      loadTotpSection(container);
+    } catch {
+      statusMsg.textContent = t('settings.totpError');
+      statusMsg.className = 'totp-status-msg error';
+      disableBtn.disabled = false;
+    }
+  }
+
+  disableBtn.addEventListener('click', doDisable);
+
+  container.appendChild(el('div', { className: 'totp-disable-form' }, [
+    el('p', { textContent: t('settings.totpDisableHint') }),
+    el('div', { className: 'input-row' }, [
+      el('label', { textContent: t('settings.currentPassword') }),
+      pwInput,
+    ]),
+    el('div', { className: 'input-row' }, [
+      el('label', { textContent: t('settings.totpCodeLabel') }),
+      codeInput,
+    ]),
+    el('div', { className: 'totp-disable-actions' }, [cancelBtn, disableBtn]),
+    statusMsg,
+  ]));
 }
 
 // ── Credits Panel ──

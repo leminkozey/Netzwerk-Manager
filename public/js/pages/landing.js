@@ -59,8 +59,13 @@ export function renderLanding(container) {
     { key: 'info',     icon: 'info',     title: t('landing.info'),     sub: t('landing.infoSub'),     route: '/info' },
     { key: 'control',  icon: 'start',    title: t('landing.start'),    sub: t('landing.startSub'),    route: '/start' },
     { key: 'analysen', icon: 'analysen', title: t('landing.analysen'), sub: t('landing.analysenSub'), route: '/analysen' },
+    { key: 'terminal', icon: 'terminal', title: t('landing.terminal'), sub: t('landing.terminalSub'), route: '/terminal' },
   ];
-  const actions = allActions.filter(a => buttons[a.key] !== false);
+  const actions = allActions.filter(a => {
+    if (buttons[a.key] === false) return false;
+    if (a.key === 'terminal' && !cfg?.terminal?.enabled) return false;
+    return true;
+  });
 
   const btnRow = el('div', { className: 'landing-actions' });
   for (const action of actions) {

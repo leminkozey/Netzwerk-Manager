@@ -13,6 +13,7 @@ import { renderLanding } from './pages/landing.js';
 import { renderInfo } from './pages/info.js';
 import { renderStart } from './pages/start.js';
 import { renderAnalysen } from './pages/analysen.js';
+import { renderTerminal } from './pages/terminal.js';
 
 // ── Page cleanup tracking ──
 let currentCleanup = null;
@@ -151,6 +152,7 @@ const PAGE_TITLES = {
   '/info': 'page.info',
   '/start': 'page.start',
   '/analysen': 'page.analysen',
+  '/terminal': 'page.terminal',
 };
 
 let floatBarContext = null;
@@ -296,6 +298,7 @@ async function init() {
   registerRoute('/info', wrapPage(renderInfo));
   registerRoute('/start', wrapPage(renderStart));
   registerRoute('/analysen', wrapPage(renderAnalysen));
+  registerRoute('/terminal', wrapPage(renderTerminal));
 
   // Event listeners
   on('loggedOut', hideAppChrome);

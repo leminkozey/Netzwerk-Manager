@@ -387,6 +387,28 @@ const siteConfig = {
   ],
 
   // ┌─────────────────────────────────────────────┐
+  // │             WEB TERMINAL                    │
+  // └─────────────────────────────────────────────┘
+
+  // ── Web Terminal ──
+  // Ermöglicht die Ausführung von SSH-Befehlen direkt im Browser.
+  // Erfordert TOTP-2FA als Pflicht-Absicherung.
+  //
+  // ACHTUNG: Das Web Terminal erlaubt beliebige Befehle auf den
+  // konfigurierten Geräten. Nur aktivieren, wenn du weißt was du tust!
+  terminal: {
+    enabled: false,              // Master-Schalter
+    totpTimeout: 5,              // Minuten bis TOTP erneut nötig
+    devices: [],                 // controlDevice-IDs (leer = alle)
+    commandTimeout: 30,          // Sekunden pro Befehl
+    dangerousCommands: [         // Muster die Extra-TOTP brauchen
+      'rm -rf', 'rm -r', 'mkfs', 'dd if=', 'shutdown', 'reboot',
+      'halt', 'poweroff', 'chmod -R 777', 'iptables -F',
+      'systemctl stop', 'kill -9', 'pkill', 'wipefs',
+    ],
+  },
+
+  // ┌─────────────────────────────────────────────┐
   // │             ANALYSEN CENTER                 │
   // └─────────────────────────────────────────────┘
 

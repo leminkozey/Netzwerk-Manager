@@ -357,6 +357,67 @@ export async function serviceAction(serviceId, action) {
   return res.json();
 }
 
+// ── TOTP ──
+
+export async function getTotpStatus() {
+  const res = await request('/api/totp/status');
+  if (!res.ok) throw new Error('Failed to get TOTP status');
+  return res.json();
+}
+
+export async function setupTotp(currentPassword) {
+  const res = await request('/api/totp/setup', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword }),
+  });
+  return res.json();
+}
+
+export async function verifyTotp(code) {
+  const res = await request('/api/totp/verify', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  return res.json();
+}
+
+export async function disableTotp(currentPassword, code) {
+  const res = await request('/api/totp/disable', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, code }),
+  });
+  return res.json();
+}
+
+// ── Terminal ──
+
+export async function terminalAuth(code) {
+  const res = await request('/api/terminal/auth', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  });
+  return res.json();
+}
+
+export async function getTerminalDevices(token) {
+  const res = await request('/api/terminal/devices', {
+    headers: { 'X-Terminal-Token': token },
+  });
+  if (!res.ok) throw new Error('Failed to get terminal devices');
+  return res.json();
+}
+
+export async function terminalExecute(token, deviceId, command, totpCode) {
+  const body = { deviceId, command };
+  if (totpCode) body.totpCode = totpCode;
+  const res = await request('/api/terminal/execute', {
+    method: 'POST',
+    headers: { 'X-Terminal-Token': token },
+    body: JSON.stringify(body),
+  });
+  return res.json();
+}
+
 // ── Logout ──
 
 export async function logout() {
