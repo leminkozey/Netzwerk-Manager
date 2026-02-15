@@ -1515,23 +1515,41 @@ async function runUptimePingCycle() {
   }
 
   saveUptimeData(data);
+}
 
-  // Collect device stats (in parallel) for online devices with stats config
-  const statsDevices = configDevices.filter((cd, i) => cd.stats && pingResults[i]);
-  if (statsDevices.length > 0) {
-    const statsResults = await Promise.all(
-      statsDevices.map(cd => collectDeviceStats(cd).catch(() => null))
-    );
-    for (let i = 0; i < statsDevices.length; i++) {
-      deviceStatsCache.set(statsDevices[i].id, statsResults[i]);
-    }
+// Separate stats collection cycle (CPU, RAM, Temperature)
+async function runDeviceStatsCycle() {
+  const configDevices = readUptimeDevicesFromConfig();
+  const statsDevices = configDevices.filter(cd => cd.stats);
+  if (statsDevices.length === 0) return;
+
+  const data = readUptimeData();
+
+  const statsResults = await Promise.all(
+    statsDevices.map(cd => {
+      // Only collect stats for online devices
+      const dev = data.devices[cd.id];
+      const lastEntry = dev?.history?.length > 0 ? dev.history[dev.history.length - 1] : null;
+      const online = lastEntry ? lastEntry[1] : false;
+      if (!online) {
+        deviceStatsCache.set(cd.id, null);
+        return Promise.resolve(null);
+      }
+      return collectDeviceStats(cd).catch(() => null);
+    })
+  );
+
+  for (let i = 0; i < statsDevices.length; i++) {
+    deviceStatsCache.set(statsDevices[i].id, statsResults[i]);
   }
-  // Clear stats for offline devices
-  for (let i = 0; i < configDevices.length; i++) {
-    if (!pingResults[i] && configDevices[i].stats) {
-      deviceStatsCache.set(configDevices[i].id, null);
-    }
-  }
+}
+
+// Read statsInterval (seconds) from config, minimum 30s, default 60s
+function readStatsIntervalMs() {
+  const cfg = readSiteConfig();
+  const val = cfg?.statsInterval;
+  if (typeof val === 'number' && val >= 30) return val * 1000;
+  return 60000;
 }
 
 function buildUptimeResponse() {
@@ -4265,6 +4283,17 @@ function startServer() {
     setTimeout(scheduleUptime, 5000);
   } else {
     console.log('Uptime monitoring disabled in config');
+  }
+
+  // Device stats collection: separate cycle, first after 8s, then recursive setTimeout
+  const hasStatsDevices = readUptimeDevicesFromConfig().some(d => d.stats);
+  if (isUptimeEnabled() && hasStatsDevices) {
+    console.log(`Device stats interval: ${readStatsIntervalMs() / 1000}s`);
+    async function scheduleStats() {
+      try { await runDeviceStatsCycle(); broadcastToAll('uptime', buildUptimeResponse()); } catch (err) { console.error('[Stats] Cycle error:', err.message); }
+      setTimeout(scheduleStats, readStatsIntervalMs());
+    }
+    setTimeout(scheduleStats, 8000);
   }
 
   // Ping Monitor: first cycle after 7s, then recursive setTimeout (re-reads interval each cycle)

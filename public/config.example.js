@@ -361,7 +361,8 @@ const siteConfig = {
   //   stats.type: 'local' (lokaler Server) oder 'ssh-linux' (per SSH)
   //   stats.credentialsFrom: ID eines Control-Devices (SSH-Daten wiederverwenden)
   //   stats.credentials: { sshUser, sshPassword, sshPort } (Inline, wird beim Start verschlüsselt)
-  uptimeInterval: 10,           // Intervall in Sekunden (Minimum: 10)
+  uptimeInterval: 10,           // Ping-Intervall in Sekunden (Minimum: 10)
+  statsInterval: 60,            // Stats-Intervall in Sekunden (CPU/RAM/Temp, Minimum: 30)
   uptimeDevices: [
     // Gerät ohne Stats → zeigt 24h/7d Uptime-Balken
     { id: 'router',    name: 'Router',     ip: '192.168.1.1' },

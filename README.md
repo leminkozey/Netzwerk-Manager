@@ -634,13 +634,16 @@ cards: {
 
 ### Control Center
 
-### Geräte Info / Uptime Monitoring (`uptimeDevices`, `uptimeInterval`)
+### Geräte Info / Uptime Monitoring (`uptimeDevices`, `uptimeInterval`, `statsInterval`)
 
 Überwacht Geräte im Netzwerk per ICMP-Ping und zeigt den Live-Status im Frontend. Optional können CPU-Last, RAM-Auslastung und Temperatur pro Gerät angezeigt werden.
 
+**Ping und Stats laufen in getrennten Zyklen**, damit der Online-Status häufig aktualisiert wird, ohne die Stats-Abfrage (SSH-Verbindungen) unnötig oft auszuführen.
+
 | Option | Typ | Default | Beschreibung |
 |--------|-----|---------|--------------|
-| `uptimeInterval` | `number` | `10` | Ping-Intervall in Sekunden. Minimum: 10. |
+| `uptimeInterval` | `number` | `10` | Ping-Intervall in Sekunden (Online/Offline-Status). Minimum: 10. |
+| `statsInterval` | `number` | `60` | Stats-Intervall in Sekunden (CPU/RAM/Temperatur). Minimum: 30. |
 | `uptimeDevices` | `array` | `[]` | Liste der zu überwachenden Geräte. |
 
 Jedes Gerät hat folgende Felder:
@@ -694,12 +697,14 @@ uptimeDevices: [
 
 | Metrik | Quelle | Anzeige |
 |--------|--------|---------|
-| **CPU-Last** | `/proc/loadavg` + `nproc` | Balken mit Prozent (grün < 60%, gelb 60–85%, rot > 85%) |
-| **RAM** | `/proc/meminfo` | Balken mit GB-Anzeige (grün < 70%, gelb 70–85%, rot > 85%) |
-| **Temperatur** | `/sys/class/thermal/thermal_zone0/temp` | Wert in °C (grün < 60°, gelb 60–75°, rot > 75°) |
+| **CPU-Last** | `/proc/loadavg` + `nproc` | Balken mit Prozent, fließender Farbverlauf grün → gelb → rot |
+| **RAM** | `/proc/meminfo` | Balken mit GB-Anzeige (z.B. "0.4/0.9 GB"), fließender Farbverlauf |
+| **Temperatur** | `/sys/class/thermal/thermal_zone0/temp` | Balken mit °C-Wert, fließender Farbverlauf |
+
+Alle drei Metriken zeigen einen **fließenden Farbverlauf** von grün (niedrig) über gelb (mittel) bis rot (hoch) — kein hartes Umschalten, sondern stufenlose Interpolation.
 
 - Stats werden nur im RAM gehalten (flüchtig, nicht persistiert)
-- Bei jedem Ping-Zyklus werden die Stats parallel abgefragt und per WebSocket live gepusht
+- Stats werden in einem **eigenen Zyklus** abgefragt (`statsInterval`, default 60s), getrennt vom Ping-Zyklus (`uptimeInterval`, default 10s)
 - Geräte ohne `stats`-Property zeigen weiterhin die klassischen 24h/7d Uptime-Balken
 - Offline-Geräte zeigen keine Stats an
 
