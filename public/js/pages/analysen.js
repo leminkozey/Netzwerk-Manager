@@ -648,8 +648,8 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
   const statusText = isOnline ? 'Online' : 'Offline';
   const pct24 = d.uptime24h;
   const pct7d = d.uptime7d;
-  const barColor24 = pct24 >= 99 ? '#22c55e' : pct24 >= 95 ? '#f59e0b' : '#ef4444';
-  const barColor7d = pct7d >= 99 ? '#22c55e' : pct7d >= 95 ? '#f59e0b' : '#ef4444';
+  const barColor24 = pct24 >= 80 ? '#22c55e' : pct24 >= 60 ? '#f59e0b' : '#ef4444';
+  const barColor7d = pct7d >= 80 ? '#22c55e' : pct7d >= 60 ? '#f59e0b' : '#ef4444';
 
   // Timer element — ticks every second with scroll digits
   const timerStyle = {
@@ -745,13 +745,31 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
     const statsLabelW = '78px';
     const statsValueW = '72px';
 
+    // Smooth green → yellow → red color based on 0–100 value
+    function statColor(pct, greenMax, yellowMax) {
+      if (pct <= greenMax) {
+        // green → yellow
+        const t = pct / greenMax;
+        const r = Math.round(34 + t * (245 - 34));
+        const g = Math.round(197 + t * (158 - 197));
+        const b = Math.round(94 + t * (11 - 94));
+        return `rgb(${r},${g},${b})`;
+      }
+      // yellow → red
+      const t = Math.min((pct - greenMax) / (yellowMax - greenMax), 1);
+      const r = Math.round(245 + t * (239 - 245));
+      const g = Math.round(158 - t * 158);
+      const b = Math.round(11 + t * (68 - 11));
+      return `rgb(${r},${g},${b})`;
+    }
+
     const cpuPct = d.stats.cpuLoadPercent ?? 0;
-    const cpuColor = cpuPct < 60 ? '#22c55e' : cpuPct < 85 ? '#f59e0b' : '#ef4444';
+    const cpuColor = statColor(Math.min(cpuPct, 100), 50, 85);
     contentChildren.push(uptimeBar(t('analysen.cpuLoad'), Math.min(cpuPct, 100), cpuColor, 0,
       { labelWidth: statsLabelW, valueWidth: statsValueW }));
 
     const ramPct = d.stats.ramUsedPercent ?? 0;
-    const ramColor = ramPct < 70 ? '#22c55e' : ramPct < 85 ? '#f59e0b' : '#ef4444';
+    const ramColor = statColor(Math.min(ramPct, 100), 55, 85);
     const ramUsedGB = d.stats.ramUsedBytes ? (d.stats.ramUsedBytes / (1024 ** 3)).toFixed(1) : '?';
     const ramTotalGB = d.stats.ramTotalBytes ? (d.stats.ramTotalBytes / (1024 ** 3)).toFixed(1) : '?';
     contentChildren.push(uptimeBar(t('analysen.ram'), Math.min(ramPct, 100), ramColor, 1,
@@ -760,7 +778,7 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
     // Temperature as bar (0–100°C range)
     if (d.stats.temperature !== null && d.stats.temperature !== undefined) {
       const temp = d.stats.temperature;
-      const tempColor = temp < 60 ? '#22c55e' : temp < 75 ? '#f59e0b' : '#ef4444';
+      const tempColor = statColor(Math.min(temp, 100), 50, 75);
       const tempPct = Math.min(temp, 100);
       contentChildren.push(uptimeBar(t('analysen.temperature'), tempPct, tempColor, 2,
         { customValue: `${temp}°C`, labelWidth: statsLabelW, valueWidth: statsValueW }));
