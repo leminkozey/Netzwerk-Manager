@@ -692,7 +692,11 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
 
   const animItems = []; // { barFill, numEl, pct, idx }
 
-  function uptimeBar(label, pct, barColor, idx, customValue) {
+  function uptimeBar(label, pct, barColor, idx, opts) {
+    const customValue = typeof opts === 'string' ? opts : opts?.customValue;
+    const labelWidth = opts?.labelWidth || '28px';
+    const valueWidth = opts?.valueWidth || '42px';
+
     const barFill = el('div', {
       style: {
         height: '100%', width: '0%', borderRadius: '3px',
@@ -702,7 +706,7 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
     });
     const displayValue = customValue || (Math.round(pct * 10) / 10 + '%');
     const numEl = createScrollNumber(displayValue);
-    numEl.style.minWidth = '42px';
+    numEl.style.minWidth = valueWidth;
     numEl.style.textAlign = 'right';
     numEl.style.fontSize = '0.8rem';
     numEl.style.fontWeight = '700';
@@ -717,7 +721,8 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
       el('span', {
         textContent: label,
         style: {
-          minWidth: '28px', fontSize: '0.7rem', fontWeight: '600',
+          minWidth: labelWidth, width: labelWidth, flexShrink: '0',
+          fontSize: '0.7rem', fontWeight: '600',
           color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em',
         },
       }),
@@ -735,41 +740,30 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
   const contentChildren = [];
 
   if (d.hasStats && d.stats) {
-    // Stats mode: CPU Load bar + RAM bar + Temperature
+    // Stats mode: CPU Load bar + RAM bar + Temperature bar
+    // Use consistent label/value widths for alignment
+    const statsLabelW = '78px';
+    const statsValueW = '72px';
+
     const cpuPct = d.stats.cpuLoadPercent ?? 0;
     const cpuColor = cpuPct < 60 ? '#22c55e' : cpuPct < 85 ? '#f59e0b' : '#ef4444';
-    const cpuLabel = `${t('analysen.cpuLoad')}`;
-    contentChildren.push(uptimeBar(cpuLabel, Math.min(cpuPct, 100), cpuColor, 0));
+    contentChildren.push(uptimeBar(t('analysen.cpuLoad'), Math.min(cpuPct, 100), cpuColor, 0,
+      { labelWidth: statsLabelW, valueWidth: statsValueW }));
 
     const ramPct = d.stats.ramUsedPercent ?? 0;
     const ramColor = ramPct < 70 ? '#22c55e' : ramPct < 85 ? '#f59e0b' : '#ef4444';
-    // Format RAM values as GB
     const ramUsedGB = d.stats.ramUsedBytes ? (d.stats.ramUsedBytes / (1024 ** 3)).toFixed(1) : '?';
     const ramTotalGB = d.stats.ramTotalBytes ? (d.stats.ramTotalBytes / (1024 ** 3)).toFixed(1) : '?';
-    contentChildren.push(uptimeBar(`${t('analysen.ram')}`, Math.min(ramPct, 100), ramColor, 1, `${ramUsedGB}/${ramTotalGB} GB`));
+    contentChildren.push(uptimeBar(t('analysen.ram'), Math.min(ramPct, 100), ramColor, 1,
+      { customValue: `${ramUsedGB}/${ramTotalGB} GB`, labelWidth: statsLabelW, valueWidth: statsValueW }));
 
-    // Temperature display
+    // Temperature as bar (0–100°C range)
     if (d.stats.temperature !== null && d.stats.temperature !== undefined) {
       const temp = d.stats.temperature;
       const tempColor = temp < 60 ? '#22c55e' : temp < 75 ? '#f59e0b' : '#ef4444';
-      contentChildren.push(el('div', {
-        style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' },
-      }, [
-        el('span', {
-          textContent: t('analysen.temperature'),
-          style: {
-            fontSize: '0.7rem', fontWeight: '600',
-            color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em',
-          },
-        }),
-        el('span', {
-          textContent: `${temp}°C`,
-          style: {
-            fontSize: '0.8rem', fontWeight: '700',
-            fontFamily: "'JetBrains Mono', monospace", color: tempColor,
-          },
-        }),
-      ]));
+      const tempPct = Math.min(temp, 100);
+      contentChildren.push(uptimeBar(t('analysen.temperature'), tempPct, tempColor, 2,
+        { customValue: `${temp}°C`, labelWidth: statsLabelW, valueWidth: statsValueW }));
     }
   } else if (d.hasStats && !d.stats) {
     // Stats configured but not available (offline or error)
