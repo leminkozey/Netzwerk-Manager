@@ -592,9 +592,16 @@ function renderDynamic(page) {
             : buildGenericInfoCard(cardDef)
         );
 
-        const gridEl = el('div', { className: 'grid two equal-height' }, gridChildren);
-        if (i > 0) gridEl.style.marginTop = '16px';
-        page.appendChild(gridEl);
+        if (pair.length === 1) {
+          // Odd last card → full width, no grid wrapper
+          const solo = gridChildren[0];
+          if (i > 0) solo.style.marginTop = '16px';
+          page.appendChild(solo);
+        } else {
+          const gridEl = el('div', { className: 'grid two equal-height' }, gridChildren);
+          if (i > 0) gridEl.style.marginTop = '16px';
+          page.appendChild(gridEl);
+        }
       }
     }
   }
