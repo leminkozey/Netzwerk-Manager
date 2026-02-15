@@ -745,22 +745,21 @@ function buildDeviceUptimeCard(d, timerRefs, animBars, animScroll, animTimer) {
     const statsLabelW = '78px';
     const statsValueW = '72px';
 
-    // Smooth green → yellow → red color based on 0–100 value
+    // Smooth green → yellow → red color based on 0–100 value (returns hex for gradient compat)
     function statColor(pct, greenMax, yellowMax) {
+      let r, g, b;
       if (pct <= greenMax) {
-        // green → yellow
-        const t = pct / greenMax;
-        const r = Math.round(34 + t * (245 - 34));
-        const g = Math.round(197 + t * (158 - 197));
-        const b = Math.round(94 + t * (11 - 94));
-        return `rgb(${r},${g},${b})`;
+        const f = pct / greenMax;
+        r = Math.round(34 + f * (245 - 34));
+        g = Math.round(197 + f * (158 - 197));
+        b = Math.round(94 + f * (11 - 94));
+      } else {
+        const f = Math.min((pct - greenMax) / (yellowMax - greenMax), 1);
+        r = Math.round(245 + f * (239 - 245));
+        g = Math.round(158 - f * 158);
+        b = Math.round(11 + f * (68 - 11));
       }
-      // yellow → red
-      const t = Math.min((pct - greenMax) / (yellowMax - greenMax), 1);
-      const r = Math.round(245 + t * (239 - 245));
-      const g = Math.round(158 - t * 158);
-      const b = Math.round(11 + t * (68 - 11));
-      return `rgb(${r},${g},${b})`;
+      return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
     }
 
     const cpuPct = d.stats.cpuLoadPercent ?? 0;
