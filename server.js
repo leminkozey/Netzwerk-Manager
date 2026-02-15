@@ -2232,7 +2232,9 @@ const SERVICE_COMMANDS = {
     restart: (name, hostType) => hostType === 'ssh-windows'
       ? `pm2 resurrect 2>nul & pm2 restart ${name}`
       : `pm2 resurrect 2>/dev/null; pm2 restart ${name}`,
-    status:  () => `pm2 jlist`,
+    status:  (name, hostType) => hostType === 'ssh-windows'
+      ? 'pm2 resurrect 2>nul & pm2 jlist'
+      : 'pm2 resurrect 2>/dev/null; pm2 jlist',
   },
   docker: {
     start:   name => `docker start ${name}`,
