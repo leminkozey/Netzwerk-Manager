@@ -9,7 +9,7 @@ Eine Web-Anwendung zur Verwaltung, Dokumentation und Steuerung deines lokalen Ne
 - **PiHole-Infos** – IP, Hostname und URLs deines Pi-hole speichern
 - **Speedport-Infos** – WLAN-Daten und Passwörter dokumentieren
 - **Speed-Test** – Download, Upload und Ping im lokalen Netzwerk messen
-- **Uptime Monitoring** – Geräte per Ping überwachen mit Live-Status
+- **Geräte Info / Uptime Monitoring** – Geräte per Ping überwachen mit Live-Status, optional CPU-Last, RAM und Temperatur per SSH oder lokal
 - **Control Center** – Geräte per Wake-on-LAN, SSH-Shutdown und SSH-Restart steuern
 - **WOL-Zeitplan** – Automatisches Hochfahren und Herunterfahren von Geräten nach konfigurierbarem Zeitplan (Cron-basiert)
 - **Pi-hole DNS Analytics** – Statistiken, Top-Domains und Query-Verlauf direkt im Dashboard
@@ -634,9 +634,9 @@ cards: {
 
 ### Control Center
 
-### Uptime Monitoring (`uptimeDevices`, `uptimeInterval`)
+### Geräte Info / Uptime Monitoring (`uptimeDevices`, `uptimeInterval`)
 
-Überwacht Geräte im Netzwerk per ICMP-Ping und zeigt den Live-Status im Frontend.
+Überwacht Geräte im Netzwerk per ICMP-Ping und zeigt den Live-Status im Frontend. Optional können CPU-Last, RAM-Auslastung und Temperatur pro Gerät angezeigt werden.
 
 | Option | Typ | Default | Beschreibung |
 |--------|-----|---------|--------------|
@@ -650,15 +650,58 @@ Jedes Gerät hat folgende Felder:
 | `id` | `string` | Eindeutiger Schlüssel (lowercase, keine Leerzeichen). |
 | `name` | `string` | Anzeigename im Frontend. |
 | `ip` | `string` | IP-Adresse des Geräts im lokalen Netzwerk. |
+| `stats` | `object` | **Optional.** Aktiviert CPU/RAM/Temperatur-Anzeige. Ohne `stats` werden die klassischen 24h/7d Uptime-Balken angezeigt. |
+
+#### Stats-Konfiguration (`stats`)
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `type` | `string` | `'local'` für den lokalen Server oder `'ssh-linux'` für SSH-Abfrage. |
+| `credentialsFrom` | `string` | ID eines Control-Devices. Die SSH-Zugangsdaten werden daraus wiederverwendet (kein Duplizieren von Passwörtern). |
+| `credentials` | `object` | Alternative zu `credentialsFrom`: Inline-Zugangsdaten `{ sshUser, sshPassword, sshPort }`. Passwörter werden beim Serverstart automatisch verschlüsselt. |
+
+**Drei Varianten:**
 
 ```js
-uptimeInterval: 10,
 uptimeDevices: [
-  { id: 'router',    name: 'Router',     ip: '192.168.1.1' },
-  { id: 'pihole',    name: 'PiHole',     ip: '192.168.1.100' },
-  { id: 'windowspc', name: 'Windows PC', ip: '192.168.1.50' },
+  // 1. Ohne Stats → klassische 24h/7d Uptime-Balken
+  { id: 'router', name: 'Router', ip: '192.168.1.1' },
+
+  // 2. Stats via SSH (Credentials aus Control Center wiederverwenden)
+  {
+    id: 'pihole', name: 'PiHole', ip: '192.168.1.100',
+    stats: {
+      type: 'ssh-linux',
+      credentialsFrom: 'piholeControl',
+    },
+  },
+
+  // 3. Stats via SSH (eigene Inline-Credentials)
+  {
+    id: 'nas', name: 'NAS', ip: '192.168.1.200',
+    stats: {
+      type: 'ssh-linux',
+      credentials: { sshUser: 'admin', sshPassword: 'password', sshPort: 22 },
+    },
+  },
+
+  // 4. Lokaler Server (liest /proc direkt, kein SSH nötig)
+  { id: 'localhost', name: 'Pi Server', ip: '127.0.0.1', stats: { type: 'local' } },
 ],
 ```
+
+#### Angezeigte Stats
+
+| Metrik | Quelle | Anzeige |
+|--------|--------|---------|
+| **CPU-Last** | `/proc/loadavg` + `nproc` | Balken mit Prozent (grün < 60%, gelb 60–85%, rot > 85%) |
+| **RAM** | `/proc/meminfo` | Balken mit GB-Anzeige (grün < 70%, gelb 70–85%, rot > 85%) |
+| **Temperatur** | `/sys/class/thermal/thermal_zone0/temp` | Wert in °C (grün < 60°, gelb 60–75°, rot > 75°) |
+
+- Stats werden nur im RAM gehalten (flüchtig, nicht persistiert)
+- Bei jedem Ping-Zyklus werden die Stats parallel abgefragt und per WebSocket live gepusht
+- Geräte ohne `stats`-Property zeigen weiterhin die klassischen 24h/7d Uptime-Balken
+- Offline-Geräte zeigen keine Stats an
 
 ### Gerätesteuerung / Control Center (`controlDevices`)
 
@@ -850,7 +893,7 @@ Einzelne Sektionen auf der Analysen-Seite ein- oder ausblenden.
 |---------|---------|--------------|
 | `speedtest` | `true` | Internet-Geschwindigkeit (Speed-Test). |
 | `outages` | `true` | Ausfälle-Card (responsiv auf Mobil). |
-| `uptime` | `true` | Uptime-Monitoring-Cards. |
+| `uptime` | `true` | Geräte Info / Uptime-Monitoring-Cards. |
 | `pingMonitor` | `true` | Ping-Monitor (Latenz-Messung). |
 | `pihole` | `true` | Pi-hole DNS Analytics. |
 
@@ -1045,6 +1088,8 @@ node -e "console.log(require('crypto').randomUUID())"
 - **Rate-Limiting** – Nach 5 falschen Login-Versuchen wird die IP gesperrt (5 Min, dann eskalierend)
 - **Verschlüsselung** – SSH-Passwörter werden mit AES-256-GCM verschlüsselt gespeichert
 - **SSH-Allowlist** – Nur vordefinierte Befehle können per SSH ausgeführt werden
+- **Stats-Allowlist** – Nur vordefinierte Read-Only-Befehle für Device Stats erlaubt (`cat /proc/loadavg`, `nproc`, etc.)
+- **Stdout-Limit** – SSH-Ausgaben für Stats auf 512 KB begrenzt (DoS-Schutz)
 - **Session-Timeout** – Automatisches Ausloggen nach Inaktivität (konfigurierbar)
 - **Config-Sandbox** – `config.js` wird serverseitig in einer isolierten VM geparst
 - **Pi-hole Proxy** – API-Calls laufen serverseitig, Passwort ist im Frontend nie sichtbar
