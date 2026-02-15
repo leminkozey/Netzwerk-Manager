@@ -679,6 +679,29 @@ async function loadTotpSection(container) {
   }
 }
 
+// Step indicator for TOTP setup flow
+function createStepIndicator(currentStep) {
+  const steps = [
+    { num: '1', label: t('settings.totpStepPassword') },
+    { num: '2', label: t('settings.totpStepScan') },
+    { num: '3', label: t('settings.totpStepVerify') },
+  ];
+
+  const items = [];
+  for (let i = 0; i < steps.length; i++) {
+    const cls = i < currentStep ? 'totp-step done' : i === currentStep ? 'totp-step active' : 'totp-step';
+    items.push(el('div', { className: cls }, [
+      el('span', { className: 'totp-step-num', textContent: i < currentStep ? '\u2713' : steps[i].num }),
+      el('span', { textContent: steps[i].label }),
+    ]));
+    if (i < steps.length - 1) {
+      items.push(el('div', { className: `totp-step-line${i < currentStep ? ' done' : ''}` }));
+    }
+  }
+
+  return el('div', { className: 'totp-steps' }, items);
+}
+
 function showTotpSetupForm(container) {
   container.replaceChildren();
 
@@ -690,14 +713,19 @@ function showTotpSetupForm(container) {
     const pw = pwInput.value;
     if (!pw) return;
     setupBtn.disabled = true;
+    setupBtn.classList.add('loading');
     statusMsg.textContent = '';
+    statusMsg.className = 'totp-status-msg';
 
     try {
       const result = await api.setupTotp(pw);
       if (result.error) {
         statusMsg.textContent = result.error === 'Wrong password' ? t('settings.totpWrongPassword') : t('settings.totpError');
         statusMsg.className = 'totp-status-msg error';
+        pwInput.classList.add('shake');
+        setTimeout(() => pwInput.classList.remove('shake'), 500);
         setupBtn.disabled = false;
+        setupBtn.classList.remove('loading');
         return;
       }
 
@@ -708,6 +736,7 @@ function showTotpSetupForm(container) {
       statusMsg.textContent = t('settings.totpError');
       statusMsg.className = 'totp-status-msg error';
       setupBtn.disabled = false;
+      setupBtn.classList.remove('loading');
     }
   }
 
@@ -715,6 +744,7 @@ function showTotpSetupForm(container) {
   pwInput.addEventListener('keyup', e => { if (e.key === 'Enter') doSetup(); });
 
   container.appendChild(el('div', { className: 'totp-setup-form' }, [
+    createStepIndicator(0),
     el('div', { className: 'input-row' }, [
       el('label', { textContent: t('settings.currentPassword') }),
       pwInput,
@@ -726,10 +756,21 @@ function showTotpSetupForm(container) {
 
 function showTotpVerifyStep(container, data) {
   const qrImg = el('img', { src: data.qrDataUrl, className: 'totp-qr-img', alt: 'TOTP QR Code' });
+
   const secretDisplay = el('code', { className: 'totp-secret-code', textContent: data.secret });
+  // Copy to clipboard on click
+  secretDisplay.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(data.secret);
+      secretDisplay.classList.add('copied');
+      showToast(t('settings.totpCopied'));
+      setTimeout(() => secretDisplay.classList.remove('copied'), 1500);
+    } catch { /* clipboard not available */ }
+  });
+
   const codeInput = el('input', {
     type: 'text',
-    className: 'totp-input',
+    className: 'totp-input small',
     maxLength: '6',
     placeholder: '000000',
     autocomplete: 'one-time-code',
@@ -743,24 +784,34 @@ function showTotpVerifyStep(container, data) {
     const code = codeInput.value.trim();
     if (!/^\d{6}$/.test(code)) return;
     verifyBtn.disabled = true;
+    verifyBtn.classList.add('loading');
     statusMsg.textContent = '';
+    statusMsg.className = 'totp-status-msg';
 
     try {
       const result = await api.verifyTotp(code);
       if (result.success) {
+        codeInput.classList.add('success');
+        statusMsg.textContent = t('settings.totpSuccess');
+        statusMsg.className = 'totp-status-msg success';
         showToast(t('settings.totpSuccess'));
-        loadTotpSection(container);
+        setTimeout(() => loadTotpSection(container), 600);
       } else {
+        codeInput.classList.add('shake');
         statusMsg.textContent = t('settings.totpWrongCode');
         statusMsg.className = 'totp-status-msg error';
+        setTimeout(() => codeInput.classList.remove('shake'), 500);
         codeInput.value = '';
         codeInput.focus();
+        verifyBtn.disabled = false;
+        verifyBtn.classList.remove('loading');
       }
     } catch {
       statusMsg.textContent = t('settings.totpError');
       statusMsg.className = 'totp-status-msg error';
+      verifyBtn.disabled = false;
+      verifyBtn.classList.remove('loading');
     }
-    verifyBtn.disabled = false;
   }
 
   verifyBtn.addEventListener('click', doVerify);
@@ -771,6 +822,7 @@ function showTotpVerifyStep(container, data) {
   });
 
   container.appendChild(el('div', { className: 'totp-verify-step' }, [
+    createStepIndicator(1),
     el('p', { textContent: t('settings.totpScanQr') }),
     el('div', { className: 'totp-qr-container' }, [qrImg]),
     el('p', { className: 'totp-manual-key' }, [
@@ -811,7 +863,9 @@ function showTotpDisableForm(container) {
     const code = codeInput.value.trim();
     if (!pw || !/^\d{6}$/.test(code)) return;
     disableBtn.disabled = true;
+    disableBtn.classList.add('loading');
     statusMsg.textContent = '';
+    statusMsg.className = 'totp-status-msg';
 
     try {
       const result = await api.disableTotp(pw, code);
@@ -822,6 +876,7 @@ function showTotpDisableForm(container) {
         statusMsg.textContent = msg;
         statusMsg.className = 'totp-status-msg error';
         disableBtn.disabled = false;
+        disableBtn.classList.remove('loading');
         return;
       }
       showToast(t('settings.totpDisabled'));
@@ -830,6 +885,7 @@ function showTotpDisableForm(container) {
       statusMsg.textContent = t('settings.totpError');
       statusMsg.className = 'totp-status-msg error';
       disableBtn.disabled = false;
+      disableBtn.classList.remove('loading');
     }
   }
 

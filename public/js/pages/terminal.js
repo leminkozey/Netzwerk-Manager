@@ -44,11 +44,19 @@ export function renderTerminal(container) {
   };
 }
 
+// ── Loading indicator with animated dots ──
+function createLoadingEl(text) {
+  return el('div', { className: 'terminal-loading' }, [
+    el('div', { className: 'terminal-loading-dots' }, [
+      el('span'), el('span'), el('span'),
+    ]),
+    text ? el('span', { className: 'terminal-loading-text', textContent: text }) : null,
+  ].filter(Boolean));
+}
+
 async function showTotpGate(page) {
   page.replaceChildren();
-  page.appendChild(el('div', { className: 'terminal-loading' }, [
-    el('span', { className: 'spinner' }),
-  ]));
+  page.appendChild(createLoadingEl(t('terminal.checking')));
 
   try {
     const status = await api.getTotpStatus();
@@ -110,21 +118,32 @@ function showTotpInput(page) {
     statusMsg,
   ]);
 
+  let isVerifying = false;
+
   async function doVerify() {
     const code = codeInput.value.trim();
-    if (!/^\d{6}$/.test(code)) return;
+    if (!/^\d{6}$/.test(code) || isVerifying) return;
+    isVerifying = true;
+    verifyBtn.classList.add('loading');
     verifyBtn.disabled = true;
     statusMsg.textContent = '';
+    statusMsg.className = 'totp-status';
 
     try {
       const result = await api.terminalAuth(code);
       if (result.success) {
+        // Success feedback
+        codeInput.classList.add('success');
+        showToast(t('terminal.authSuccess'));
         terminalToken = result.terminalToken;
         tokenExpiresAt = result.expiresAt;
-        showDeviceSelection(page);
+        setTimeout(() => showDeviceSelection(page), 350);
       } else {
+        // Error feedback with shake
+        codeInput.classList.add('shake');
         statusMsg.textContent = t('terminal.invalidCode');
         statusMsg.className = 'totp-status error';
+        setTimeout(() => codeInput.classList.remove('shake'), 500);
         codeInput.value = '';
         codeInput.focus();
       }
@@ -132,7 +151,9 @@ function showTotpInput(page) {
       statusMsg.textContent = t('msg.error');
       statusMsg.className = 'totp-status error';
     }
+    verifyBtn.classList.remove('loading');
     verifyBtn.disabled = false;
+    isVerifying = false;
   }
 
   verifyBtn.addEventListener('click', doVerify);
@@ -146,14 +167,12 @@ function showTotpInput(page) {
   });
 
   page.appendChild(form);
-  setTimeout(() => codeInput.focus(), 50);
+  setTimeout(() => codeInput.focus(), 100);
 }
 
 async function showDeviceSelection(page) {
   page.replaceChildren();
-  page.appendChild(el('div', { className: 'terminal-loading' }, [
-    el('span', { className: 'spinner' }),
-  ]));
+  page.appendChild(createLoadingEl(t('terminal.loadingDevices')));
 
   try {
     const data = await api.getTerminalDevices(terminalToken);
@@ -215,6 +234,16 @@ function showTerminalView(page, device) {
     const mins = Math.floor(remaining / 60000);
     const secs = Math.floor((remaining % 60000) / 1000);
     timerEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+
+    // Timer warning states
+    const totalSec = mins * 60 + secs;
+    if (totalSec <= 30) {
+      timerEl.className = 'terminal-timer critical';
+    } else if (totalSec <= 60) {
+      timerEl.className = 'terminal-timer warn';
+    } else {
+      timerEl.className = 'terminal-timer';
+    }
   }
   updateTimer();
   if (sessionTimer) clearInterval(sessionTimer);
@@ -253,6 +282,13 @@ function showTerminalView(page, device) {
   // Output area
   const output = el('div', { className: 'terminal-output', id: 'terminalOutput' });
 
+  // Welcome banner
+  const welcome = el('div', { className: 'terminal-welcome' }, [
+    el('div', { className: 'terminal-welcome-text', textContent: `Connected to ${device.name}` }),
+    el('div', { className: 'terminal-welcome-info', textContent: `${device.ip} | ${t('terminal.readyHint')}` }),
+  ]);
+  output.appendChild(welcome);
+
   // Input line
   const promptLabel = el('span', { className: 'terminal-prompt-label', textContent: `${device.name}:~$ ` });
   const cmdInput = el('input', {
@@ -283,9 +319,13 @@ function showTerminalView(page, device) {
     }
   });
 
+  let isExecuting = false;
+
   async function executeCommand() {
     const command = cmdInput.value.trim();
-    if (!command) return;
+    if (!command || isExecuting) return;
+
+    isExecuting = true;
 
     // Add to history
     commandHistory.push(command);
@@ -295,6 +335,7 @@ function showTerminalView(page, device) {
     // Check token expiry
     if (Date.now() > tokenExpiresAt) {
       showSessionExpired(page);
+      isExecuting = false;
       return;
     }
 
@@ -322,6 +363,7 @@ function showTerminalView(page, device) {
 
     scrollToBottom(output);
     cmdInput.focus();
+    isExecuting = false;
   }
 
   cmdInput.addEventListener('keydown', (e) => {
@@ -345,11 +387,18 @@ function showTerminalView(page, device) {
     }
   });
 
-  setTimeout(() => cmdInput.focus(), 50);
+  setTimeout(() => cmdInput.focus(), 100);
 }
 
 async function runCommand(output, device, command, totpCode) {
-  const loadingLine = el('div', { className: 'terminal-line loading', textContent: t('terminal.executing') });
+  const loadingLine = el('div', { className: 'terminal-line loading' }, [
+    el('span', { textContent: t('terminal.executing') + ' ' }),
+    el('span', { className: 'terminal-loading-dots', style: { display: 'inline-flex', gap: '3px', verticalAlign: 'middle' } }, [
+      el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
+      el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
+      el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
+    ]),
+  ]);
   output.appendChild(loadingLine);
   scrollToBottom(output);
 
@@ -396,6 +445,12 @@ async function runCommand(output, device, command, totpCode) {
     if (result.exitCode && result.exitCode !== 0) {
       const exitLine = el('div', { className: 'terminal-line error', textContent: `exit code: ${result.exitCode}` });
       output.appendChild(exitLine);
+    }
+
+    // Empty result feedback
+    if (!result.stdout && !result.stderr && (!result.exitCode || result.exitCode === 0)) {
+      const okLine = el('div', { className: 'terminal-line', style: { color: '#3fb950', fontStyle: 'italic' }, textContent: '(ok)' });
+      output.appendChild(okLine);
     }
   } catch {
     loadingLine.remove();
@@ -454,6 +509,7 @@ async function handleDangerousCommand(output, device, command, cmdInput) {
       const code = codeInput.value.trim();
       if (!/^\d{6}$/.test(code)) return;
       confirmBtn.disabled = true;
+      confirmBtn.classList.add('loading');
       statusMsg.textContent = '';
 
       overlay.remove();
@@ -472,7 +528,7 @@ async function handleDangerousCommand(output, device, command, cmdInput) {
     });
 
     document.querySelector('.terminal-container')?.appendChild(overlay);
-    setTimeout(() => codeInput.focus(), 50);
+    setTimeout(() => codeInput.focus(), 100);
   });
 }
 
@@ -484,7 +540,9 @@ function showSessionExpired(page) {
   if (container) {
     const overlay = el('div', { className: 'dangerous-overlay' }, [
       el('div', { className: 'dangerous-modal' }, [
+        el('div', { className: 'expired-icon' }, [iconEl('shield', 36)]),
         el('h3', { textContent: t('terminal.sessionExpired') }),
+        el('p', { textContent: t('terminal.sessionExpiredHint') }),
         el('button', {
           className: 'btn',
           textContent: t('terminal.verify'),

@@ -345,10 +345,15 @@ const translations = {
     'terminal.dangerousTitle': 'Gefährlicher Befehl',
     'terminal.dangerousHint': 'Dieser Befehl erfordert eine zusätzliche TOTP-Bestätigung.',
     'terminal.dangerousConfirm': 'Bestätigen & Ausführen',
-    'terminal.executing': 'Wird ausgeführt...',
+    'terminal.executing': 'Wird ausgeführt',
     'terminal.timeRemaining': 'verbleibend',
     'terminal.error': 'Fehler bei der Ausführung',
     'terminal.rateLimited': 'Zu viele Befehle. Bitte warten.',
+    'terminal.checking': 'Sicherheitsstatus wird geprüft...',
+    'terminal.loadingDevices': 'Geräte werden geladen...',
+    'terminal.authSuccess': 'Authentifizierung erfolgreich!',
+    'terminal.readyHint': 'Bereit für Befehle',
+    'terminal.sessionExpiredHint': 'Deine Session ist abgelaufen. Bitte authentifiziere dich erneut.',
 
     // Settings - TOTP
     'settings.totp2fa': 'Zwei-Faktor-Authentifizierung',
@@ -367,6 +372,10 @@ const translations = {
     'settings.totpWrongPassword': 'Falsches Passwort.',
     'settings.totpWrongCode': 'Ungültiger TOTP-Code.',
     'settings.totpError': 'Fehler bei der TOTP-Einrichtung.',
+    'settings.totpStepPassword': 'Passwort',
+    'settings.totpStepScan': 'Scannen',
+    'settings.totpStepVerify': 'Bestätigen',
+    'settings.totpCopied': 'Schlüssel kopiert!',
   },
 
   en: {
@@ -706,10 +715,15 @@ const translations = {
     'terminal.dangerousTitle': 'Dangerous Command',
     'terminal.dangerousHint': 'This command requires an additional TOTP confirmation.',
     'terminal.dangerousConfirm': 'Confirm & Execute',
-    'terminal.executing': 'Executing...',
+    'terminal.executing': 'Executing',
     'terminal.timeRemaining': 'remaining',
     'terminal.error': 'Execution error',
     'terminal.rateLimited': 'Too many commands. Please wait.',
+    'terminal.checking': 'Checking security status...',
+    'terminal.loadingDevices': 'Loading devices...',
+    'terminal.authSuccess': 'Authentication successful!',
+    'terminal.readyHint': 'Ready for commands',
+    'terminal.sessionExpiredHint': 'Your session has expired. Please re-authenticate.',
 
     // Settings - TOTP
     'settings.totp2fa': 'Two-Factor Authentication',
@@ -728,6 +742,10 @@ const translations = {
     'settings.totpWrongPassword': 'Wrong password.',
     'settings.totpWrongCode': 'Invalid TOTP code.',
     'settings.totpError': 'Error during TOTP setup.',
+    'settings.totpStepPassword': 'Password',
+    'settings.totpStepScan': 'Scan',
+    'settings.totpStepVerify': 'Confirm',
+    'settings.totpCopied': 'Key copied!',
   },
 };
 
