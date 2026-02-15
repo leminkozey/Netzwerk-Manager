@@ -4010,11 +4010,10 @@ app.get('/api/services/status', authRequired, async (req, res) => {
       // PM2: one `pm2 jlist` returns all processes — run once, parse for each service
       if (type === 'pm2') {
         try {
-          const statusCmd = buildServiceCommand('pm2', 'status', svcs[0].service, hostKey === '_local'
-            ? (process.platform === 'win32' ? 'ssh-windows' : 'ssh-linux')
-            : undefined);
           let result;
           if (hostKey === '_local') {
+            const hostType = process.platform === 'win32' ? 'ssh-windows' : 'ssh-linux';
+            const statusCmd = buildServiceCommand('pm2', 'status', svcs[0].service, hostType);
             result = await localCommandWithOutput(statusCmd);
           } else {
             const creds = readControlDeviceCredentials(hostKey);
@@ -4024,6 +4023,8 @@ app.get('/api/services/status', authRequired, async (req, res) => {
               for (const svc of svcs) statuses[svc.id] = 'unknown';
               continue;
             }
+            const hostType = controlDevice.type || 'ssh-linux';
+            const statusCmd = buildServiceCommand('pm2', 'status', svcs[0].service, hostType);
             const sshConfig = {
               ipAddress: controlDevice.ip,
               sshUser: creds.sshUser,
