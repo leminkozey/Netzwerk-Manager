@@ -2226,7 +2226,7 @@ const SERVICE_COMMANDS = {
     start:   name => `pm2 start ${name}`,
     stop:    name => `pm2 stop ${name}`,
     restart: name => `pm2 restart ${name}`,
-    status:  () => `pm2 jlist`,
+    status:  () => `pm2 resurrect 2>/dev/null; pm2 jlist`,
   },
   docker: {
     start:   name => `docker start ${name}`,
