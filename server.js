@@ -584,6 +584,13 @@ app.get('/config.js', (req, res) => {
       }
     }
   }
+  // Normalize controlDevices show — only expose controlCenter to frontend
+  if (Array.isArray(safe.controlDevices)) {
+    for (const d of safe.controlDevices) {
+      const normalized = normalizeDeviceShow(d.show);
+      d.show = { controlCenter: normalized.controlCenter };
+    }
+  }
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache');
   res.send(`const siteConfig = ${JSON.stringify(safe, null, 2)};\n`);
@@ -2578,6 +2585,17 @@ function saveControlDeviceCredentials(deviceId, creds) {
   saveControlDevicesData(data);
 }
 
+function normalizeDeviceShow(show) {
+  if (show === false) return { controlCenter: false, terminal: false };
+  if (show && typeof show === 'object') {
+    return {
+      controlCenter: show.controlCenter !== false,
+      terminal: show.terminal !== false,
+    };
+  }
+  return { controlCenter: true, terminal: true };
+}
+
 function readControlDevicesFromConfig() {
   const cfg = readSiteConfig();
   const devices = cfg?.controlDevices;
@@ -2588,7 +2606,7 @@ function readControlDevicesFromConfig() {
       && typeof d.type === 'string'
       && typeof d.ip === 'string' && VALIDATION.ipAddress.test(d.ip)
       && Array.isArray(d.actions)
-  );
+  ).map(d => ({ ...d, show: normalizeDeviceShow(d.show) }));
 }
 
 function logControlAction(deviceId, action, ip, success, details = '') {
@@ -5225,7 +5243,8 @@ app.get('/api/terminal/devices', authRequired, terminalAuthRequired, (req, res) 
   const devices = configDevices
     .filter(d => {
       if (!d || !d.id || !d.ip) return false;
-      if (d.show === false) return false;
+      const show = normalizeDeviceShow(d.show);
+      if (show.terminal === false) return false;
       if (allowedIds && !allowedIds.has(d.id)) return false;
       return true;
     })
@@ -5268,6 +5287,9 @@ app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req
     : null;
   const device = configDevices.find(d => d.id === deviceId);
   if (!device || (allowedIds && !allowedIds.has(deviceId))) {
+    return res.status(404).json({ success: false, error: 'Device not found or not allowed' });
+  }
+  if (normalizeDeviceShow(device.show).terminal === false) {
     return res.status(404).json({ success: false, error: 'Device not found or not allowed' });
   }
 

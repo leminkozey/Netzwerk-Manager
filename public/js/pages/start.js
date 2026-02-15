@@ -336,10 +336,10 @@ export function renderStart(container) {
   // Section: Gerätesteuerung
   page.appendChild(buildSectionTitle(t('section.control')));
 
-  // Build tiles from config (show !== false → default visible)
+  // Build tiles from config (show.controlCenter !== false → default visible)
   const cfg = getConfig();
   const devices = cfg?.controlDevices && Array.isArray(cfg.controlDevices)
-    ? cfg.controlDevices.filter(d => d.show !== false)
+    ? cfg.controlDevices.filter(d => d.show?.controlCenter !== false)
     : [];
 
   const tiles = [];

@@ -729,7 +729,7 @@ Jedes Gerät hat folgende Felder:
 | `type` | `string` | SSH-Typ: `'ssh-windows'` oder `'ssh-linux'`. Bestimmt welche Befehle für Shutdown/Restart verwendet werden. |
 | `ip` | `string` | IP-Adresse des Geräts. |
 | `actions` | `array` | Verfügbare Aktionen: `'wake'`, `'restart'`, `'shutdown'`. |
-| `show` | `boolean` | **Optional.** `true` (Standard) = Tile im Control Center anzeigen. `false` = Gerät wird im UI versteckt, bleibt aber als SSH-Quelle für Remote-Services (`credentialsFrom`) nutzbar. |
+| `show` | `boolean \| object` | **Optional.** Steuert die Sichtbarkeit im Control Center und Web Terminal (siehe [Sichtbarkeit](#sichtbarkeit-show)). |
 
 **SSH-Befehle nach Typ:**
 
@@ -766,10 +766,50 @@ controlDevices: [
     actions: ['shutdown'],
     show: false,
   },
+  // Nur im Web Terminal verfügbar, nicht im Control Center
+  {
+    id: 'piserver',
+    name: 'Pi Server',
+    icon: 'server',
+    type: 'ssh-linux',
+    ip: '192.168.1.100',
+    actions: [],
+    show: { controlCenter: false, terminal: true },
+  },
 ],
 ```
 
-> **Tipp:** Mit `show: false` kannst du ein Gerät als reine SSH-Credential-Quelle verwenden, ohne dass es als Tile im Control Center erscheint. Die SSH-Zugangsdaten werden trotzdem in den Einstellungen konfiguriert und können von Remote-Services über `credentialsFrom` referenziert werden.
+#### Sichtbarkeit (`show`)
+
+Die `show`-Property steuert, wo ein Gerät angezeigt wird: im Control Center (als Tile) und/oder im Web Terminal (als Zielgerät). Standardmäßig ist ein Gerät überall sichtbar.
+
+**Formate:**
+
+| Wert | Control Center | Web Terminal | Beschreibung |
+|------|:-:|:-:|--------------|
+| `show` nicht gesetzt | Ja | Ja | Standard — überall sichtbar. |
+| `show: true` | Ja | Ja | Explizit überall sichtbar (identisch mit Standard). |
+| `show: false` | Nein | Nein | Überall ausgeblendet. Nützlich als reine SSH-Credential-Quelle für Remote-Services (`credentialsFrom`). |
+| `show: { controlCenter: true, terminal: false }` | Ja | Nein | Nur als Tile im Control Center. |
+| `show: { controlCenter: false, terminal: true }` | Nein | Ja | Nur im Web Terminal. Kein Tile im Control Center. |
+
+Fehlende Keys im Objekt werden als `true` interpretiert: `show: { controlCenter: false }` entspricht `show: { controlCenter: false, terminal: true }`.
+
+```js
+// Überall sichtbar (Standard)
+{ id: 'windowspc', show: true, ... }
+
+// Überall ausgeblendet, nur als SSH-Quelle nutzbar
+{ id: 'piholeControl', show: false, ... }
+
+// Nur im Web Terminal, kein Tile im Control Center
+{ id: 'piserver', show: { controlCenter: false, terminal: true }, ... }
+
+// Nur als Tile, nicht im Terminal
+{ id: 'nas', show: { controlCenter: true, terminal: false }, ... }
+```
+
+> **Rückwärtskompatibel:** Bestehende Konfigurationen mit `show: true` / `show: false` funktionieren weiterhin ohne Änderung.
 
 #### Icons
 
@@ -946,7 +986,7 @@ Jeder Service hat folgende Felder:
 - Das Control-Device muss in den Einstellungen konfigurierte SSH-Credentials haben
 - Das Tool (`systemctl`, `pm2`, `docker`) muss auf dem Remote-Gerät installiert sein
 
-> **Tipp:** Wenn du das Remote-Gerät nicht als Tile im Control Center sehen willst, setze `show: false` im `controlDevices`-Eintrag. Das Gerät dient dann nur als SSH-Credential-Quelle.
+> **Tipp:** Wenn du das Remote-Gerät nicht als Tile im Control Center sehen willst, setze `show: false` oder `show: { controlCenter: false }` im `controlDevices`-Eintrag. Das Gerät dient dann nur als SSH-Credential-Quelle (siehe [Sichtbarkeit](#sichtbarkeit-show)).
 
 #### Beispiel
 

@@ -277,8 +277,12 @@ const siteConfig = {
   // type:    'ssh-windows' | 'ssh-linux' – bestimmt die SSH-Befehle
   // ip:      IP-Adresse des Geräts
   // actions: Array von Aktionen: 'wake', 'restart', 'shutdown'
-  // show:    true/false – Tile im Control Center anzeigen (Standard: true)
-  //          Mit show: false wird das Gerät versteckt, bleibt aber als
+  // show:    Sichtbarkeit steuern (Standard: überall sichtbar)
+  //          Objekt: { controlCenter: true/false, terminal: true/false }
+  //          Beispiel: show: { controlCenter: false, terminal: true }
+  //            → Keine Tile im Control Center, aber im Web Terminal verfügbar
+  //          Rückwärtskompatibel: show: false blendet beides aus.
+  //          Mit show: false / controlCenter: false bleibt das Gerät als
   //          SSH-Quelle für Remote-Services (credentialsFrom) nutzbar.
   //
   // SSH-Zugangsdaten werden pro Gerät in den Einstellungen konfiguriert
