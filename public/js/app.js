@@ -17,6 +17,7 @@ import { renderTerminal } from './pages/terminal.js';
 
 // ── Page cleanup tracking ──
 let currentCleanup = null;
+let lockoutInterval = null;
 
 function wrapPage(renderFn) {
   return (container) => {
@@ -79,6 +80,13 @@ function renderLogin(container) {
     });
     document.getElementById('loginUser')?.focus();
   }, 50);
+
+  return () => {
+    if (lockoutInterval) {
+      clearInterval(lockoutInterval);
+      lockoutInterval = null;
+    }
+  };
 }
 
 async function doLogin() {
@@ -112,13 +120,15 @@ async function doLogin() {
 }
 
 function startLockoutCountdown(remainingMs, statusEl, btn) {
+  if (lockoutInterval) clearInterval(lockoutInterval);
   if (btn) btn.disabled = true;
   const endTime = Date.now() + remainingMs;
 
-  const interval = setInterval(() => {
+  lockoutInterval = setInterval(() => {
     const left = endTime - Date.now();
     if (left <= 0) {
-      clearInterval(interval);
+      clearInterval(lockoutInterval);
+      lockoutInterval = null;
       if (btn) btn.disabled = false;
       if (statusEl) {
         statusEl.textContent = t('msg.lockLifted');

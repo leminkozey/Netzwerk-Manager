@@ -86,12 +86,16 @@ function isHashedPassword(stored) {
 // Symmetric encryption for sensitive data at rest (SSH passwords etc.)
 const ENCRYPTION_KEY_FILE = path.join(__dirname, 'Data', '.encryption-key');
 function getEncryptionKey() {
-  if (fs.existsSync(ENCRYPTION_KEY_FILE)) {
-    return Buffer.from(fs.readFileSync(ENCRYPTION_KEY_FILE, 'utf-8').trim(), 'hex');
+  try {
+    const newKey = crypto.randomBytes(32).toString('hex');
+    fs.writeFileSync(ENCRYPTION_KEY_FILE, newKey, { mode: 0o600, flag: 'wx' });
+    return Buffer.from(newKey, 'hex');
+  } catch (err) {
+    if (err.code === 'EEXIST') {
+      return Buffer.from(fs.readFileSync(ENCRYPTION_KEY_FILE, 'utf-8').trim(), 'hex');
+    }
+    throw err;
   }
-  const key = crypto.randomBytes(32);
-  fs.writeFileSync(ENCRYPTION_KEY_FILE, key.toString('hex'), { encoding: 'utf-8', mode: 0o600 });
-  return key;
 }
 
 function encryptValue(plaintext) {
@@ -532,20 +536,22 @@ async function executeSshCommand(session, command) {
 const TERMINAL_AUDIT_FILE = path.join(__dirname, 'Data', 'terminal-audit.json');
 const TERMINAL_AUDIT_MAX = 1000;
 
-function logTerminalAudit(entry) {
+async function logTerminalAudit(entry) {
   const timestamp = new Date().toISOString();
   console.log(`[TERMINAL-AUDIT] ${timestamp} | User: ${sanitizeLogParam(entry.username)} | Device: ${sanitizeLogParam(entry.deviceId)} | IP: ${sanitizeLogParam(entry.ip)} | Command: ${sanitizeLogParam(entry.command)} | Exit: ${entry.exitCode}`);
   try {
-    let audit = [];
-    if (fs.existsSync(TERMINAL_AUDIT_FILE)) {
-      audit = JSON.parse(fs.readFileSync(TERMINAL_AUDIT_FILE, 'utf-8'));
-      if (!Array.isArray(audit)) audit = [];
-    }
-    audit.push({ ...entry, timestamp });
-    if (audit.length > TERMINAL_AUDIT_MAX) {
-      audit = audit.slice(audit.length - TERMINAL_AUDIT_MAX);
-    }
-    atomicWriteFileSync(TERMINAL_AUDIT_FILE, JSON.stringify(audit, null, 2), { mode: 0o600 });
+    await withAuditLock(() => {
+      let audit = [];
+      if (fs.existsSync(TERMINAL_AUDIT_FILE)) {
+        audit = JSON.parse(fs.readFileSync(TERMINAL_AUDIT_FILE, 'utf-8'));
+        if (!Array.isArray(audit)) audit = [];
+      }
+      audit.push({ ...entry, timestamp });
+      if (audit.length > TERMINAL_AUDIT_MAX) {
+        audit = audit.slice(audit.length - TERMINAL_AUDIT_MAX);
+      }
+      atomicWriteFileSync(TERMINAL_AUDIT_FILE, JSON.stringify(audit, null, 2), { mode: 0o600 });
+    });
   } catch (err) {
     console.error('[TERMINAL-AUDIT] Failed to write audit log:', err.message);
   }
@@ -668,15 +674,6 @@ function resetAttempts(ip) {
   runtime.loginAttempts.set(ip, { count: 0, lockedUntil: 0, lockoutLevel: 1 });
 }
 
-// Raw body parser für Upload-Tests (muss VOR json() kommen)
-// #17 Auth-Check VOR Body-Parsing um DoS durch unauthentifizierte 50MB-Uploads zu verhindern
-app.use('/api/speedtest/upload', (req, res, next) => {
-  const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
-  if (!token || !isSessionValid() || !timingSafeEqual(runtime.activeSession.token, token)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-}, express.raw({ type: '*/*', limit: '50mb' }));
 app.use(express.json({ limit: '1mb' }));
 
 // Security headers middleware
@@ -1010,6 +1007,41 @@ async function withTotpLock(fn) {
     return await fn();
   } finally {
     releaseTotpLock();
+  }
+}
+
+// Mutex for terminal audit log to prevent concurrent write races
+let _auditLocked = false;
+const _auditWaiters = [];
+
+function acquireAuditLock() {
+  return new Promise((resolve, reject) => {
+    if (!_auditLocked) {
+      _auditLocked = true;
+      resolve();
+    } else if (_auditWaiters.length > 50) {
+      reject(new Error('Audit lock queue full'));
+    } else {
+      _auditWaiters.push(resolve);
+    }
+  });
+}
+
+function releaseAuditLock() {
+  if (_auditWaiters.length > 0) {
+    const next = _auditWaiters.shift();
+    next();
+  } else {
+    _auditLocked = false;
+  }
+}
+
+async function withAuditLock(fn) {
+  await acquireAuditLock();
+  try {
+    return fn();
+  } finally {
+    releaseAuditLock();
   }
 }
 
@@ -3281,7 +3313,7 @@ app.get('/api/bootstrap', (req, res) => {
   });
 });
 
-app.post('/api/login', (req, res) => {
+app.post('/api/login', async (req, res) => {
   const { username, password, deviceName = 'Unknown device', deviceToken } = req.body || {};
   const clientIp = getClientIp(req);
 
@@ -3325,6 +3357,20 @@ app.post('/api/login', (req, res) => {
     if (!isWhitelisted) {
       isWhitelisted = fileTokenList.some(t => timingSafeEqual(t, hashedDeviceToken));
     }
+
+    // Rate-limit failed device token attempts to prevent brute-force
+    if (!isWhitelisted) {
+      const result = recordFailedAttempt(clientIp);
+      if (result.locked) {
+        const lockoutMin = Math.ceil(result.lockoutMs / 60000);
+        return res.status(429).json({
+          success: false,
+          locked: true,
+          remainingMs: result.lockoutMs,
+          message: `Too many failed attempts. Locked for ${lockoutMin} min.`,
+        });
+      }
+    }
   }
 
   // Use timing-safe comparison for credentials
@@ -3361,12 +3407,15 @@ app.post('/api/login', (req, res) => {
 
   // Auto-migrate password hash to stronger iterations on successful login
   if (passwordValid && needsRehash(storedPassword)) {
-    const newHash = hashPassword(password);
-    state.credentials.password = newHash;
-    saveState(state);
-    writeCredentialsFile({ username: state.credentials.username, password: newHash });
-    _defaultPwCache = { hash: null, result: false };
-    console.log('[Security] Password hash migrated to stronger iterations');
+    await withStateLock(() => {
+      const freshState = readState();
+      const newHash = hashPassword(password);
+      freshState.credentials.password = newHash;
+      saveState(freshState);
+      writeCredentialsFile({ username: freshState.credentials.username, password: newHash });
+      _defaultPwCache = { hash: null, result: false };
+      console.log('[Security] Password hash migrated to stronger iterations');
+    });
   }
 
   // Erfolgreicher Login - Reset
@@ -3392,20 +3441,26 @@ app.post('/api/login', (req, res) => {
   }
   if (!isWhitelisted) {
     // Token not yet in whitelist — store as SHA-256 hash
-    state.deviceTokens.push(hashDeviceToken(returnedDeviceToken));
-    // Limit stored device tokens to prevent unbounded growth
-    if (state.deviceTokens.length > 20) {
-      state.deviceTokens = state.deviceTokens.slice(-20);
-    }
-    saveState(state);
+    await withStateLock(() => {
+      const freshState = readState();
+      freshState.deviceTokens.push(hashDeviceToken(returnedDeviceToken));
+      // Limit stored device tokens to prevent unbounded growth
+      if (freshState.deviceTokens.length > 20) {
+        freshState.deviceTokens = freshState.deviceTokens.slice(-20);
+      }
+      saveState(freshState);
+    });
     const loginDeviceName = sanitizeLogParam(deviceName || 'Unbekannt');
     sendNewDeviceLoginEmail(username || 'admin', clientIp, loginDeviceName).catch(() => {});
   } else if (needsTokenMigration) {
     // Migrate plaintext tokens to hashed format
-    state.deviceTokens = state.deviceTokens.map(t =>
-      /^[a-f0-9]{64}$/.test(t) ? t : hashDeviceToken(t)
-    );
-    saveState(state);
+    await withStateLock(() => {
+      const freshState = readState();
+      freshState.deviceTokens = freshState.deviceTokens.map(t =>
+        /^[a-f0-9]{64}$/.test(t) ? t : hashDeviceToken(t)
+      );
+      saveState(freshState);
+    });
   }
 
   if (previousSession && previousSession.token !== token) {
@@ -3443,19 +3498,6 @@ app.post('/api/logout', authRequired, (req, res) => {
 app.get('/api/state', authRequired, (req, res) => {
   const state = readState();
   res.json(maskStateForClient(state));
-});
-
-app.post('/api/theme', authRequired, async (req, res) => {
-  const { theme } = req.body || {};
-  if (!['dark', 'light'].includes(theme)) {
-    return res.status(400).json({ error: 'Invalid theme' });
-  }
-  await withStateLock(() => {
-    const state = readState();
-    state.theme = theme;
-    saveState(state);
-    res.json({ ok: true, theme, versions: state.versions });
-  });
 });
 
 app.post('/api/ports/color', authRequired, async (req, res) => {
@@ -3822,40 +3864,6 @@ function speedtestConcurrencyGuard(req, res, next) {
   res.on('close', release);
   next();
 }
-
-app.get('/api/speedtest/download', authRequired, speedtestConcurrencyGuard, (req, res) => {
-  // Cap size to prevent memory exhaustion DoS
-  const sizeMB = Math.min(Math.max(parseInt(req.query.size) || 1, 1), MAX_SPEEDTEST_SIZE_MB);
-  const sizeBytes = sizeMB * 1024 * 1024;
-
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Length', sizeBytes);
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-
-  // Stream random data in chunks to avoid memory exhaustion
-  const chunkSize = 64 * 1024; // 64 KB
-  let sent = 0;
-  function sendChunk() {
-    while (sent < sizeBytes) {
-      const remaining = sizeBytes - sent;
-      const size = Math.min(chunkSize, remaining);
-      const chunk = crypto.randomBytes(size);
-      sent += size;
-      if (!res.write(chunk)) {
-        res.once('drain', sendChunk);
-        return;
-      }
-    }
-    res.end();
-  }
-  sendChunk();
-});
-
-app.post('/api/speedtest/upload', authRequired, (req, res) => {
-  // Der Body wurde bereits von express.raw() geparst
-  const receivedBytes = req.body ? req.body.length : 0;
-  res.json({ ok: true, bytes: receivedBytes });
-});
 
 // Local network proxy endpoints - test to Raspberry Pi
 app.get('/api/speedtest/local-ping', authRequired, (req, res) => {
@@ -5500,7 +5508,7 @@ app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req
     const result = await executeSshCommand(session, command);
 
     // Audit log
-    logTerminalAudit({
+    await logTerminalAudit({
       username: req.terminalSession.username,
       ip: clientIp,
       deviceId,

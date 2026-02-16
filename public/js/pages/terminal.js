@@ -9,12 +9,22 @@ import { getConfig } from '../state.js';
 import { showToast } from '../ui.js';
 import * as api from '../api.js';
 
-let terminalToken = null;
-let tokenExpiresAt = 0;
-let sessionTimer = null;
-let commandHistory = [];
-let historyIndex = -1;
-let currentCwd = '~'; // Track current working directory
+let session = null;
+
+function resetSession() {
+  if (session) {
+    if (session.timer) clearInterval(session.timer);
+    if (session.token) api.terminalDisconnect(session.token);
+  }
+  session = {
+    token: null,
+    expiresAt: 0,
+    timer: null,
+    history: [],
+    historyIndex: -1,
+    cwd: '~',
+  };
+}
 
 export function renderTerminal(container) {
   const cfg = getConfig();
@@ -31,21 +41,16 @@ export function renderTerminal(container) {
     return;
   }
 
+  resetSession();
+
   // Show TOTP status check
   showTotpGate(page);
   container.appendChild(page);
 
   // Cleanup on navigation
   return () => {
-    if (sessionTimer) clearInterval(sessionTimer);
-    if (terminalToken) {
-      api.terminalDisconnect(terminalToken);
-    }
-    terminalToken = null;
-    tokenExpiresAt = 0;
-    commandHistory = [];
-    historyIndex = -1;
-    currentCwd = '~';
+    resetSession();
+    session = null;
   };
 }
 
@@ -132,8 +137,8 @@ function showTotpInput(page) {
         // Success feedback
         codeInput.classList.add('success');
         showToast(t('terminal.authSuccess'));
-        terminalToken = result.terminalToken;
-        tokenExpiresAt = result.expiresAt;
+        session.token = result.terminalToken;
+        session.expiresAt = result.expiresAt;
         setTimeout(() => showDeviceSelection(page), 350);
         return;
       } else {
@@ -169,7 +174,7 @@ async function showDeviceSelection(page) {
   page.appendChild(createLoadingEl(t('terminal.loadingDevices')));
 
   try {
-    const data = await api.getTerminalDevices(terminalToken);
+    const data = await api.getTerminalDevices(session.token);
 
     page.replaceChildren();
 
@@ -213,15 +218,15 @@ async function showDeviceSelection(page) {
 
 function showTerminalView(page, device) {
   page.replaceChildren();
-  commandHistory = [];
-  historyIndex = -1;
+  session.history = [];
+  session.historyIndex = -1;
 
   // Session timer
   const timerEl = el('span', { className: 'terminal-timer' });
   function updateTimer() {
-    const remaining = Math.max(0, tokenExpiresAt - Date.now());
+    const remaining = Math.max(0, session.expiresAt - Date.now());
     if (remaining === 0) {
-      clearInterval(sessionTimer);
+      clearInterval(session.timer);
       showSessionExpired(page);
       return;
     }
@@ -240,8 +245,8 @@ function showTerminalView(page, device) {
     }
   }
   updateTimer();
-  if (sessionTimer) clearInterval(sessionTimer);
-  sessionTimer = setInterval(updateTimer, 1000);
+  if (session.timer) clearInterval(session.timer);
+  session.timer = setInterval(updateTimer, 1000);
 
   // Header
   const header = el('div', { className: 'terminal-header' }, [
@@ -272,9 +277,9 @@ function showTerminalView(page, device) {
         className: 'terminal-header-btn',
         textContent: t('terminal.switchDevice'),
         onClick: () => {
-          clearInterval(sessionTimer);
-          if (terminalToken) api.terminalDisconnect(terminalToken);
-          currentCwd = '~';
+          clearInterval(session.timer);
+          if (session.token) api.terminalDisconnect(session.token);
+          session.cwd = '~';
           showDeviceSelection(page);
         },
       }),
@@ -282,10 +287,10 @@ function showTerminalView(page, device) {
         className: 'terminal-header-btn danger',
         textContent: t('terminal.disconnect'),
         onClick: () => {
-          clearInterval(sessionTimer);
-          if (terminalToken) api.terminalDisconnect(terminalToken);
-          terminalToken = null;
-          currentCwd = '~';
+          clearInterval(session.timer);
+          if (session.token) api.terminalDisconnect(session.token);
+          session.token = null;
+          session.cwd = '~';
           showTotpGate(page);
         },
       }),
@@ -324,7 +329,7 @@ function showTerminalView(page, device) {
   };
 
   // Initialize prompt
-  updatePromptLabel(currentCwd);
+  updatePromptLabel(session.cwd);
 
   async function runCommand(outputEl, dev, command, totpCode) {
     const loadingLine = el('div', { className: 'terminal-line loading' }, [
@@ -339,7 +344,7 @@ function showTerminalView(page, device) {
     scrollToBottom(outputEl);
 
     try {
-      const result = await api.terminalExecute(terminalToken, dev.id, command, totpCode);
+      const result = await api.terminalExecute(session.token, dev.id, command, totpCode);
       loadingLine.remove();
 
       if (result.expired) {
@@ -376,8 +381,8 @@ function showTerminalView(page, device) {
 
       // Update current working directory
       if (result.cwd) {
-        currentCwd = result.cwd;
-        updatePromptLabel(currentCwd);
+        session.cwd = result.cwd;
+        updatePromptLabel(session.cwd);
       }
 
       // Show error if present
@@ -501,10 +506,10 @@ function showTerminalView(page, device) {
 
     // Handle clear command locally
     if (command === 'clear') {
-      output.innerHTML = '';
+      output.replaceChildren();
       cmdInput.value = '';
-      commandHistory.push(command);
-      historyIndex = commandHistory.length;
+      session.history.push(command);
+      session.historyIndex = session.history.length;
       return;
     }
 
@@ -512,20 +517,20 @@ function showTerminalView(page, device) {
 
     try {
       // Add to history
-      commandHistory.push(command);
-      if (commandHistory.length > 500) commandHistory.shift();
-      historyIndex = commandHistory.length;
+      session.history.push(command);
+      if (session.history.length > 500) session.history.shift();
+      session.historyIndex = session.history.length;
       cmdInput.value = '';
 
       // Check token expiry
-      if (Date.now() > tokenExpiresAt) {
+      if (Date.now() > session.expiresAt) {
         showSessionExpired(page);
         return;
       }
 
       // Show command in output with current working directory
       const cmdLine = el('div', { className: 'terminal-line' }, [
-        el('span', { className: 'terminal-line-prompt', textContent: `${device.name}:${currentCwd}$ ` }),
+        el('span', { className: 'terminal-line-prompt', textContent: `${device.name}:${session.cwd}$ ` }),
         el('span', { className: 'terminal-line-cmd', textContent: command }),
       ]);
       output.appendChild(cmdLine);
@@ -563,17 +568,17 @@ function showTerminalView(page, device) {
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (historyIndex > 0) {
-        historyIndex--;
-        cmdInput.value = commandHistory[historyIndex];
+      if (session.historyIndex > 0) {
+        session.historyIndex--;
+        cmdInput.value = session.history[session.historyIndex];
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (historyIndex < commandHistory.length - 1) {
-        historyIndex++;
-        cmdInput.value = commandHistory[historyIndex];
+      if (session.historyIndex < session.history.length - 1) {
+        session.historyIndex++;
+        cmdInput.value = session.history[session.historyIndex];
       } else {
-        historyIndex = commandHistory.length;
+        session.historyIndex = session.history.length;
         cmdInput.value = '';
       }
     }
@@ -583,8 +588,8 @@ function showTerminalView(page, device) {
 }
 
 function showSessionExpired(page) {
-  if (sessionTimer) clearInterval(sessionTimer);
-  terminalToken = null;
+  if (session.timer) clearInterval(session.timer);
+  session.token = null;
 
   const container = page.querySelector('.terminal-container');
   if (container) {

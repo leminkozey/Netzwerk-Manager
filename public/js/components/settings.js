@@ -4,7 +4,7 @@
 
 import { t, setLanguage, getCurrentLang } from '../i18n.js';
 import { state, defaults, STORAGE_KEYS, getConfig } from '../state.js';
-import { el, applyTheme, applyGlowStrength, applyAccentColor, applyButtonStyle, showToast } from '../ui.js';
+import { el, applyTheme, applyGlowStrength, applyAccentColor, applyButtonStyle, showToast, showConfirm } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 import { handleLogout } from '../auth.js';
@@ -527,10 +527,15 @@ async function handleImport(file) {
     const text = await file.text();
     let parsed = JSON.parse(text);
     if (parsed.data) parsed = parsed.data;
-    if (!confirm(t('msg.confirmOverwrite'))) return;
-    await api.importData(parsed);
-    showToast(t('msg.imported'));
-    setTimeout(() => location.reload(), 1500);
+    showConfirm(t('msg.confirmOverwrite'), '', async () => {
+      try {
+        await api.importData(parsed);
+        showToast(t('msg.imported'));
+        setTimeout(() => location.reload(), 1500);
+      } catch {
+        showToast(t('msg.invalidJson'), true);
+      }
+    });
   } catch {
     showToast(t('msg.invalidJson'), true);
   }
