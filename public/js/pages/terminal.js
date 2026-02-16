@@ -254,6 +254,21 @@ function showTerminalView(page, device) {
     el('div', { className: 'terminal-header-right' }, [
       timerEl,
       el('button', {
+        className: 'terminal-header-btn fullscreen-btn',
+        title: 'Fullscreen',
+        onClick: (e) => {
+          const container = e.target.closest('.terminal-container');
+          container.classList.toggle('fullscreen');
+        },
+      }, [
+        el('div', { className: 'fullscreen-icon' }, [
+          el('div', { className: 'corner corner-tl' }),
+          el('div', { className: 'corner corner-tr' }),
+          el('div', { className: 'corner corner-bl' }),
+          el('div', { className: 'corner corner-br' }),
+        ]),
+      ]),
+      el('button', {
         className: 'terminal-header-btn',
         textContent: t('terminal.switchDevice'),
         onClick: () => {
@@ -540,6 +555,12 @@ function showTerminalView(page, device) {
   cmdInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       executeCommand();
+    } else if (e.key === 'Escape') {
+      const container = e.target.closest('.terminal-container');
+      if (container && container.classList.contains('fullscreen')) {
+        e.preventDefault();
+        container.classList.remove('fullscreen');
+      }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (historyIndex > 0) {

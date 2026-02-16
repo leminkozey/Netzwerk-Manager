@@ -4976,6 +4976,7 @@ input.shake {
   color: var(--accent);
   white-space: nowrap;
   flex-shrink: 0;
+  margin-right: 12px;
 }
 .terminal-cmd-input {
   flex: 1;
@@ -4985,8 +4986,15 @@ input.shake {
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.85rem;
   color: #e6edf3;
-  caret-color: #58a6ff;
+  caret-color: #e6edf3;
   padding: 0;
+}
+input[type='text'].terminal-cmd-input:focus,
+input[type='text'].terminal-cmd-input:focus-visible {
+  outline: none;
+  border: none;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 /* Dangerous Command Overlay */
@@ -5052,6 +5060,126 @@ input.shake {
 }
 
 /* Terminal responsive */
+/* Terminal Fullscreen Mode */
+.terminal-container.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  border-radius: 0;
+  z-index: 9999;
+  animation: terminal-zoom-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes terminal-zoom-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.terminal-container.fullscreen .terminal-output {
+  max-height: calc(100vh - 140px);
+}
+
+/* Fullscreen Button Animation */
+.terminal-header-btn.fullscreen-btn {
+  padding: 5px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.terminal-header-btn.fullscreen-btn .fullscreen-icon {
+  width: 14px;
+  height: 14px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.terminal-header-btn.fullscreen-btn:hover .fullscreen-icon {
+  transform: scale(1.1);
+}
+
+.terminal-header-btn.fullscreen-btn .fullscreen-icon .corner {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border: 1.5px solid currentColor;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-tl {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+}
+
+.terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-tr {
+  top: 0;
+  right: 0;
+  border-left: none;
+  border-bottom: none;
+}
+
+.terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-bl {
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+}
+
+.terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-br {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+}
+
+/* When fullscreen is active - corners move inward */
+.terminal-container.fullscreen .terminal-header-btn.fullscreen-btn .fullscreen-icon .corner {
+  width: 4px;
+  height: 4px;
+}
+
+.terminal-container.fullscreen .terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-tl {
+  top: 2px;
+  left: 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+}
+
+.terminal-container.fullscreen .terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-tr {
+  top: 2px;
+  right: 2px;
+  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+}
+
+.terminal-container.fullscreen .terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-bl {
+  bottom: 2px;
+  left: 2px;
+  border-right: 1.5px solid currentColor;
+  border-top: 1.5px solid currentColor;
+}
+
+.terminal-container.fullscreen .terminal-header-btn.fullscreen-btn .fullscreen-icon .corner-br {
+  bottom: 2px;
+  right: 2px;
+  border-left: 1.5px solid currentColor;
+  border-top: 1.5px solid currentColor;
+}
+
 @media (max-width: 600px) {
   .terminal-container {
     height: calc(100vh - 160px);
