@@ -14,6 +14,7 @@ let tokenExpiresAt = 0;
 let sessionTimer = null;
 let commandHistory = [];
 let historyIndex = -1;
+let currentCwd = '~'; // Track current working directory
 
 export function renderTerminal(container) {
   const cfg = getConfig();
@@ -37,10 +38,14 @@ export function renderTerminal(container) {
   // Cleanup on navigation
   return () => {
     if (sessionTimer) clearInterval(sessionTimer);
+    if (terminalToken) {
+      api.terminalDisconnect(terminalToken);
+    }
     terminalToken = null;
     tokenExpiresAt = 0;
     commandHistory = [];
     historyIndex = -1;
+    currentCwd = '~';
   };
 }
 
@@ -253,6 +258,8 @@ function showTerminalView(page, device) {
         textContent: t('terminal.switchDevice'),
         onClick: () => {
           clearInterval(sessionTimer);
+          if (terminalToken) api.terminalDisconnect(terminalToken);
+          currentCwd = '~';
           showDeviceSelection(page);
         },
       }),
@@ -261,7 +268,9 @@ function showTerminalView(page, device) {
         textContent: t('terminal.disconnect'),
         onClick: () => {
           clearInterval(sessionTimer);
+          if (terminalToken) api.terminalDisconnect(terminalToken);
           terminalToken = null;
+          currentCwd = '~';
           showTotpGate(page);
         },
       }),
@@ -293,6 +302,167 @@ function showTerminalView(page, device) {
     cmdInput,
   ]);
 
+  // Function to update prompt with current working directory
+  const updatePromptLabel = (cwd) => {
+    const promptText = `${device.name}:${cwd}$ `;
+    promptLabel.textContent = promptText;
+  };
+
+  // Initialize prompt
+  updatePromptLabel(currentCwd);
+
+  async function runCommand(outputEl, dev, command, totpCode) {
+    const loadingLine = el('div', { className: 'terminal-line loading' }, [
+      el('span', { textContent: t('terminal.executing') + ' ' }),
+      el('span', { className: 'terminal-loading-dots', style: { display: 'inline-flex', gap: '3px', verticalAlign: 'middle' } }, [
+        el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
+        el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
+        el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
+      ]),
+    ]);
+    outputEl.appendChild(loadingLine);
+    scrollToBottom(outputEl);
+
+    try {
+      const result = await api.terminalExecute(terminalToken, dev.id, command, totpCode);
+      loadingLine.remove();
+
+      if (result.expired) {
+        const expLine = el('div', { className: 'terminal-line error', textContent: t('terminal.sessionExpired') });
+        outputEl.appendChild(expLine);
+        return;
+      }
+
+      if (result.rateLimited) {
+        const rlLine = el('div', { className: 'terminal-line error', textContent: t('terminal.rateLimited') });
+        outputEl.appendChild(rlLine);
+        return;
+      }
+
+      // Backend flagged as dangerous but we didn't send TOTP code
+      if (!result.success && result.dangerous && !totpCode) {
+        return 'needs-totp';
+      }
+
+      if (!result.success && result.error) {
+        const errLine = el('div', { className: 'terminal-line error', textContent: result.error });
+        outputEl.appendChild(errLine);
+        return;
+      }
+
+      // Show output (combined stdout/stderr in PTY mode)
+      if (result.output && result.output.trim()) {
+        const outputBlock = el('pre', {
+          className: 'terminal-line stdout',
+          textContent: result.output
+        });
+        outputEl.appendChild(outputBlock);
+      }
+
+      // Update current working directory
+      if (result.cwd) {
+        currentCwd = result.cwd;
+        updatePromptLabel(currentCwd);
+      }
+
+      // Show error if present
+      if (result.error) {
+        const errLine = el('div', {
+          className: 'terminal-line error',
+          textContent: result.error
+        });
+        outputEl.appendChild(errLine);
+      }
+
+      // Show exit code only if non-zero
+      if (result.exitCode && result.exitCode !== 0) {
+        const exitLine = el('div', { className: 'terminal-line error', textContent: `exit code: ${result.exitCode}` });
+        outputEl.appendChild(exitLine);
+      }
+
+      // NO MORE "(ok)" - if command has no output, show nothing (like real terminal)
+    } catch {
+      loadingLine.remove();
+      const errLine = el('div', { className: 'terminal-line error', textContent: t('terminal.error') });
+      outputEl.appendChild(errLine);
+    }
+
+    scrollToBottom(outputEl);
+  }
+
+  async function handleDangerousCommand(outputEl, dev, command, inputEl) {
+    return new Promise((resolve) => {
+      const overlay = el('div', { className: 'dangerous-overlay' });
+
+      const codeInput = el('input', {
+        type: 'text',
+        className: 'totp-input',
+        maxLength: '6',
+        placeholder: '000000',
+        autocomplete: 'one-time-code',
+        inputMode: 'numeric',
+        pattern: '[0-9]{6}',
+      });
+
+      const statusMsg = el('div', { className: 'totp-status' });
+
+      const confirmBtn = el('button', {
+        className: 'btn danger',
+        textContent: t('terminal.dangerousConfirm'),
+      });
+
+      const cancelBtn = el('button', {
+        className: 'btn secondary',
+        textContent: t('ui.cancel'),
+      });
+
+      overlay.appendChild(el('div', { className: 'dangerous-modal' }, [
+        el('h3', { textContent: t('terminal.dangerousTitle') }),
+        el('p', { textContent: t('terminal.dangerousHint') }),
+        el('pre', { className: 'dangerous-command', textContent: command }),
+        codeInput,
+        statusMsg,
+        el('div', { className: 'dangerous-actions' }, [cancelBtn, confirmBtn]),
+      ]));
+
+      cancelBtn.addEventListener('click', () => {
+        overlay.remove();
+        const cancelLine = el('div', { className: 'terminal-line error', textContent: 'Aborted.' });
+        outputEl.appendChild(cancelLine);
+        scrollToBottom(outputEl);
+        if (inputEl) inputEl.focus();
+        resolve();
+      });
+
+      let isConfirming = false;
+      async function doConfirm() {
+        const code = codeInput.value.trim();
+        if (!/^\d{6}$/.test(code) || isConfirming) return;
+        isConfirming = true;
+        confirmBtn.disabled = true;
+        confirmBtn.classList.add('loading');
+        statusMsg.textContent = '';
+
+        overlay.remove();
+        await runCommand(outputEl, dev, command, code);
+        if (inputEl) inputEl.focus();
+        resolve();
+      }
+
+      confirmBtn.addEventListener('click', doConfirm);
+      codeInput.addEventListener('keyup', e => {
+        if (e.key === 'Enter') doConfirm();
+      });
+      codeInput.addEventListener('input', () => {
+        codeInput.value = codeInput.value.replace(/\D/g, '');
+        if (codeInput.value.length === 6) doConfirm();
+      });
+
+      document.querySelector('.terminal-container')?.appendChild(overlay);
+      setTimeout(() => codeInput.focus(), 100);
+    });
+  }
+
   const termContainer = el('div', { className: 'terminal-container' }, [
     header,
     output,
@@ -314,6 +484,15 @@ function showTerminalView(page, device) {
     const command = cmdInput.value.trim();
     if (!command || isExecuting) return;
 
+    // Handle clear command locally
+    if (command === 'clear') {
+      output.innerHTML = '';
+      cmdInput.value = '';
+      commandHistory.push(command);
+      historyIndex = commandHistory.length;
+      return;
+    }
+
     isExecuting = true;
 
     try {
@@ -329,9 +508,9 @@ function showTerminalView(page, device) {
         return;
       }
 
-      // Show command in output
+      // Show command in output with current working directory
       const cmdLine = el('div', { className: 'terminal-line' }, [
-        el('span', { className: 'terminal-line-prompt', textContent: `${device.name}:~$ ` }),
+        el('span', { className: 'terminal-line-prompt', textContent: `${device.name}:${currentCwd}$ ` }),
         el('span', { className: 'terminal-line-cmd', textContent: command }),
       ]);
       output.appendChild(cmdLine);
@@ -380,150 +559,6 @@ function showTerminalView(page, device) {
   });
 
   setTimeout(() => cmdInput.focus(), 100);
-}
-
-async function runCommand(output, device, command, totpCode) {
-  const loadingLine = el('div', { className: 'terminal-line loading' }, [
-    el('span', { textContent: t('terminal.executing') + ' ' }),
-    el('span', { className: 'terminal-loading-dots', style: { display: 'inline-flex', gap: '3px', verticalAlign: 'middle' } }, [
-      el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
-      el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
-      el('span', { style: { width: '4px', height: '4px', borderRadius: '50%', background: '#8b949e', display: 'inline-block' } }),
-    ]),
-  ]);
-  output.appendChild(loadingLine);
-  scrollToBottom(output);
-
-  try {
-    const result = await api.terminalExecute(terminalToken, device.id, command, totpCode);
-    loadingLine.remove();
-
-    if (result.expired) {
-      const expLine = el('div', { className: 'terminal-line error', textContent: t('terminal.sessionExpired') });
-      output.appendChild(expLine);
-      return;
-    }
-
-    if (result.rateLimited) {
-      const rlLine = el('div', { className: 'terminal-line error', textContent: t('terminal.rateLimited') });
-      output.appendChild(rlLine);
-      return;
-    }
-
-    // Backend flagged as dangerous but we didn't send TOTP code
-    if (!result.success && result.dangerous && !totpCode) {
-      return 'needs-totp';
-    }
-
-    if (!result.success && result.error) {
-      const errLine = el('div', { className: 'terminal-line error', textContent: result.error });
-      output.appendChild(errLine);
-      return;
-    }
-
-    // Show stdout
-    if (result.stdout) {
-      const stdoutBlock = el('pre', { className: 'terminal-line stdout', textContent: result.stdout });
-      output.appendChild(stdoutBlock);
-    }
-
-    // Show stderr
-    if (result.stderr) {
-      const stderrBlock = el('pre', { className: 'terminal-line stderr', textContent: result.stderr });
-      output.appendChild(stderrBlock);
-    }
-
-    // Show exit code if non-zero
-    if (result.exitCode && result.exitCode !== 0) {
-      const exitLine = el('div', { className: 'terminal-line error', textContent: `exit code: ${result.exitCode}` });
-      output.appendChild(exitLine);
-    }
-
-    // Empty result feedback
-    if (!result.stdout && !result.stderr && (!result.exitCode || result.exitCode === 0)) {
-      const okLine = el('div', { className: 'terminal-line', style: { color: '#3fb950', fontStyle: 'italic' }, textContent: '(ok)' });
-      output.appendChild(okLine);
-    }
-  } catch {
-    loadingLine.remove();
-    const errLine = el('div', { className: 'terminal-line error', textContent: t('terminal.error') });
-    output.appendChild(errLine);
-  }
-
-  scrollToBottom(output);
-}
-
-async function handleDangerousCommand(output, device, command, cmdInput) {
-  return new Promise((resolve) => {
-    const overlay = el('div', { className: 'dangerous-overlay' });
-
-    const codeInput = el('input', {
-      type: 'text',
-      className: 'totp-input',
-      maxLength: '6',
-      placeholder: '000000',
-      autocomplete: 'one-time-code',
-      inputMode: 'numeric',
-      pattern: '[0-9]{6}',
-    });
-
-    const statusMsg = el('div', { className: 'totp-status' });
-
-    const confirmBtn = el('button', {
-      className: 'btn danger',
-      textContent: t('terminal.dangerousConfirm'),
-    });
-
-    const cancelBtn = el('button', {
-      className: 'btn secondary',
-      textContent: t('ui.cancel'),
-    });
-
-    overlay.appendChild(el('div', { className: 'dangerous-modal' }, [
-      el('h3', { textContent: t('terminal.dangerousTitle') }),
-      el('p', { textContent: t('terminal.dangerousHint') }),
-      el('pre', { className: 'dangerous-command', textContent: command }),
-      codeInput,
-      statusMsg,
-      el('div', { className: 'dangerous-actions' }, [cancelBtn, confirmBtn]),
-    ]));
-
-    cancelBtn.addEventListener('click', () => {
-      overlay.remove();
-      const cancelLine = el('div', { className: 'terminal-line error', textContent: 'Aborted.' });
-      output.appendChild(cancelLine);
-      scrollToBottom(output);
-      if (cmdInput) cmdInput.focus();
-      resolve();
-    });
-
-    let isConfirming = false;
-    async function doConfirm() {
-      const code = codeInput.value.trim();
-      if (!/^\d{6}$/.test(code) || isConfirming) return;
-      isConfirming = true;
-      confirmBtn.disabled = true;
-      confirmBtn.classList.add('loading');
-      statusMsg.textContent = '';
-
-      overlay.remove();
-      await runCommand(output, device, command, code);
-      if (cmdInput) cmdInput.focus();
-      resolve();
-    }
-
-    confirmBtn.addEventListener('click', doConfirm);
-    codeInput.addEventListener('keyup', e => {
-      if (e.key === 'Enter') doConfirm();
-    });
-    codeInput.addEventListener('input', () => {
-      codeInput.value = codeInput.value.replace(/\D/g, '');
-      if (codeInput.value.length === 6) doConfirm();
-    });
-
-    document.querySelector('.terminal-container')?.appendChild(overlay);
-    setTimeout(() => codeInput.focus(), 100);
-  });
 }
 
 function showSessionExpired(page) {

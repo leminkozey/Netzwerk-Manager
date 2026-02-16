@@ -186,12 +186,6 @@ export async function getControlDevice(deviceId) {
   return res.json();
 }
 
-export async function getControlDevicePassword(deviceId) {
-  const res = await request(`/api/control/${encodeURIComponent(deviceId)}/password`);
-  if (!res.ok) throw new Error('Failed to get password');
-  return res.json();
-}
-
 export async function saveControlDevice(deviceId, config) {
   const res = await request(`/api/control/${encodeURIComponent(deviceId)}`, {
     method: 'POST',
@@ -416,6 +410,13 @@ export async function terminalExecute(token, deviceId, command, totpCode) {
     body: JSON.stringify(body),
   });
   return res.json();
+}
+
+export async function terminalDisconnect(token) {
+  await request('/api/terminal/disconnect', {
+    method: 'POST',
+    headers: { 'X-Terminal-Token': token },
+  }).catch(() => {});
 }
 
 // ── Logout ──

@@ -280,6 +280,254 @@ function checkTotpRateLimit(ip) {
   return { allowed: true, retryAfter: 0 };
 }
 
+// ── Persistent SSH Sessions for Terminal (PTY-based) ──
+const activeSshSessions = new Map(); // terminalToken -> { connection, shell, cwd, deviceId, lastActivity }
+const pendingSshSessions = new Map(); // terminalToken -> Promise (prevents duplicate concurrent connections)
+const SSH_SESSION_TIMEOUT = 180000; // 3 minutes (matches terminal token expiry)
+
+// Cleanup expired SSH sessions every 30 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of activeSshSessions.entries()) {
+    if (now - session.lastActivity > SSH_SESSION_TIMEOUT) {
+      cleanupSshSession(token);
+    }
+  }
+}, 30000);
+
+function cleanupSshSession(token) {
+  const session = activeSshSessions.get(token);
+  if (session) {
+    if (session.shell) session.shell.end();
+    if (session.connection) session.connection.end();
+    activeSshSessions.delete(token);
+    console.log(`[SSH-SESSION] Cleaned up session for token ${token.substring(0, 8)}...`);
+  }
+}
+
+async function getOrCreateSshSession(terminalToken, deviceId, sshConfig) {
+  // Return pending creation promise if one exists (prevents duplicate concurrent connections)
+  if (pendingSshSessions.has(terminalToken)) {
+    return pendingSshSessions.get(terminalToken);
+  }
+
+  const existing = activeSshSessions.get(terminalToken);
+
+  // Return existing session if valid and for same device
+  if (existing && existing.deviceId === deviceId && existing.connection._sock && !existing.connection._sock.destroyed) {
+    existing.lastActivity = Date.now();
+    return existing;
+  }
+
+  // Clean up invalid session
+  if (existing) {
+    cleanupSshSession(terminalToken);
+  }
+
+  // Register promise BEFORE starting async work to prevent TOCTOU race
+  const promise = _createNewSshSession(terminalToken, deviceId, sshConfig);
+  pendingSshSessions.set(terminalToken, promise);
+
+  try {
+    return await promise;
+  } finally {
+    pendingSshSessions.delete(terminalToken);
+  }
+}
+
+async function _createNewSshSession(terminalToken, deviceId, sshConfig) {
+  const { Client } = require('ssh2');
+  const conn = new Client();
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      conn.end();
+      reject(new Error('SSH connection timeout'));
+    }, 10000);
+
+    conn.on('ready', () => {
+      clearTimeout(timeout);
+
+      // Request PTY shell with proper terminal size
+      conn.shell({
+        term: 'xterm-256color',
+        cols: 120,
+        rows: 30,
+        modes: {
+          // Disable echo to prevent command duplication
+          ECHO: 0,
+        }
+      }, (err, stream) => {
+        if (err) {
+          conn.end();
+          return reject(err);
+        }
+
+        const session = {
+          connection: conn,
+          shell: stream,
+          cwd: '~', // Initial working directory
+          deviceId,
+          lastActivity: Date.now(),
+        };
+
+        activeSshSessions.set(terminalToken, session);
+
+        // Clear initial shell prompt output
+        let initialOutput = '';
+        let resolved = false;
+        const clearInitial = (data) => {
+          initialOutput += data.toString();
+          // Wait for first prompt to appear
+          if (!resolved && (initialOutput.includes('$') || initialOutput.includes('#'))) {
+            resolved = true;
+            stream.removeListener('data', clearInitial);
+            clearTimeout(promptTimeout);
+            resolve(session);
+          }
+        };
+        stream.on('data', clearInitial);
+
+        // Timeout for initial prompt
+        const promptTimeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            stream.removeListener('data', clearInitial);
+            resolve(session);
+          }
+        }, 2000);
+      });
+    });
+
+    conn.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+
+    // Validate config before connecting
+    const { ipAddress, sshUser, sshPort } = sshConfig;
+    const sshPassword = sshConfig._sshPasswordDecrypted || decryptValue(sshConfig.sshPassword);
+
+    if (!VALIDATION.ipAddress.test(ipAddress)) {
+      clearTimeout(timeout);
+      return reject(new Error('Invalid IP address'));
+    }
+    if (!VALIDATION.sshUser.test(sshUser)) {
+      clearTimeout(timeout);
+      return reject(new Error('Invalid SSH user'));
+    }
+    if (!VALIDATION.sshPort(sshPort)) {
+      clearTimeout(timeout);
+      return reject(new Error('Invalid SSH port'));
+    }
+    if (typeof sshPassword !== 'string' || sshPassword.length === 0) {
+      clearTimeout(timeout);
+      return reject(new Error('SSH password missing'));
+    }
+
+    // Connect
+    conn.connect({
+      host: ipAddress,
+      port: sshPort || 22,
+      username: sshUser,
+      password: sshPassword,
+      readyTimeout: 10000,
+    });
+  });
+}
+
+async function executeSshCommand(session, command) {
+  return new Promise((resolve) => {
+    const { shell } = session;
+    let output = '';
+    let isComplete = false;
+    const MAX_OUTPUT = 1024 * 1024; // 1MB
+
+    // Handle 'clear' command specially (no shell interaction needed)
+    if (command.trim() === 'clear') {
+      return resolve({
+        output: '\x1b[2J\x1b[H',
+        cwd: session.cwd,
+        exitCode: 0,
+      });
+    }
+
+    // Unique marker that cannot appear in normal command output
+    const marker = `__CMD_DONE_${crypto.randomBytes(12).toString('hex')}__`;
+
+    const dataHandler = (data) => {
+      output += data.toString();
+
+      if (output.length > MAX_OUTPUT) {
+        cleanup();
+        resolve({
+          output: output.substring(0, MAX_OUTPUT),
+          cwd: session.cwd,
+          exitCode: 0,
+          error: 'Output too large (truncated)',
+        });
+        return;
+      }
+
+      // Check if the unique marker has appeared, indicating command completion
+      const markerIdx = output.indexOf(marker);
+      if (markerIdx !== -1) {
+        cleanup();
+
+        // Everything before the marker line is command output
+        const beforeMarker = output.substring(0, markerIdx);
+
+        // After the marker, look for pwd output to track cwd
+        const afterMarker = output.substring(markerIdx + marker.length);
+        const cwdMatch = afterMarker.match(/\n?(\/[^\n\r]*)/);
+        if (cwdMatch) {
+          session.cwd = cwdMatch[1].trim();
+        }
+
+        // Clean the output: remove the echoed compound command (first line)
+        const lines = beforeMarker.split('\n');
+        if (lines.length > 0) {
+          lines.shift();
+        }
+        while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+          lines.pop();
+        }
+
+        resolve({
+          output: lines.join('\n').trim(),
+          cwd: session.cwd,
+          exitCode: 0,
+        });
+      }
+    };
+
+    shell.on('data', dataHandler);
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve({
+        output: output || '',
+        cwd: session.cwd,
+        exitCode: -1,
+        error: 'Command timeout',
+      });
+    }, 30000);
+
+    const cleanup = () => {
+      if (!isComplete) {
+        isComplete = true;
+        shell.removeListener('data', dataHandler);
+        clearTimeout(timeout);
+      }
+    };
+
+    // Send command, then echo the unique marker, then pwd to track cwd.
+    // This works uniformly for ALL commands including cd -- no special cases needed.
+    shell.write(`${command}; echo "${marker}"; pwd\n`);
+    session.lastActivity = Date.now();
+  });
+}
+
 // Terminal audit logging
 const TERMINAL_AUDIT_FILE = path.join(__dirname, 'Data', 'terminal-audit.json');
 const TERMINAL_AUDIT_MAX = 1000;
@@ -308,85 +556,22 @@ function terminalAuthRequired(req, res, next) {
   if (!token) return res.status(401).json({ expired: true });
   const session = runtime.terminalSessions.get(token);
   if (!session || Date.now() > session.expiresAt) {
-    if (session) runtime.terminalSessions.delete(token);
+    if (session) {
+      runtime.terminalSessions.delete(token);
+      cleanupSshSession(token);
+    }
     return res.status(401).json({ expired: true });
   }
   // Bind session to original IP
   const clientIp = getClientIp(req);
   if (session.ip !== clientIp) {
     runtime.terminalSessions.delete(token);
+    cleanupSshSession(token);
     console.warn(`[TERMINAL] Token IP mismatch: session=${sanitizeLogParam(session.ip)} request=${sanitizeLogParam(clientIp)}`);
     return res.status(401).json({ expired: true });
   }
   req.terminalSession = session;
   next();
-}
-
-function sshTerminalCommand(config, command, timeoutSec) {
-  return new Promise((resolve) => {
-    const { ipAddress, sshUser, sshPort } = config;
-    const sshPassword = config._sshPasswordDecrypted || decryptValue(config.sshPassword);
-
-    if (!VALIDATION.ipAddress.test(ipAddress)) return resolve({ stdout: '', stderr: 'Invalid IP', code: -1 });
-    if (!VALIDATION.sshUser.test(sshUser)) return resolve({ stdout: '', stderr: 'Invalid SSH user', code: -1 });
-    if (!VALIDATION.sshPort(sshPort)) return resolve({ stdout: '', stderr: 'Invalid SSH port', code: -1 });
-    if (typeof sshPassword !== 'string' || sshPassword.length === 0) return resolve({ stdout: '', stderr: 'SSH password missing', code: -1 });
-
-    const sshArgs = [
-      '-o', 'StrictHostKeyChecking=accept-new',
-      '-o', 'ConnectTimeout=5',
-      '-o', 'BatchMode=no',
-      '-p', String(sshPort),
-      `${sshUser}@${ipAddress}`,
-      command,
-    ];
-
-    const sshpass = spawn('sshpass', ['-e', 'ssh', ...sshArgs], {
-      env: { ...process.env, SSHPASS: sshPassword },
-    });
-
-    let settled = false;
-    let stdout = '';
-    let stderr = '';
-    const MAX_OUTPUT = 1024 * 1024; // 1MB
-
-    const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        sshpass.kill();
-        resolve({ stdout: stdout.trim(), stderr: 'Command timeout', code: -1 });
-      }
-    }, (timeoutSec || 30) * 1000);
-
-    sshpass.stdout.on('data', (data) => {
-      stdout += data.toString();
-      if (stdout.length > MAX_OUTPUT && !settled) {
-        settled = true; clearTimeout(timer); sshpass.kill();
-        resolve({ stdout: stdout.substring(0, MAX_OUTPUT).trim(), stderr: 'Output too large', code: -1 });
-      }
-    });
-    sshpass.stderr.on('data', (data) => {
-      if (stderr.length < MAX_OUTPUT) stderr += data.toString();
-    });
-
-    sshpass.on('close', (code) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (stderr.includes('Permanently added')) {
-        console.warn(`[Terminal-SSH] New host key accepted for ${sanitizeLogParam(ipAddress)}`);
-      }
-      resolve({ stdout: stdout.trim(), stderr: stderr.trim(), code: code ?? -1 });
-    });
-
-    sshpass.on('error', (err) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      sshpass.kill();
-      resolve({ stdout: '', stderr: err.code === 'ENOENT' ? 'sshpass not installed' : 'SSH connection failed', code: -1 });
-    });
-  });
 }
 
 function broadcastToAll(type, data) {
@@ -1256,12 +1441,6 @@ function checkPasswordRateLimit(ip) {
 // Sanitize log parameters to prevent log injection
 function sanitizeLogParam(str) {
   return String(str).replace(/[\r\n\t\x00-\x1f]/g, '_');
-}
-
-// Audit logging for sensitive operations
-function logPCAction(action, ip, success, details = '') {
-  const timestamp = new Date().toISOString();
-  console.log(`[PC-AUDIT] ${timestamp} | ${sanitizeLogParam(action)} | IP: ${sanitizeLogParam(ip)} | Success: ${success} | ${sanitizeLogParam(details)}`);
 }
 
 function sendWakeOnLan(macAddress) {
@@ -4300,24 +4479,6 @@ app.get('/api/control/:deviceId/status', authRequired, async (req, res) => {
   res.json({ online, configured: true });
 });
 
-// GET password - reveal decrypted SSH password
-app.get('/api/control/:deviceId/password', authRequired, (req, res) => {
-  const deviceId = req.params.deviceId;
-  if (!isValidDeviceId(deviceId)) return res.status(400).json({ error: 'Invalid device ID' });
-  const clientIp = getClientIp(req);
-
-  if (!checkPasswordRateLimit(clientIp)) {
-    return res.status(429).json({ error: 'Too many requests' });
-  }
-
-  const configDevices = readControlDevicesFromConfig();
-  const device = configDevices.find(d => d.id === deviceId);
-  if (!device) return res.status(404).json({ error: 'Device not found' });
-
-  const creds = readControlDeviceCredentials(deviceId);
-  res.json({ password: creds._sshPasswordDecrypted || '' });
-});
-
 // POST action - execute wake/restart/shutdown
 app.post('/api/control/:deviceId/:action', authRequired, async (req, res) => {
   const { deviceId, action } = req.params;
@@ -5216,7 +5377,10 @@ app.post('/api/terminal/auth', authRequired, (req, res) => {
         oldestTime = s.expiresAt;
       }
     }
-    if (oldestToken) runtime.terminalSessions.delete(oldestToken);
+    if (oldestToken) {
+      runtime.terminalSessions.delete(oldestToken);
+      cleanupSshSession(oldestToken);
+    }
   }
 
   // Create terminal token
@@ -5261,6 +5425,7 @@ app.get('/api/terminal/devices', authRequired, terminalAuthRequired, (req, res) 
 app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req, res) => {
   const { deviceId, command, totpCode } = req.body || {};
   const clientIp = getClientIp(req);
+  const terminalToken = req.headers['x-terminal-token'] || req.terminalToken;
 
   // Validate inputs
   if (!deviceId || typeof deviceId !== 'string' || !isValidDeviceId(deviceId)) {
@@ -5268,6 +5433,9 @@ app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req
   }
   if (!command || typeof command !== 'string' || command.length > 2000) {
     return res.status(400).json({ success: false, error: 'Invalid command' });
+  }
+  if (/[\n\r\x00]/.test(command)) {
+    return res.status(400).json({ success: false, error: 'Command contains invalid control characters' });
   }
 
   // Rate limit
@@ -5324,26 +5492,45 @@ app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req
     sshPort: creds.sshPort || 22,
   };
 
-  const timeoutSec = Math.max(5, Math.min(120, Number(cfg.terminal.commandTimeout) || 30));
-  const result = await sshTerminalCommand(sshConfig, command, timeoutSec);
+  try {
+    // Get or create persistent SSH session
+    const session = await getOrCreateSshSession(terminalToken, deviceId, sshConfig);
 
-  // Audit log
-  logTerminalAudit({
-    username: req.terminalSession.username,
-    ip: clientIp,
-    deviceId,
-    command: command.substring(0, 500),
-    exitCode: result.code,
-    dangerous: isDangerous,
-  });
+    // Execute command in persistent shell
+    const result = await executeSshCommand(session, command);
 
-  res.json({
-    success: result.code === 0,
-    stdout: result.stdout,
-    stderr: result.stderr,
-    exitCode: result.code,
-    dangerous: isDangerous,
-  });
+    // Audit log
+    logTerminalAudit({
+      username: req.terminalSession.username,
+      ip: clientIp,
+      deviceId,
+      command: command.substring(0, 500),
+      exitCode: result.exitCode,
+      dangerous: isDangerous,
+    });
+
+    res.json({
+      success: result.exitCode === 0,
+      output: result.output,
+      cwd: result.cwd,
+      exitCode: result.exitCode,
+      error: result.error,
+      dangerous: isDangerous,
+    });
+  } catch (err) {
+    console.error('[TERMINAL-EXEC] Error:', err);
+    cleanupSshSession(terminalToken);
+    res.status(500).json({
+      success: false,
+      error: 'SSH connection failed',
+    });
+  }
+});
+
+app.post('/api/terminal/disconnect', authRequired, terminalAuthRequired, (req, res) => {
+  const terminalToken = req.headers['x-terminal-token'] || req.terminalToken;
+  cleanupSshSession(terminalToken);
+  res.json({ success: true });
 });
 
 app.use((req, res) => {
@@ -5495,6 +5682,7 @@ function startServer() {
     for (const [token, session] of runtime.terminalSessions.entries()) {
       if (now > session.expiresAt) {
         runtime.terminalSessions.delete(token);
+        cleanupSshSession(token);
       }
     }
 
