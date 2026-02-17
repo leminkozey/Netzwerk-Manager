@@ -1,84 +1,84 @@
 // ═══════════════════════════════════════════════════════════════════
-// Website-Konfiguration (Beispiel)
+// Website Configuration (Example)
 // ═══════════════════════════════════════════════════════════════════
-// Kopiere diese Datei nach config.js und passe die Werte an.
-// Alle Werte hier sind Beispiele – ersetze IPs, Links und Namen
-// durch deine eigenen.
+// Copy this file to config.js and adjust the values.
+// All values here are examples – replace IPs, links, and names
+// with your own.
 // ═══════════════════════════════════════════════════════════════════
 
 const siteConfig = {
 
   // ┌─────────────────────────────────────────────┐
-  // │             ALLGEMEIN                       │
+  // │             GENERAL                         │
   // └─────────────────────────────────────────────┘
 
-  // ── Animationen ──
-  // Steuert alle visuellen Animationen der Oberfläche.
-  // Mit enabled: false werden sämtliche Animationen deaktiviert.
+  // ── Animations ──
+  // Controls all visual animations of the interface.
+  // With enabled: false, all animations are disabled.
   animations: {
-    enabled: true,              // Master-Schalter für alle Animationen
-    heroGradient: true,         // Titel-Farbverlauf-Animation auf der Startseite
-    fadeIn: true,               // Einblend-Effekte beim Laden von Elementen
-    modalSlide: true,           // Slide-Animation beim Öffnen von Modals/Overlays
-    panelFade: true,            // Überblend-Effekt beim Tab-Wechsel in Einstellungen
-    themeSwitcher: true,        // Animations-Effekte der Theme-Buttons (Sonne/Mond/System)
-    iconAnimations: true,       // Hover-Animationen der Icons (Analysen, Control Center, Einstellungen, Landing)
-    numberScroll: true,         // Scroll-Animationen bei Zahlen (Analysen Center)
-    analysen: {                 // Pro-Section Animationen im Analysen Center
-      speedtest: true,          // Speedtest Download/Upload/Ping Scroll-Animationen
-      uptime: true,             // Uptime-Cards: Balken + Prozent + Timer-Scroll
-      pingMonitor: true,        // Ping Monitor: Ping-Scroll + Chart-Reveal
-      piholeSummary: true,      // Pi-hole Summary Cards: Zahlen-Scroll
-      queriesOverTime: true,    // Queries Bar-Chart: Balken wachsen hoch
-      donuts: true,             // Donut-Charts: Segmente + Legende
-      topLists: true,           // Top Domains/Blocked/Clients: Balken + Zahlen
+    enabled: true,              // Master switch for all animations
+    heroGradient: true,         // Title gradient animation on the landing page
+    fadeIn: true,               // Fade-in effects when loading elements
+    modalSlide: true,           // Slide animation when opening modals/overlays
+    panelFade: true,            // Crossfade effect when switching tabs in settings
+    themeSwitcher: true,        // Animation effects of theme buttons (sun/moon/system)
+    iconAnimations: true,       // Hover animations of icons (analytics, control center, settings, landing)
+    numberScroll: true,         // Scroll animations for numbers (analytics center)
+    analysen: {                 // Per-section animations in the analytics center
+      speedtest: true,          // Speedtest download/upload/ping scroll animations
+      uptime: true,             // Uptime cards: bars + percent + timer scroll
+      pingMonitor: true,        // Ping monitor: ping scroll + chart reveal
+      piholeSummary: true,      // Pi-hole summary cards: number scroll
+      queriesOverTime: true,    // Queries bar chart: bars grow upward
+      donuts: true,             // Donut charts: segments + legend
+      topLists: true,           // Top domains/blocked/clients: bars + numbers
     },
   },
 
   // ── Design Defaults ──
-  // Standard-Werte für neue Benutzer. Benutzer können diese über
-  // die Einstellungen überschreiben (wird in localStorage gespeichert).
+  // Default values for new users. Users can override these via
+  // the settings (stored in localStorage).
   defaults: {
     theme: 'dark',              // 'dark' | 'light' | 'system'
     buttonStyle: 'default',     // 'default' | 'simple'
     language: 'de',             // 'de' | 'en'
-    accentColor: '#00d4ff',     // Akzentfarbe als Hex-Wert
+    accentColor: '#00d4ff',     // Accent color as hex value
     glow: {
-      enabled: true,            // Glow an/aus
-      strength: 1,              // Intensität: 0 (aus) bis 2 (stark)
+      enabled: true,            // Glow on/off
+      strength: 1,              // Intensity: 0 (off) to 2 (strong)
     },
     sessionTimeout: {
-      enabled: false,           // Timeout an/aus
-      minutes: 5,               // Minuten bis zum automatischen Logout (1–60)
+      enabled: false,           // Timeout on/off
+      minutes: 5,               // Minutes until automatic logout (1–60)
     },
   },
 
-  // ── Einstellungen-Sichtbarkeit ──
-  // Bestimmt, welche Bereiche der Einstellungen sichtbar sind.
+  // ── Settings Visibility ──
+  // Determines which areas of the settings are visible.
   settings: {
-    showSettingsButton: true,   // Einstellungen-Button komplett anzeigen/verstecken
+    showSettingsButton: true,   // Show/hide settings button completely
     tabs: {
-      design: true,             // Design-Tab (Theme, Farben, Glow)
-      analysen: true,           // Analysen-Tab (Uptime Reset)
-      daten: true,              // Daten-Tab (Export/Import, Versionshistorie)
-      session: true,            // Session-Tab (Timeout-Einstellungen)
-      user: true,               // User-Tab (Benutzername/Passwort ändern, Logout)
-      // credits: immer sichtbar (kann nicht deaktiviert werden)
+      design: true,             // Design tab (theme, colors, glow)
+      analysen: true,           // Analytics tab (uptime reset)
+      daten: true,              // Data tab (export/import, version history)
+      session: true,            // Session tab (timeout settings)
+      user: true,               // User tab (change username/password, logout)
+      // credits: always visible (cannot be disabled)
     },
 
     // ── Remote Update ──
-    // Ermöglicht das Aktualisieren der Website direkt über die Einstellungen
-    // (Credits-Tab). Zeigt den Status "Up to date" oder "Get up to date" an.
-    // Bei Klick auf "Get up to date" werden die konfigurierten Befehle
-    // nacheinander auf dem Server ausgeführt.
+    // Allows updating the website directly from the settings
+    // (credits tab). Shows the status "Up to date" or "Get up to date".
+    // On click, the configured commands are executed sequentially
+    // on the server.
     //
-    // ACHTUNG: Die Befehle werden mit den Rechten des Server-Prozesses
-    // ausgeführt. Nur vertrauenswürdige Befehle eintragen!
-    // Nach erfolgreichem Update startet der Server sich automatisch neu
-    // (systemd/pm2 startet den Prozess). Kein manueller Restart nötig.
+    // WARNING: Commands are executed with the server process permissions.
+    // Only enter trusted commands!
+    // After a successful update, the server restarts automatically
+    // (systemd/pm2 restarts the process). No manual restart needed.
     update: {
-      enabled: false,           // true = Update-Funktion im Credits-Tab anzeigen
-      commands: [               // Befehle die nacheinander ausgeführt werden
+      enabled: false,           // true = show update function in credits tab
+      commands: [               // Commands to execute sequentially
         'git stash',
         'git pull',
         'git stash pop',
@@ -91,39 +91,39 @@ const siteConfig = {
   // └─────────────────────────────────────────────┘
 
   // ── Landing GIF ──
-  // Animiertes Bild über dem Titel. Wird automatisch in der Akzentfarbe eingefärbt.
-  // Das Bild muss vorbereitet sein: weißer/heller Inhalt auf transparentem Hintergrund
-  // (wird als CSS-Maske genutzt, siehe README → "Eigenes Landing-GIF").
-  // Unterstützt GIF, APNG, WebP. false = kein GIF anzeigen.
-  landingGif: 'landing-gif.png',    // Pfad zum animierten Bild (relativ zu /public)
-  landingGifSize: 200,              // Größe in Pixel (Breite und Höhe)
+  // Animated image above the title. Automatically tinted in the accent color.
+  // The image must be prepared: white/bright content on transparent background
+  // (used as a CSS mask, see README → "Creating a Custom Landing GIF").
+  // Supports GIF, APNG, WebP. false = don't show a GIF.
+  landingGif: 'landing-gif.png',    // Path to animated image (relative to /public)
+  landingGifSize: 200,              // Size in pixels (width and height)
 
   // ── Buttons ──
-  // Navigations-Buttons auf der Landing Page ein-/ausblenden.
+  // Show/hide navigation buttons on the landing page.
   buttons: {
-    info: true,                 // Info Center Button
-    control: true,              // Control Center Button
-    analysen: true,             // Analysen Center Button
+    info: true,                 // Info Center button
+    control: true,              // Control Center button
+    analysen: true,             // Analytics Center button
   },
 
   // ── Header Links ──
-  // Links erscheinen als Chips unter den Buttons auf der Landing Page.
+  // Links appear as chips below the buttons on the landing page.
   headerLinks: [
     { name: 'Github', url: 'https://github.com/leminkozey' },
     { name: 'KanBan', url: 'https://leminkanban.de' },
   ],
 
-  // ── Willkommensnachrichten ──
-  // Eigene Begrüßungstexte auf der Landing Page.
-  // customOnly: true  → Nur die eigenen Nachrichten anzeigen
-  // customOnly: false → Die eingebauten zufälligen Nachrichten verwenden
+  // ── Welcome Messages ──
+  // Custom greeting texts on the landing page.
+  // customOnly: true  → Only show custom messages
+  // customOnly: false → Use built-in random messages
   greetings: {
-    customOnly: false,          // true = nur eigene, false = eingebaute zufällige
+    customOnly: false,          // true = custom only, false = built-in random
     messages: [
-      // Eigene Willkommensnachrichten hier eintragen:
-      // 'Willkommen im Netzwerk!',
-      // 'Hallo Admin!',
-      // 'Schön dass du da bist.',
+      // Enter custom welcome messages here:
+      // 'Welcome to the network!',
+      // 'Hello Admin!',
+      // 'Good to see you.',
     ],
   },
 
@@ -131,26 +131,26 @@ const siteConfig = {
   // │             INFO CENTER                     │
   // └─────────────────────────────────────────────┘
 
-  // ── Cards Sichtbarkeit (Legacy) ──
-  // Steuert Speedtest und Windows PC Cards (nicht Teil von infoCenter).
+  // ── Card Visibility (Legacy) ──
+  // Controls speedtest and Windows PC cards (not part of infoCenter).
   cards: {
-    speedtest: true,            // Internet Geschwindigkeit – LAN Speed-Test
-    windowsPc: true,            // Windows PC – PC-Steuerung (Control Center)
+    speedtest: true,            // Internet Speed – LAN speed test
+    windowsPc: true,            // Windows PC – PC controls (Control Center)
   },
 
-  // ── Info Center Layout (Konfigurierbar) ──
-  // Definiert das komplette Layout des Info Centers.
-  // Wenn vorhanden, ersetzt es die statischen Cards oben.
-  // Zwei Kartentypen: 'table' (Tabelle mit Spalten) und 'info' (Formular-Felder).
+  // ── Info Center Layout (Configurable) ──
+  // Defines the complete layout of the Info Center.
+  // When present, it replaces the static cards above.
+  // Two card types: 'table' (table with columns) and 'info' (form fields).
   //
-  // layout: 'double' = 2 Cards nebeneinander | 'single' = volle Breite
-  // icon: Eingebauter Name (z.B. 'switchColor'), URL oder Iconify-Format ('logos:raspberry-pi')
-  // password: true = Feld wird verschlüsselt gespeichert + Eye-Toggle
-  // copy: true/false = Copy-Button anzeigen/verstecken (Standard: true)
-  // linkField: Referenziert ein Feld per Key – der Feldwert wird als URL genutzt
+  // layout: 'double' = 2 cards side by side | 'single' = full width
+  // icon: Built-in name (e.g. 'switchColor'), URL, or Iconify format ('logos:raspberry-pi')
+  // password: true = field is stored encrypted + eye toggle
+  // copy: true/false = show/hide copy button (default: true)
+  // linkField: References a field by key – the field value is used as the URL
   infoCenter: [
     {
-      heading: 'Netzwerkgeräte',
+      heading: 'Network Devices',
       layout: 'double',
       cards: [
         {
@@ -160,9 +160,9 @@ const siteConfig = {
           type: 'table',
           columns: {
             label: 'Port',
-            input: 'Belegung',
-            inputPlaceholder: 'Nicht belegt',
-            color: 'Farbe',
+            input: 'Assignment',
+            inputPlaceholder: 'Not assigned',
+            color: 'Color',
           },
           rows: [
             { id: 'port1', label: 'Port 1' },
@@ -177,14 +177,14 @@ const siteConfig = {
         },
         {
           id: 'router',
-          title: 'WLAN Router',
+          title: 'WiFi Router',
           icon: 'routerColor',
           type: 'table',
           columns: {
             label: 'Port',
-            input: 'Belegung',
-            inputPlaceholder: 'Nicht belegt',
-            color: 'Farbe',
+            input: 'Assignment',
+            inputPlaceholder: 'Not assigned',
+            color: 'Color',
           },
           rows: [
             { id: 'dsl', label: 'DSL' },
@@ -192,7 +192,7 @@ const siteConfig = {
             { id: 'lan2', label: 'LAN2' },
             { id: 'lan3', label: 'LAN3' },
             { id: 'lan4', label: 'LAN4' },
-            { id: 'telefon', label: 'Telefon' },
+            { id: 'telefon', label: 'Phone' },
           ],
         },
       ],
@@ -207,13 +207,13 @@ const siteConfig = {
           icon: 'raspberryColor',
           type: 'info',
           fields: [
-            { key: 'model',           label: 'Modell',        copy: false },
+            { key: 'model',           label: 'Model',          copy: false },
             { key: 'hostname',        label: 'Hostname' },
             { key: 'ipAddress',       label: 'LAN IP' },
             { key: 'vpnIp',           label: 'VPN IP' },
-            { key: 'macAddress',      label: 'MAC-Adresse' },
-            { key: 'sshUser',         label: 'SSH-Benutzer' },
-            { key: 'sshPassword',     label: 'SSH-Passwort',  password: true },
+            { key: 'macAddress',      label: 'MAC Address' },
+            { key: 'sshUser',         label: 'SSH User' },
+            { key: 'sshPassword',     label: 'SSH Password',   password: true },
             { key: 'piholeUrl',       label: 'Admin URL' },
             { key: 'piholeRemoteUrl', label: 'VPN Admin URL' },
           ],
@@ -228,16 +228,16 @@ const siteConfig = {
           icon: 'speedportColor',
           type: 'info',
           fields: [
-            { key: 'wifiName',       label: 'WLAN Name' },
-            { key: 'wifiPassword',   label: 'WLAN Passwort',         password: true },
-            { key: 'serialNumber',   label: 'Seriennummer' },
-            { key: 'configuration',  label: 'Konfiguration' },
+            { key: 'wifiName',       label: 'WiFi Name' },
+            { key: 'wifiPassword',   label: 'WiFi Password',          password: true },
+            { key: 'serialNumber',   label: 'Serial Number' },
+            { key: 'configuration',  label: 'Configuration' },
             { key: 'remoteUrl',      label: 'VPN URL' },
-            { key: 'devicePassword', label: 'Geräte-Passwort',       password: true },
-            { key: 'modemId',        label: 'Modem Installationscode', copy: false },
+            { key: 'devicePassword', label: 'Device Password',        password: true },
+            { key: 'modemId',        label: 'Modem Installation Code', copy: false },
           ],
           links: [
-            { label: 'VPN Zugang', linkField: 'remoteUrl' },
+            { label: 'VPN Access', linkField: 'remoteUrl' },
           ],
         },
       ],
@@ -253,10 +253,10 @@ const siteConfig = {
           type: 'info',
           fields: [
             { key: 'hostname',    label: 'Hostname' },
-            { key: 'ipAddress',   label: 'IP-Adresse' },
-            { key: 'macAddress',  label: 'MAC-Adresse' },
-            { key: 'sshUser',     label: 'SSH-Benutzer' },
-            { key: 'sshPassword', label: 'SSH-Passwort', password: true },
+            { key: 'ipAddress',   label: 'IP Address' },
+            { key: 'macAddress',  label: 'MAC Address' },
+            { key: 'sshUser',     label: 'SSH User' },
+            { key: 'sshPassword', label: 'SSH Password', password: true },
           ],
         },
       ],
@@ -267,41 +267,41 @@ const siteConfig = {
   // │             CONTROL CENTER                  │
   // └─────────────────────────────────────────────┘
 
-  // ── Gerätesteuerung ──
-  // Geräte die über das Control Center ferngesteuert werden können.
-  // Unterstützt Wake-on-LAN, SSH-Shutdown und SSH-Restart.
+  // ── Device Control ──
+  // Devices that can be remotely controlled via the Control Center.
+  // Supports Wake-on-LAN, SSH shutdown, and SSH restart.
   //
-  // id:      eindeutiger Schlüssel (lowercase, keine Leerzeichen)
-  // name:    Anzeigename im Frontend
-  // icon:    Icon-Name aus icons.js (z.B. 'windowsColor', 'server')
-  // type:    'ssh-windows' | 'ssh-linux' – bestimmt die SSH-Befehle
-  // ip:      IP-Adresse des Geräts
-  // actions: Array von Aktionen: 'wake', 'restart', 'shutdown'
-  // show:    Sichtbarkeit steuern (Standard: überall sichtbar)
-  //          Objekt: { controlCenter: true/false, terminal: true/false }
-  //          Beispiel: show: { controlCenter: false, terminal: true }
-  //            → Keine Tile im Control Center, aber im Web Terminal verfügbar
-  //          Rückwärtskompatibel: show: false blendet beides aus.
-  //          Mit show: false / controlCenter: false bleibt das Gerät als
-  //          SSH-Quelle für Remote-Services (credentialsFrom) nutzbar.
+  // id:      unique key (lowercase, no spaces)
+  // name:    display name in the frontend
+  // icon:    icon name from icons.js (e.g. 'windowsColor', 'server')
+  // type:    'ssh-windows' | 'ssh-linux' – determines SSH commands
+  // ip:      IP address of the device
+  // actions: array of actions: 'wake', 'restart', 'shutdown'
+  // show:    control visibility (default: visible everywhere)
+  //          Object: { controlCenter: true/false, terminal: true/false }
+  //          Example: show: { controlCenter: false, terminal: true }
+  //            → No tile in Control Center, but available in Web Terminal
+  //          Backward compatible: show: false hides both.
+  //          With show: false / controlCenter: false, the device remains
+  //          usable as an SSH source for remote services (credentialsFrom).
   //
-  // SSH-Zugangsdaten werden pro Gerät in den Einstellungen konfiguriert
-  // und verschlüsselt auf dem Server gespeichert.
+  // SSH credentials are configured per device in the settings
+  // and stored encrypted on the server.
   //
-  // ── Zeitplan (Schedule) ──
-  // Automatisches Hochfahren (Wake-on-LAN) und Herunterfahren (SSH) zu
-  // festgelegten Zeiten. Der Server muss laufen, damit Zeitpläne ausgeführt werden.
+  // ── Schedule ──
+  // Automatic startup (Wake-on-LAN) and shutdown (SSH) at
+  // scheduled times. The server must be running for schedules to execute.
   //
-  // schedule.wake:     Benötigt eine konfigurierte MAC-Adresse (in den Einstellungen)
-  // schedule.shutdown: Benötigt konfigurierte SSH-Zugangsdaten (in den Einstellungen)
+  // schedule.wake:     Requires a configured MAC address (in settings)
+  // schedule.shutdown: Requires configured SSH credentials (in settings)
   //
-  // Optionen:
-  //   enabled: true/false – Zeitplan aktivieren/deaktivieren
-  //   days:    Wochentage als Array: 'mon','tue','wed','thu','fri','sat','sun'
-  //   time:    Uhrzeit im 24h-Format, z.B. '07:30' oder '18:00'
+  // Options:
+  //   enabled: true/false – enable/disable schedule
+  //   days:    weekdays as array: 'mon','tue','wed','thu','fri','sat','sun'
+  //   time:    time in 24h format, e.g. '07:30' or '18:00'
   //
-  // HINWEIS: Zeitpläne werden aktuell nur über diese Datei konfiguriert.
-  //          Eine UI-Bearbeitung ist für eine zukünftige Version geplant.
+  // NOTE: Schedules are currently only configurable via this file.
+  //       UI editing is planned for a future version.
   controlDevices: [
     {
       id: 'windowspc',
@@ -311,8 +311,8 @@ const siteConfig = {
       ip: '192.168.1.50',
       actions: ['wake', 'restart', 'shutdown'],
 
-      // Zeitplan: Automatisches Hoch-/Herunterfahren
-      // Entferne die Kommentare um den Zeitplan zu aktivieren.
+      // Schedule: Automatic startup/shutdown
+      // Remove the comments to activate the schedule.
       schedule: {
         wake: {
           enabled: true,
@@ -326,7 +326,7 @@ const siteConfig = {
         },
       },
     },
-    // Weiteres Beispiel: Linux-Server
+    // Another example: Linux server
     // {
     //   id: 'nas',
     //   name: 'NAS Server',
@@ -350,27 +350,27 @@ const siteConfig = {
   ],
 
   // ── Service / Container Management ──
-  // Services die über das Control Center gesteuert werden können.
-  // Unterstützt systemd-Dienste, PM2-Prozesse und Docker-Container.
+  // Services that can be managed via the Control Center.
+  // Supports systemd services, PM2 processes, and Docker containers.
   //
-  // id:      eindeutiger Schlüssel (lowercase, keine Leerzeichen)
-  // name:    Anzeigename im Frontend
-  // icon:    Icon-Name aus icons.js (z.B. 'serverColor')
+  // id:      unique key (lowercase, no spaces)
+  // name:    display name in the frontend
+  // icon:    icon name from icons.js (e.g. 'serverColor')
   // type:    'systemd' | 'pm2' | 'docker'
-  // service: exakter Unit-/Prozess-/Container-Name
-  // host:    'local' für lokale Ausführung, oder
-  //          { credentialsFrom: '<controlDevice-id>' } für SSH-Remote-Ausführung
+  // service: exact unit/process/container name
+  // host:    'local' for local execution, or
+  //          { credentialsFrom: '<controlDevice-id>' } for SSH remote execution
   services: [
-    // Beispiel: Lokaler systemd-Dienst
+    // Example: Local systemd service
     // {
     //   id: 'netzwerk-manager',
-    //   name: 'Netzwerk Manager',
+    //   name: 'Network Manager',
     //   icon: 'serverColor',
     //   type: 'systemd',
     //   service: 'netzwerk-manager',
     //   host: 'local',
     // },
-    // Beispiel: PM2-Prozess auf Remote-Server
+    // Example: PM2 process on remote server
     // {
     //   id: 'lemin-kanban',
     //   name: 'Lemin Kanban',
@@ -379,7 +379,7 @@ const siteConfig = {
     //   service: 'lemin-kanban',
     //   host: { credentialsFrom: 'piholeControl' },
     // },
-    // Beispiel: Docker-Container auf Remote-Server
+    // Example: Docker container on remote server
     // {
     //   id: 'pihole-docker',
     //   name: 'Pi-hole',
@@ -395,17 +395,17 @@ const siteConfig = {
   // └─────────────────────────────────────────────┘
 
   // ── Web Terminal ──
-  // Ermöglicht die Ausführung von SSH-Befehlen direkt im Browser.
-  // Erfordert TOTP-2FA als Pflicht-Absicherung.
+  // Allows executing SSH commands directly in the browser.
+  // Requires TOTP 2FA as mandatory security.
   //
-  // ACHTUNG: Das Web Terminal erlaubt beliebige Befehle auf den
-  // konfigurierten Geräten. Nur aktivieren, wenn du weißt was du tust!
+  // WARNING: The web terminal allows arbitrary commands on
+  // configured devices. Only enable if you know what you're doing!
   terminal: {
-    enabled: false,              // Master-Schalter
-    totpTimeout: 5,              // Minuten bis TOTP erneut nötig
-    devices: [],                 // controlDevice-IDs (leer = alle)
-    commandTimeout: 30,          // Sekunden pro Befehl
-    dangerousCommands: [         // Muster die Extra-TOTP brauchen
+    enabled: false,              // Master switch
+    totpTimeout: 5,              // Minutes until TOTP is required again
+    devices: [],                 // controlDevice IDs (empty = all)
+    commandTimeout: 30,          // Seconds per command
+    dangerousCommands: [         // Patterns that require extra TOTP
       'rm -rf', 'rm -r', 'mkfs', 'dd if=', 'shutdown', 'reboot',
       'halt', 'poweroff', 'chmod -R 777', 'iptables -F',
       'systemctl stop', 'kill -9', 'pkill', 'wipefs',
@@ -413,31 +413,31 @@ const siteConfig = {
   },
 
   // ┌─────────────────────────────────────────────┐
-  // │             ANALYSEN CENTER                 │
+  // │             ANALYTICS CENTER                │
   // └─────────────────────────────────────────────┘
 
-  // ── Sektionen ein-/ausblenden ──
+  // ── Show/Hide Sections ──
   analysen: {
-    speedtest: true,            // Internet-Geschwindigkeit (Speed-Test)
-    outages: true,              // Ausfälle-Card
-    uptime: true,               // Geräte Info / Uptime-Monitoring-Cards
-    pingMonitor: true,          // Ping-Monitor (Latenz-Messung)
-    pihole: true,               // Pi-hole DNS Analytics
+    speedtest: true,            // Internet speed (speed test)
+    outages: true,              // Outages card
+    uptime: true,               // Device info / uptime monitoring cards
+    pingMonitor: true,          // Ping monitor (latency measurement)
+    pihole: true,               // Pi-hole DNS analytics
   },
 
-  // ── Geräte Info / Uptime Monitoring ──
-  // Ping-Intervall und Geräte für die Uptime-Überwachung.
-  // Optional: stats-Property für CPU, RAM, Temperatur pro Gerät.
-  //   stats.type: 'local' (lokaler Server) oder 'ssh-linux' (per SSH)
-  //   stats.credentialsFrom: ID eines Control-Devices (SSH-Daten wiederverwenden)
-  //   stats.credentials: { sshUser, sshPassword, sshPort } (Inline, wird beim Start verschlüsselt)
-  uptimeInterval: 10,           // Ping-Intervall in Sekunden (Minimum: 10)
-  statsInterval: 60,            // Stats-Intervall in Sekunden (CPU/RAM/Temp, Minimum: 30)
+  // ── Device Info / Uptime Monitoring ──
+  // Ping interval and devices for uptime monitoring.
+  // Optional: stats property for CPU, RAM, temperature per device.
+  //   stats.type: 'local' (local server) or 'ssh-linux' (via SSH)
+  //   stats.credentialsFrom: ID of a control device (reuse SSH credentials)
+  //   stats.credentials: { sshUser, sshPassword, sshPort } (inline, encrypted on start)
+  uptimeInterval: 10,           // Ping interval in seconds (minimum: 10)
+  statsInterval: 60,            // Stats interval in seconds (CPU/RAM/temp, minimum: 30)
   uptimeDevices: [
-    // Gerät ohne Stats → zeigt 24h/7d Uptime-Balken
+    // Device without stats → shows 24h/7d uptime bars
     { id: 'router',    name: 'Router',     ip: '192.168.1.1' },
 
-    // Gerät mit Stats via SSH (Credentials aus Control Center)
+    // Device with stats via SSH (credentials from Control Center)
     // {
     //   id: 'pihole', name: 'PiHole', ip: '192.168.1.100',
     //   stats: {
@@ -446,7 +446,7 @@ const siteConfig = {
     //   },
     // },
 
-    // Gerät mit Stats via SSH (eigene Credentials)
+    // Device with stats via SSH (own credentials)
     // {
     //   id: 'nas', name: 'NAS', ip: '192.168.1.200',
     //   stats: {
@@ -458,35 +458,35 @@ const siteConfig = {
     { id: 'pihole',    name: 'PiHole',     ip: '192.168.1.100' },
     { id: 'windowspc', name: 'Windows PC', ip: '192.168.1.50' },
 
-    // Lokaler Server (der Pi selbst)
+    // Local server (the Pi itself)
     // { id: 'localhost', name: 'Pi Server', ip: '127.0.0.1', stats: { type: 'local' } },
   ],
 
   // ── Pi-hole v6 DNS Analytics ──
-  // HINWEIS: config.js wird vom Server blockiert (403) und ist nicht
-  // öffentlich abrufbar. Der Server liest die Datei nur intern.
+  // NOTE: config.js is blocked by the server (403) and is not
+  // publicly accessible. The server reads the file internally only.
   pihole: {
-    enabled: true,              // false → DNS Analytics komplett deaktiviert
+    enabled: true,              // false → DNS analytics completely disabled
     url: 'http://192.168.1.100',
     password: 'your-pihole-password',
-    blockingToggle: true,       // Blocking-Toggle im Control Center anzeigen
+    blockingToggle: true,       // Show blocking toggle in Control Center
     cards: {
-      summary: true,            // 4 Summary-Stat-Cards (Queries, Blocked, %, Blocklist)
-      queriesOverTime: true,    // Stacked Bar Chart (Queries über Zeit)
-      queryTypes: true,         // Donut: Anfragetypen (A, AAAA, HTTPS, etc.)
-      upstreams: true,          // Donut: Upstream-Server
-      topDomains: true,         // Top Domains Liste
-      topBlocked: true,         // Top Blockierte Domains Liste
-      topClients: true,         // Top Clients Liste
+      summary: true,            // 4 summary stat cards (queries, blocked, %, blocklist)
+      queriesOverTime: true,    // Stacked bar chart (queries over time)
+      queryTypes: true,         // Donut: query types (A, AAAA, HTTPS, etc.)
+      upstreams: true,          // Donut: upstream servers
+      topDomains: true,         // Top domains list
+      topBlocked: true,         // Top blocked domains list
+      topClients: true,         // Top clients list
     },
   },
-  piholeInterval: 60,           // Aktualisierungs-Intervall in Sekunden (Minimum: 30)
+  piholeInterval: 60,           // Update interval in seconds (minimum: 30)
 
-  // ── Ping Monitor (Latenz-Messung) ──
-  // Misst die Latenz (ms) zu externen Hosts per ICMP-Ping.
+  // ── Ping Monitor (Latency Measurement) ──
+  // Measures latency (ms) to external hosts via ICMP ping.
   pingMonitor: {
-    enabled: true,              // false → Ping Monitor komplett deaktiviert
-    interval: 30,               // Ping-Intervall in Sekunden (Minimum: 10)
+    enabled: true,              // false → Ping monitor completely disabled
+    interval: 30,               // Ping interval in seconds (minimum: 10)
     hosts: [
       { id: 'google',     name: 'Google DNS',     ip: '8.8.8.8' },
       { id: 'cloudflare', name: 'Cloudflare DNS', ip: '1.1.1.1' },
@@ -496,48 +496,48 @@ const siteConfig = {
   },
 
   // ┌─────────────────────────────────────────────┐
-  // │             E-MAIL BENACHRICHTIGUNGEN       │
+  // │             EMAIL NOTIFICATIONS             │
   // └─────────────────────────────────────────────┘
 
-  // ── E-Mail Benachrichtigungen ──
-  // Sendet automatisch E-Mails bei Geräte-Ausfällen, Sicherheits-Events
-  // und verdächtigen Aktivitäten. Nutzt SMTP (z.B. Gmail, Outlook).
+  // ── Email Notifications ──
+  // Automatically sends emails on device outages, security events,
+  // and suspicious activities. Uses SMTP (e.g. Gmail, Outlook).
   //
-  // Für Gmail: App-Passwort unter https://myaccount.google.com/apppasswords erstellen
-  // und als 'pass' eintragen (nicht das normale Gmail-Passwort).
+  // For Gmail: Create an app password at https://myaccount.google.com/apppasswords
+  // and enter it as 'pass' (not the regular Gmail password).
   //
-  // Jedes Event kann einzeln mit true/false aktiviert oder deaktiviert werden.
-  // So lassen sich z.B. nur Sicherheits-Mails aktivieren und Uptime-Mails abschalten.
+  // Each event can be individually enabled or disabled with true/false.
+  // This allows e.g. enabling only security emails and disabling uptime emails.
   notifications: {
-    enabled: false,                 // true = E-Mail-Benachrichtigungen aktivieren
-    cooldownMinutes: 5,             // Mindestabstand zwischen E-Mails pro Gerät/Event
+    enabled: false,                 // true = enable email notifications
+    cooldownMinutes: 5,             // Minimum interval between emails per device/event
 
-    // SMTP-Server Konfiguration
+    // SMTP server configuration
     smtp: {
-      host: 'smtp.gmail.com',      // SMTP-Server (Gmail, Outlook, eigener Server)
+      host: 'smtp.gmail.com',      // SMTP server (Gmail, Outlook, custom server)
       port: 587,                    // Port (587 = STARTTLS, 465 = SSL)
-      secure: false,                // true für Port 465 (SSL), false für Port 587 (STARTTLS)
-      user: 'deine.email@gmail.com',// SMTP-Benutzername
-      pass: 'xxxx xxxx xxxx xxxx',  // SMTP-Passwort (bei Gmail: App-Passwort)
+      secure: false,                // true for port 465 (SSL), false for port 587 (STARTTLS)
+      user: 'your.email@gmail.com', // SMTP username
+      pass: 'xxxx xxxx xxxx xxxx',  // SMTP password (for Gmail: app password)
     },
 
-    // Absender und Empfänger
-    from: '"Netzwerk Manager" <deine.email@gmail.com>',
-    to: 'empfaenger@example.com',   // Empfänger-Adresse
+    // Sender and recipient
+    from: '"Network Manager" <your.email@gmail.com>',
+    to: 'recipient@example.com',    // Recipient address
 
-    // ── Welche Events eine E-Mail auslösen ──
-    // Jedes Event kann einzeln aktiviert (true) oder deaktiviert (false) werden.
+    // ── Which events trigger an email ──
+    // Each event can be individually enabled (true) or disabled (false).
     events: {
-      // Geräte-Monitoring
-      offline: true,                // Gerät offline → E-Mail
-      online: true,                 // Gerät wieder online → E-Mail (mit Ausfallzeit)
+      // Device monitoring
+      offline: true,                // Device offline → email
+      online: true,                 // Device back online → email (with downtime)
 
-      // Sicherheits-Events
-      credentialsChanged: true,     // Benutzername oder Passwort geändert
-      totpEnabled: true,            // 2FA (TOTP) wurde aktiviert
-      totpDisabled: true,           // 2FA (TOTP) wurde deaktiviert
-      terminalAccess: true,         // Web Terminal wurde geöffnet (mit IP + Standort)
-      newDeviceLogin: true,         // Login von neuem Gerät ohne Device-Token (mit IP + Standort)
+      // Security events
+      credentialsChanged: true,     // Username or password changed
+      totpEnabled: true,            // 2FA (TOTP) was enabled
+      totpDisabled: true,           // 2FA (TOTP) was disabled
+      terminalAccess: true,         // Web terminal was opened (with IP + location)
+      newDeviceLogin: true,         // Login from new device without device token (with IP + location)
     },
   },
 };
