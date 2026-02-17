@@ -5,11 +5,13 @@
 import { t } from '../i18n.js';
 import { el } from '../ui.js';
 import { iconEl } from '../icons.js';
-import { getConfig } from '../state.js';
+import { getConfig, state } from '../state.js';
 import { showToast } from '../ui.js';
 import * as api from '../api.js';
+import { showSudoApprovalModal } from '../components/sudo-modal.js';
 
 let session = null;
+let activeSudoHandler = null;
 
 function resetSession() {
   if (session) {
@@ -49,6 +51,10 @@ export function renderTerminal(container) {
 
   // Cleanup on navigation
   return () => {
+    if (activeSudoHandler) {
+      window.removeEventListener('ws:sudo-challenge', activeSudoHandler);
+      activeSudoHandler = null;
+    }
     resetSession();
     session = null;
   };
@@ -497,6 +503,19 @@ function showTerminalView(page, device) {
       cmdInput.focus();
     }
   });
+
+  // Sudo challenge listener – show modal when backend requests sudo approval
+  if (activeSudoHandler) {
+    window.removeEventListener('ws:sudo-challenge', activeSudoHandler);
+  }
+  activeSudoHandler = function handleSudoChallenge(event) {
+    showSudoApprovalModal(event.detail, (response) => {
+      if (state.socket?.readyState === WebSocket.OPEN) {
+        state.socket.send(JSON.stringify(response));
+      }
+    });
+  };
+  window.addEventListener('ws:sudo-challenge', activeSudoHandler);
 
   let isExecuting = false;
 

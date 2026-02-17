@@ -5301,6 +5301,157 @@ input[type='text'].terminal-cmd-input:focus-visible {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   Sudo Approval Modal
+   ═══════════════════════════════════════════════════════════════════ */
+
+.sudo-approval-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 8, 20, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.25s ease;
+}
+
+[data-theme='light'] .sudo-approval-overlay {
+  background: rgba(100, 120, 160, 0.4);
+}
+
+.sudo-approval-modal {
+  background: var(--surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  width: 92%;
+  max-width: 400px;
+  box-shadow: var(--shadow-elevated);
+  animation: modalSlideIn 0.35s var(--ease-out-expo);
+}
+
+.sudo-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+  color: var(--accent);
+  font-size: 2.5rem;
+}
+
+.sudo-approval-modal h3 {
+  text-align: center;
+  margin: 0 0 0.5rem;
+  color: var(--text);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.sudo-approval-modal p.sudo-subtitle {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.sudo-command {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--text);
+  word-break: break-all;
+  margin-bottom: 1.25rem;
+}
+
+.sudo-totp-section {
+  margin-bottom: 1rem;
+}
+
+.sudo-totp-section label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.sudo-totp-input {
+  width: 100%;
+  text-align: center;
+  font-size: 1.5rem;
+  letter-spacing: 0.3em;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.sudo-totp-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 calc(12px * var(--glow-strength)) var(--accent-glow);
+}
+
+.sudo-remember-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.sudo-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.sudo-deny-btn,
+.sudo-confirm-btn {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.sudo-deny-btn {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.sudo-deny-btn:hover {
+  background: rgb(var(--accent-warm-rgb) / 0.1);
+  border-color: var(--accent-warm);
+  color: var(--accent-warm);
+}
+
+.sudo-confirm-btn {
+  background: var(--accent);
+  color: #fff;
+}
+
+.sudo-confirm-btn:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.sudo-confirm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    Reduced Motion – disable GPU-heavy effects for low-power devices
    ═══════════════════════════════════════════════════════════════════ */
 
@@ -5311,7 +5462,8 @@ input[type='text'].terminal-cmd-input:focus-visible {
 
   .top-bar, .card, .float-bar, .overlay, #settingsOverlay,
   .action-btn, .link-chip, .back-btn,
-  .terminal-totp-gate, .terminal-device-card {
+  .terminal-totp-gate, .terminal-device-card,
+  .sudo-approval-overlay {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
   }
@@ -5324,7 +5476,8 @@ input[type='text'].terminal-cmd-input:focus-visible {
   .totp-badge.active, .totp-qr-container,
   .dangerous-overlay, .dangerous-modal,
   .terminal-timer.warn, .terminal-timer.critical,
-  .totp-steps, .totp-input.shake, input.shake {
+  .totp-steps, .totp-input.shake, input.shake,
+  .sudo-approval-overlay, .sudo-approval-modal {
     animation: none !important;
   }
 }

@@ -46,6 +46,8 @@ export function connectSocket() {
       } else if (msg.type === 'forceLogout' && typeof msg.deviceName === 'string') {
         const loginAt = typeof msg.loginAt === 'number' ? msg.loginAt : null;
         handleForceLogout(msg.deviceName, loginAt);
+      } else if (msg.type === 'sudo-challenge') {
+        window.dispatchEvent(new CustomEvent('ws:sudo-challenge', { detail: msg }));
       } else if (msg.type && msg.data !== undefined && WS_DATA_TYPES.has(msg.type)) {
         window.dispatchEvent(new CustomEvent(`ws:${msg.type}`, { detail: msg.data }));
       }

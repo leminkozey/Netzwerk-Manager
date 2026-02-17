@@ -289,12 +289,27 @@ const activeSshSessions = new Map(); // terminalToken -> { connection, shell, cw
 const pendingSshSessions = new Map(); // terminalToken -> Promise (prevents duplicate concurrent connections)
 const SSH_SESSION_TIMEOUT = 180000; // 3 minutes (matches terminal token expiry)
 
-// Cleanup expired SSH sessions every 30 seconds
+// ── Sudo Challenge-Response System ──
+const pendingSudoChallenges = new Map();
+// challengeId -> { terminalToken, timestamp, deviceId, command, resolvePromise }
+
+const approvedSudoSessions = new Map();
+// terminalToken -> { approvedAt, expiresAt, deviceId }
+
+const SUDO_CHALLENGE_TIMEOUT = 30000; // 30 Sekunden
+const SUDO_SESSION_DURATION = 180000; // 3 Minuten
+
+// Cleanup expired SSH sessions + sudo sessions every 30 seconds
 setInterval(() => {
   const now = Date.now();
   for (const [token, session] of activeSshSessions.entries()) {
     if (now - session.lastActivity > SSH_SESSION_TIMEOUT) {
       cleanupSshSession(token);
+    }
+  }
+  for (const [token, approval] of approvedSudoSessions.entries()) {
+    if (now >= approval.expiresAt) {
+      approvedSudoSessions.delete(token);
     }
   }
 }, 30000);
@@ -440,11 +455,13 @@ async function _createNewSshSession(terminalToken, deviceId, sshConfig) {
   });
 }
 
-async function executeSshCommand(session, command) {
+async function executeSshCommand(session, command, terminalToken, deviceId) {
   return new Promise((resolve) => {
     const { shell } = session;
     let output = '';
     let isComplete = false;
+    let sudoDetected = false;
+    let sudoChallengeActive = false;
     const MAX_OUTPUT = 1024 * 1024; // 1MB
 
     // Handle 'clear' command specially (no shell interaction needed)
@@ -459,8 +476,9 @@ async function executeSshCommand(session, command) {
     // Unique marker that cannot appear in normal command output
     const marker = `__CMD_DONE_${crypto.randomBytes(12).toString('hex')}__`;
 
-    const dataHandler = (data) => {
-      output += data.toString();
+    const dataHandler = async (data) => {
+      const chunk = data.toString();
+      output += chunk;
 
       if (output.length > MAX_OUTPUT) {
         cleanup();
@@ -473,35 +491,64 @@ async function executeSshCommand(session, command) {
         return;
       }
 
+      // Sudo prompt detection
+      if (!sudoDetected && !sudoChallengeActive && terminalToken && detectSudoPrompt(chunk, output)) {
+        sudoDetected = true;
+        console.log('[SUDO] Detected sudo password prompt for command:', sanitizeLogParam(command));
+        const approval = approvedSudoSessions.get(terminalToken);
+        if (approval && approval.expiresAt > Date.now() && approval.deviceId === deviceId) {
+          const creds = readControlDeviceCredentials(deviceId);
+          setTimeout(() => shell.write((creds._sshPasswordDecrypted || '') + '\n'), 100);
+        } else {
+          sudoChallengeActive = true;
+          const approved = await sendSudoChallenge(terminalToken, deviceId, command);
+          sudoChallengeActive = false;
+          if (approved) {
+            const creds = readControlDeviceCredentials(deviceId);
+            setTimeout(() => shell.write((creds._sshPasswordDecrypted || '') + '\n'), 100);
+          } else {
+            shell.write('\x03');
+            cleanup();
+            resolve({ output: output + '\n[Sudo request denied by user]', cwd: session.cwd, exitCode: 130 });
+          }
+        }
+      }
+
       // Check if the unique marker has appeared, indicating command completion
-      const markerIdx = output.indexOf(marker);
-      if (markerIdx !== -1) {
-        cleanup();
+      // IMPORTANT: Do NOT resolve while a sudo challenge is active — the user is
+      // still deciding in the modal. If sudo times out on the PTY side while the
+      // challenge is pending, the marker will appear but we must wait for the
+      // challenge to finish first.
+      if (!sudoChallengeActive) {
+        const markerIdx = output.indexOf(marker);
+        if (markerIdx !== -1) {
+          cleanup();
 
-        // Everything before the marker line is command output
-        const beforeMarker = output.substring(0, markerIdx);
+          // Everything before the marker line is command output
+          const beforeMarker = output.substring(0, markerIdx);
 
-        // After the marker, look for pwd output to track cwd
-        const afterMarker = output.substring(markerIdx + marker.length);
-        const cwdMatch = afterMarker.match(/\n?(\/[^\n\r]*)/);
-        if (cwdMatch) {
-          session.cwd = cwdMatch[1].trim();
+          // After the marker, look for pwd output to track cwd
+          const afterMarker = output.substring(markerIdx + marker.length);
+          const cwdMatch = afterMarker.match(/\n?(\/[^\n\r]*)/);
+          if (cwdMatch) {
+            session.cwd = cwdMatch[1].trim();
+          }
+
+          // Clean the output: remove the echoed compound command (first line)
+          const lines = beforeMarker.split('\n');
+          if (lines.length > 0) {
+            lines.shift();
+          }
+          while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+            lines.pop();
+          }
+
+          resolve({
+            output: lines.join('\n').trim(),
+            cwd: session.cwd,
+            exitCode: 0,
+          });
         }
-
-        // Clean the output: remove the echoed compound command (first line)
-        const lines = beforeMarker.split('\n');
-        if (lines.length > 0) {
-          lines.shift();
-        }
-        while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
-          lines.pop();
-        }
-
-        resolve({
-          output: lines.join('\n').trim(),
-          cwd: session.cwd,
-          exitCode: 0,
-        });
       }
     };
 
@@ -530,6 +577,98 @@ async function executeSshCommand(session, command) {
     shell.write(`${command}; echo "${marker}"; pwd\n`);
     session.lastActivity = Date.now();
   });
+}
+
+function detectSudoPrompt(recentChunk, fullOutput) {
+  const patterns = [
+    /\[sudo\] password for \w+:/i,
+    /Password:\s*$/i,
+    /\w+@\w+'s password:/i,
+  ];
+  // Check recent chunk first (fast path)
+  const lastChunkLines = recentChunk.split('\n').slice(-3).join('\n');
+  if (patterns.some(p => p.test(lastChunkLines))) return true;
+  // Fallback: check last 3 lines of full accumulated output (handles chunk-split prompts)
+  const lastFullLines = fullOutput.split('\n').slice(-3).join('\n');
+  return patterns.some(p => p.test(lastFullLines));
+}
+
+function sendSudoChallenge(terminalToken, deviceId, command) {
+  return new Promise((resolve) => {
+    const challengeId = crypto.randomUUID();
+    const timeout = setTimeout(() => {
+      console.warn('[SUDO] Challenge timed out:', challengeId);
+      pendingSudoChallenges.delete(challengeId);
+      resolve(false);
+    }, SUDO_CHALLENGE_TIMEOUT);
+
+    pendingSudoChallenges.set(challengeId, {
+      terminalToken,
+      timestamp: Date.now(),
+      deviceId,
+      command,
+      resolvePromise: (result) => {
+        clearTimeout(timeout);
+        pendingSudoChallenges.delete(challengeId);
+        resolve(result);
+      }
+    });
+
+    // Find WebSocket for the active browser session
+    const sessionToken = runtime.activeSession?.token;
+    const ws = sessionToken ? runtime.sockets?.get(sessionToken) : null;
+    if (ws?.readyState === 1) {
+      console.log('[SUDO] Sending challenge to browser:', challengeId);
+      ws.send(JSON.stringify({ type: 'sudo-challenge', challengeId, timestamp: Date.now(), command }));
+    } else {
+      console.warn('[SUDO] No active WebSocket found for sudo challenge.',
+        'activeSession:', !!runtime.activeSession,
+        'sessionToken:', !!sessionToken,
+        'socketsSize:', runtime.sockets?.size,
+        'wsState:', ws?.readyState);
+      pendingSudoChallenges.delete(challengeId);
+      clearTimeout(timeout);
+      resolve(false);
+    }
+  });
+}
+
+function handleSudoResponse(msg) {
+  const challenge = pendingSudoChallenges.get(msg.challengeId);
+  if (!challenge) {
+    console.warn('[SUDO] Response for unknown challenge:', msg.challengeId);
+    return;
+  }
+  if ((Date.now() - challenge.timestamp) >= SUDO_CHALLENGE_TIMEOUT) {
+    console.warn('[SUDO] Response arrived after timeout:', msg.challengeId);
+    challenge.resolvePromise(false);
+    return;
+  }
+
+  if (!msg.approve) {
+    console.log('[SUDO] User denied sudo challenge:', msg.challengeId);
+    challenge.resolvePromise(false);
+    return;
+  }
+
+  const username = runtime.terminalSessions?.get(challenge.terminalToken)?.username;
+  if (!username) {
+    console.warn('[SUDO] No username found for terminalToken — cannot verify TOTP');
+    challenge.resolvePromise(false);
+    return;
+  }
+  const totpValid = verifyTotpCode(username, msg.totpCode);
+  console.log('[SUDO] TOTP verification for', sanitizeLogParam(username), ':', totpValid ? 'valid' : 'invalid');
+
+  if (totpValid && msg.rememberSession) {
+    approvedSudoSessions.set(challenge.terminalToken, {
+      approvedAt: Date.now(),
+      expiresAt: Date.now() + SUDO_SESSION_DURATION,
+      deviceId: challenge.deviceId
+    });
+  }
+
+  challenge.resolvePromise(totpValid);
 }
 
 // Terminal audit logging
@@ -5505,7 +5644,7 @@ app.post('/api/terminal/execute', authRequired, terminalAuthRequired, async (req
     const session = await getOrCreateSshSession(terminalToken, deviceId, sshConfig);
 
     // Execute command in persistent shell
-    const result = await executeSshCommand(session, command);
+    const result = await executeSshCommand(session, command, terminalToken, deviceId);
 
     // Audit log
     await logTerminalAudit({
@@ -5575,7 +5714,15 @@ function startServer() {
 
     // Authenticate via first message instead of URL query
     socket.on('message', (data) => {
-      if (authenticatedToken) return; // Already authenticated
+      if (authenticatedToken) {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === 'sudo-response') {
+            handleSudoResponse(msg);
+          }
+        } catch {}
+        return;
+      }
       try {
         const msg = JSON.parse(data.toString());
         if (msg.type === 'auth' && msg.token) {
