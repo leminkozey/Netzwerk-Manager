@@ -633,7 +633,17 @@ function sendSudoChallenge(terminalToken, deviceId, command) {
   });
 }
 
+// Rate limit for sudo TOTP attempts per challenge (max 3 attempts per challenge)
+const SUDO_TOTP_MAX_ATTEMPTS = 3;
+const sudoTotpAttempts = new Map(); // challengeId -> count
+
 function handleSudoResponse(msg) {
+  // Type validation: challengeId must be a string
+  if (typeof msg.challengeId !== 'string') {
+    console.warn('[SUDO] Invalid challengeId type:', typeof msg.challengeId);
+    return;
+  }
+
   const challenge = pendingSudoChallenges.get(msg.challengeId);
   if (!challenge) {
     console.warn('[SUDO] Response for unknown challenge:', msg.challengeId);
@@ -647,6 +657,17 @@ function handleSudoResponse(msg) {
 
   if (!msg.approve) {
     console.log('[SUDO] User denied sudo challenge:', msg.challengeId);
+    sudoTotpAttempts.delete(msg.challengeId);
+    challenge.resolvePromise(false);
+    return;
+  }
+
+  // Rate limit: max TOTP attempts per challenge to prevent brute-force via WebSocket
+  const attempts = (sudoTotpAttempts.get(msg.challengeId) || 0) + 1;
+  sudoTotpAttempts.set(msg.challengeId, attempts);
+  if (attempts > SUDO_TOTP_MAX_ATTEMPTS) {
+    console.warn('[SUDO] Too many TOTP attempts for challenge:', msg.challengeId);
+    sudoTotpAttempts.delete(msg.challengeId);
     challenge.resolvePromise(false);
     return;
   }
@@ -660,12 +681,15 @@ function handleSudoResponse(msg) {
   const totpValid = verifyTotpCode(username, msg.totpCode);
   console.log('[SUDO] TOTP verification for', sanitizeLogParam(username), ':', totpValid ? 'valid' : 'invalid');
 
-  if (totpValid && msg.rememberSession) {
-    approvedSudoSessions.set(challenge.terminalToken, {
-      approvedAt: Date.now(),
-      expiresAt: Date.now() + SUDO_SESSION_DURATION,
-      deviceId: challenge.deviceId
-    });
+  if (totpValid) {
+    sudoTotpAttempts.delete(msg.challengeId);
+    if (msg.rememberSession) {
+      approvedSudoSessions.set(challenge.terminalToken, {
+        approvedAt: Date.now(),
+        expiresAt: Date.now() + SUDO_SESSION_DURATION,
+        deviceId: challenge.deviceId
+      });
+    }
   }
 
   challenge.resolvePromise(totpValid);
@@ -5859,6 +5883,14 @@ function startServer() {
     for (const [key, expiry] of usedTotpCodes.entries()) {
       if (now > expiry) {
         usedTotpCodes.delete(key);
+      }
+    }
+
+    // Cleanup stale sudo challenges (defense-in-depth, normally cleared by setTimeout)
+    for (const [id, challenge] of pendingSudoChallenges.entries()) {
+      if ((now - challenge.timestamp) >= SUDO_CHALLENGE_TIMEOUT * 2) {
+        pendingSudoChallenges.delete(id);
+        sudoTotpAttempts.delete(id);
       }
     }
 
