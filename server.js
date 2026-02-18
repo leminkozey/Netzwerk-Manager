@@ -5704,6 +5704,72 @@ app.post('/api/terminal/disconnect', authRequired, terminalAuthRequired, (req, r
   res.json({ success: true });
 });
 
+// ── Internal Notify Endpoint (localhost only, no auth) ──
+app.post('/api/notify', (req, res) => {
+  const ip = req.ip?.replace('::ffff:', '') || req.connection.remoteAddress;
+  if (ip !== '127.0.0.1' && ip !== '::1') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const { type, title, message } = req.body;
+  if (!type || !title || !message) {
+    return res.status(400).json({ error: 'Missing type, title, or message' });
+  }
+
+  const config = readNotificationConfig();
+  if (!config) {
+    return res.status(503).json({ error: 'Notifications not configured' });
+  }
+
+  const transporter = createMailTransporter(config.smtp);
+  if (!transporter) {
+    return res.status(503).json({ error: 'nodemailer not available' });
+  }
+
+  const stripCRLF = s => String(s).replace(/[\r\n\0]/g, '');
+  const safeTitle = escapeHtml(stripCRLF(title));
+  const safeMessage = escapeHtml(stripCRLF(message));
+  const safeType = stripCRLF(type);
+  const time = escapeHtml(formatTimestamp(Date.now()));
+  const isError = safeType.includes('fail');
+  const badgeColor = isError ? '#ef4444' : '#22c55e';
+  const badgeText = isError ? 'FEHLER' : 'OK';
+  const emoji = isError ? '&#9888;&#65039;' : '&#9989;';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="margin:0;padding:0;background:#06080f;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#06080f;padding:32px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#0d1117;border:1px solid #1e2a3a;border-radius:12px;overflow:hidden;">
+<tr><td style="padding:24px 32px 16px;border-bottom:1px solid #1e2a3a;">
+  <table width="100%" cellpadding="0" cellspacing="0"><tr>
+    <td><span style="display:inline-block;background:${badgeColor};color:#fff;font-size:13px;font-weight:600;padding:4px 12px;border-radius:6px;">${badgeText}</span></td>
+    <td align="right" style="color:#8b949e;font-size:13px;">${time}</td>
+  </tr></table>
+</td></tr>
+<tr><td style="padding:24px 32px;">
+  <h2 style="margin:0 0 16px;color:#f0f6fc;font-size:20px;">${emoji} ${safeTitle}</h2>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#161b22;border:1px solid #1e2a3a;border-radius:8px;">
+    <tr><td style="padding:16px;color:#c9d1d9;font-size:14px;font-family:monospace;white-space:pre-wrap;word-break:break-word;">${safeMessage}</td></tr>
+  </table>
+</td></tr>
+<tr><td style="padding:16px 32px 24px;border-top:1px solid #1e2a3a;">
+  <p style="margin:0;color:#484f58;font-size:12px;text-align:center;">Diese Nachricht wurde automatisch vom Netzwerk Manager gesendet.</p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+  const safeFrom = stripCRLF(config.from || `"Netzwerk Manager" <${config.smtp.user}>`);
+  const safeTo = stripCRLF(config.to);
+  const subject = `${isError ? '\u26A0\uFE0F' : '\u2705'} ${stripCRLF(title)}`;
+
+  transporter.sendMail({ from: safeFrom, to: safeTo, subject, html })
+    .then(() => console.log(`[Notify] E-Mail gesendet: ${safeType} — ${stripCRLF(title)}`))
+    .catch(err => console.error(`[Notify] E-Mail-Fehler:`, err.message));
+
+  res.json({ success: true });
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
