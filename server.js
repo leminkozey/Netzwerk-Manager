@@ -863,6 +863,8 @@ app.use((req, res, next) => {
 
 // CSRF protection: validate Origin/Referer on state-mutating requests
 app.use((req, res, next) => {
+  // Skip CSRF for internal notify endpoint (localhost-only, checked in handler)
+  if (req.path === '/api/notify') return next();
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     const origin = req.headers.origin;
     const referer = req.headers.referer;
