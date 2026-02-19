@@ -6,6 +6,7 @@ export const state = {
   token: null,
   theme: 'dark',
   glowStrength: 1,
+  borderRadius: 1,
   accent: '#00d4ff',
   buttonStyle: 'default',
   username: '',
@@ -56,6 +57,7 @@ const STORAGE_KEYS = {
   theme: 'theme',
   buttonStyle: 'buttonStyle',
   glowStrength: 'glowStrength',
+  borderRadius: 'borderRadius',
   accent: 'accent',
   sessionTimeoutEnabled: 'sessionTimeoutEnabled',
   sessionTimeoutMinutes: 'sessionTimeoutMinutes',
@@ -138,6 +140,11 @@ function validateGlow(v) {
   return Number.isNaN(n) ? 1 : Math.min(2, Math.max(0, n));
 }
 
+function validateRadius(v) {
+  const n = Number(v);
+  return Number.isNaN(n) ? 1 : Math.min(2, Math.max(0, n));
+}
+
 function validateTimeout(v) {
   const n = parseInt(v, 10);
   return Number.isNaN(n) || n < 1 ? 5 : Math.min(60, n);
@@ -147,6 +154,7 @@ export const defaults = {
   theme: validateTheme(cfgDefaults?.theme),
   buttonStyle: cfgDefaults?.buttonStyle === 'simple' ? 'simple' : 'default',
   glowStrength: cfgDefaults?.glow?.enabled !== false ? validateGlow(cfgDefaults?.glow?.strength ?? 1) : 0,
+  borderRadius: validateRadius(cfgDefaults?.borderRadius ?? 1),
   accent: /^#[0-9A-Fa-f]{6}$/.test(cfgDefaults?.accentColor) ? cfgDefaults.accentColor : '#00d4ff',
   language: cfgDefaults?.language === 'en' ? 'en' : 'de',
   sessionTimeoutEnabled: cfgDefaults?.sessionTimeout?.enabled !== false,

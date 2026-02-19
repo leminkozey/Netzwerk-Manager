@@ -4,7 +4,7 @@
 
 import { t, setLanguage, getCurrentLang } from '../i18n.js';
 import { state, defaults, STORAGE_KEYS, getConfig } from '../state.js';
-import { el, applyTheme, applyGlowStrength, applyAccentColor, applyButtonStyle, showToast, showConfirm } from '../ui.js';
+import { el, applyTheme, applyGlowStrength, applyBorderRadius, applyAccentColor, applyButtonStyle, showToast, showConfirm } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 import { handleLogout } from '../auth.js';
@@ -136,6 +136,9 @@ function createDesignPanel() {
     // Glow Strength
     createSettingRow(t('settings.glowStrength'), createGlowSlider()),
 
+    // Border Radius
+    createSettingRow(t('settings.borderRadius'), createRadiusSlider()),
+
     // Language
     createSettingRow(t('settings.language'), createToggleGroup('language', [
       { value: 'de', label: 'Deutsch' },
@@ -265,6 +268,51 @@ function createGlowSlider() {
     el('span', { className: 'glow-icon' }, [iconEl('moon', 18)]),
     slider,
     el('span', { className: 'glow-icon', style: { color: 'var(--accent)' } }, [iconEl('sun', 18)]),
+  ]);
+}
+
+function radiusThumbSvg(scale) {
+  const r = Math.max(0, Math.min(6, Math.round(scale * 3))).toFixed(0);
+  return `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><rect x='4' y='4' width='16' height='16' rx='${r}' ry='${r}'/></svg>")`;
+}
+
+function createRadiusSlider() {
+  const currentRadius = state.borderRadius ?? defaults.borderRadius;
+  const slider = el('input', {
+    type: 'range',
+    className: 'radius-slider',
+    min: '0',
+    max: '2',
+    step: '0.1',
+    value: String(currentRadius),
+  });
+
+  const updateSlider = () => {
+    const val = Number(slider.value);
+    const percent = Math.round((val / 2) * 100);
+    slider.style.setProperty('--radius-percent', `${percent}%`);
+    slider.style.setProperty('--radius-thumb-icon', radiusThumbSvg(val));
+  };
+  updateSlider();
+
+  slider.addEventListener('input', () => {
+    applyBorderRadius(Number(slider.value));
+    updateSlider();
+  });
+  slider.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEYS.borderRadius, slider.value);
+  });
+
+  const sharpIcon = el('span', { className: 'radius-icon' });
+  sharpIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="0" ry="0"/></svg>`;
+
+  const roundIcon = el('span', { className: 'radius-icon', style: { color: 'var(--accent)' } });
+  roundIcon.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="6" ry="6"/></svg>`;
+
+  return el('div', { className: 'radius-control' }, [
+    sharpIcon,
+    slider,
+    roundIcon,
   ]);
 }
 

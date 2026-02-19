@@ -47,6 +47,7 @@ const siteConfig = {
       enabled: true,            // Glow on/off
       strength: 1,              // Intensity: 0 (off) to 2 (strong)
     },
+    borderRadius: 1,            // Corner rounding: 0 (sharp) to 2 (round)
     sessionTimeout: {
       enabled: false,           // Timeout on/off
       minutes: 5,               // Minutes until automatic logout (1–60)

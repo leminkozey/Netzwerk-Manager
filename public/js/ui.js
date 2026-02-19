@@ -59,6 +59,15 @@ export function applyGlowStrength(value) {
   document.body.style.setProperty('--glow-strength', String(safe));
 }
 
+// ── Border Radius ──
+export function applyBorderRadius(value) {
+  const n = Number(value);
+  const safe = Number.isNaN(n) ? defaults.borderRadius : Math.min(2, Math.max(0, n));
+  state.borderRadius = safe;
+  document.documentElement.style.setProperty('--radius-scale', String(safe));
+  document.body.style.setProperty('--radius-scale', String(safe));
+}
+
 // ── Accent Color ──
 function darkenHex(hex, amount = 0.15) {
   const rgb = hexToRgb(hex);
@@ -199,10 +208,12 @@ export function loadLocalSettings() {
   const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || defaults.buttonStyle;
   const savedGlow = localStorage.getItem(STORAGE_KEYS.glowStrength);
   const savedAccent = localStorage.getItem(STORAGE_KEYS.accent) || defaults.accent;
+  const savedRadius = localStorage.getItem(STORAGE_KEYS.borderRadius);
 
   applyTheme(savedTheme);
   applyButtonStyle(savedButtonStyle);
   applyGlowStrength(savedGlow !== null ? Number(savedGlow) : defaults.glowStrength);
+  applyBorderRadius(savedRadius !== null ? Number(savedRadius) : defaults.borderRadius);
   applyAccentColor(savedAccent);
 
   // Session settings
