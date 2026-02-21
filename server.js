@@ -2995,7 +2995,7 @@ function logControlAction(deviceId, action, ip, success, details = '') {
 // ═══════════════════════════════════════════════════════════════════
 
 const SERVICE_NAME_PATTERN = /^[a-zA-Z0-9_.-]{1,100}$/;
-const VALID_SERVICE_TYPES = new Set(['systemd', 'pm2', 'docker']);
+const VALID_SERVICE_TYPES = new Set(['systemd', 'pm2', 'docker', 'nssm']);
 const VALID_SERVICE_ACTIONS = new Set(['start', 'stop', 'restart']);
 
 const SERVICE_COMMANDS = {
@@ -3018,6 +3018,12 @@ const SERVICE_COMMANDS = {
     stop:    name => `docker stop ${name}`,
     restart: name => `docker restart ${name}`,
     status:  name => `docker inspect -f '{{.State.Status}}' ${name}`,
+  },
+  nssm: {
+    start:   name => `nssm start ${name}`,
+    stop:    name => `nssm stop ${name}`,
+    restart: name => `nssm restart ${name}`,
+    status:  name => `nssm status ${name}`,
   },
 };
 
@@ -3175,6 +3181,14 @@ function parseServiceStatus(type, serviceName, result) {
     if (out === 'exited' || out === 'created' || out === 'dead') return 'stopped';
     if (out === 'restarting') return 'running';
     if (out === 'paused') return 'stopped';
+    if (result.code !== 0) return 'unknown';
+    return 'stopped';
+  }
+
+  if (type === 'nssm') {
+    const out = result.stdout.replace(/\0/g, '').trim().toUpperCase();
+    if (out.includes('SERVICE_RUNNING')) return 'running';
+    if (out.includes('SERVICE_STOPPED') || out.includes('SERVICE_PAUSED')) return 'stopped';
     if (result.code !== 0) return 'unknown';
     return 'stopped';
   }
