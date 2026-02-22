@@ -11,7 +11,6 @@ import * as api from '../api.js';
 import { showSudoApprovalModal } from '../components/sudo-modal.js';
 
 let session = null;
-let currentDevice = null;
 let activeSudoHandler = null;
 
 function resetSession() {
@@ -56,7 +55,6 @@ export function renderTerminal(container) {
       window.removeEventListener('ws:sudo-challenge', activeSudoHandler);
       activeSudoHandler = null;
     }
-    currentDevice = null;
     resetSession();
     session = null;
   };
@@ -252,7 +250,6 @@ function restartSessionTimer(page, timerEl) {
 
 function showTerminalView(page, device) {
   page.replaceChildren();
-  currentDevice = device;
   session.historyIndex = -1;
 
   // Session timer
@@ -290,7 +287,6 @@ function showTerminalView(page, device) {
         onClick: () => {
           clearInterval(session.timer);
           if (session.token) api.terminalDisconnect(session.token);
-          currentDevice = null;
           session.cwd = '~';
           showDeviceSelection(page);
         },
@@ -535,6 +531,7 @@ function showTerminalView(page, device) {
       output.replaceChildren();
       cmdInput.value = '';
       session.history.push(command);
+      if (session.history.length > 500) session.history.shift();
       session.historyIndex = session.history.length;
       return;
     }
