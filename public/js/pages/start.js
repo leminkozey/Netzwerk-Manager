@@ -331,7 +331,11 @@ export function renderStart(container) {
   let pollInterval = null;
   let destroyed = false;
 
-  const page = el('div', { className: 'page-wide' });
+  // Unlock parent .page max-width so control center uses full viewport
+  const parentPage = container.closest('.page');
+  if (parentPage) parentPage.style.maxWidth = 'none';
+
+  const page = el('div', { className: 'page-wide', style: { maxWidth: 'none' } });
 
   // Section: Gerätesteuerung
   page.appendChild(buildSectionTitle(t('section.control')));
@@ -344,6 +348,8 @@ export function renderStart(container) {
 
   const tiles = [];
 
+  const deviceGrid = el('div', { className: 'grid two equal-height' });
+
   if (devices.length === 0) {
     page.appendChild(el('p', {
       className: 'muted',
@@ -354,13 +360,15 @@ export function renderStart(container) {
     for (const device of devices) {
       const { tile, updateStatus, updateSchedule, deviceId } = buildDeviceTile(device);
       tiles.push({ updateStatus, updateSchedule, deviceId });
-      page.appendChild(tile);
+      deviceGrid.appendChild(tile);
     }
   }
 
   // ── Pi-hole Blocking Toggle ──
   const piholeTileContainer = el('div');
-  page.appendChild(piholeTileContainer);
+  deviceGrid.appendChild(piholeTileContainer);
+
+  page.appendChild(deviceGrid);
 
   // Shared refs for Pi-hole tile (set once tile is built, used by poll)
   let piholeRefs = null;
@@ -490,11 +498,13 @@ export function renderStart(container) {
     page.appendChild(buildPlaceholderSection());
   } else {
     const isDestroyed = () => destroyed;
+    const serviceGrid = el('div', { className: 'grid two equal-height' });
     for (const service of services) {
       const { tile, updateStatus, serviceId } = buildServiceTile(service, isDestroyed);
       serviceTiles.push({ updateStatus, serviceId });
-      page.appendChild(tile);
+      serviceGrid.appendChild(tile);
     }
+    page.appendChild(serviceGrid);
   }
 
   container.appendChild(page);
@@ -596,6 +606,8 @@ export function renderStart(container) {
   // ── Cleanup ──
   return function cleanup() {
     destroyed = true;
+    // Restore parent .page max-width for other pages
+    if (parentPage) parentPage.style.maxWidth = '';
     if (pollInterval) {
       clearInterval(pollInterval);
       pollInterval = null;
