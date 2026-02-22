@@ -11,6 +11,7 @@ import * as api from '../api.js';
 import { showSudoApprovalModal } from '../components/sudo-modal.js';
 
 let session = null;
+let currentDevice = null;
 let activeSudoHandler = null;
 
 function resetSession() {
@@ -55,6 +56,7 @@ export function renderTerminal(container) {
       window.removeEventListener('ws:sudo-challenge', activeSudoHandler);
       activeSudoHandler = null;
     }
+    currentDevice = null;
     resetSession();
     session = null;
   };
@@ -222,25 +224,19 @@ async function showDeviceSelection(page) {
   }
 }
 
-function showTerminalView(page, device) {
-  page.replaceChildren();
-  session.history = [];
-  session.historyIndex = -1;
-
-  // Session timer
-  const timerEl = el('span', { className: 'terminal-timer' });
+function restartSessionTimer(page, timerEl) {
+  if (session.timer) clearInterval(session.timer);
   function updateTimer() {
     const remaining = Math.max(0, session.expiresAt - Date.now());
     if (remaining === 0) {
       clearInterval(session.timer);
-      showSessionExpired(page);
+      showSessionExpired(page, timerEl);
       return;
     }
     const mins = Math.floor(remaining / 60000);
     const secs = Math.floor((remaining % 60000) / 1000);
     timerEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
 
-    // Timer warning states
     const totalSec = mins * 60 + secs;
     if (totalSec <= 30) {
       timerEl.className = 'terminal-timer critical';
@@ -251,8 +247,17 @@ function showTerminalView(page, device) {
     }
   }
   updateTimer();
-  if (session.timer) clearInterval(session.timer);
   session.timer = setInterval(updateTimer, 1000);
+}
+
+function showTerminalView(page, device) {
+  page.replaceChildren();
+  currentDevice = device;
+  session.historyIndex = -1;
+
+  // Session timer
+  const timerEl = el('span', { className: 'terminal-timer' });
+  restartSessionTimer(page, timerEl);
 
   // Header
   const header = el('div', { className: 'terminal-header' }, [
@@ -285,6 +290,7 @@ function showTerminalView(page, device) {
         onClick: () => {
           clearInterval(session.timer);
           if (session.token) api.terminalDisconnect(session.token);
+          currentDevice = null;
           session.cwd = '~';
           showDeviceSelection(page);
         },
@@ -295,6 +301,7 @@ function showTerminalView(page, device) {
         onClick: () => {
           clearInterval(session.timer);
           if (session.token) api.terminalDisconnect(session.token);
+          currentDevice = null;
           session.token = null;
           session.cwd = '~';
           showTotpGate(page);
@@ -606,28 +613,109 @@ function showTerminalView(page, device) {
   setTimeout(() => cmdInput.focus(), 100);
 }
 
-function showSessionExpired(page) {
+function showSessionExpired(page, timerEl) {
   if (session.timer) clearInterval(session.timer);
   session.token = null;
 
   const container = page.querySelector('.terminal-container');
-  if (container) {
-    const overlay = el('div', { className: 'dangerous-overlay' }, [
-      el('div', { className: 'dangerous-modal' }, [
-        el('div', { className: 'expired-icon' }, [iconEl('shield', 36)]),
-        el('h3', { textContent: t('terminal.sessionExpired') }),
-        el('p', { textContent: t('terminal.sessionExpiredHint') }),
-        el('button', {
-          className: 'btn',
-          textContent: t('terminal.verify'),
-          onClick: () => showTotpInput(page),
-        }),
-      ]),
-    ]);
-    container.appendChild(overlay);
-  } else {
+  if (!container) {
     showTotpInput(page);
+    return;
   }
+
+  // Guard against duplicate overlays
+  if (container.querySelector('.dangerous-overlay')) return;
+
+  // Find timer element if not passed (e.g. called from executeCommand)
+  if (!timerEl) timerEl = container.querySelector('.terminal-timer');
+
+  const codeInput = el('input', {
+    type: 'text',
+    className: 'totp-input',
+    maxLength: '6',
+    placeholder: '000000',
+    autocomplete: 'one-time-code',
+    inputMode: 'numeric',
+    pattern: '[0-9]{6}',
+  });
+
+  const statusMsg = el('div', { className: 'totp-status' });
+
+  const overlay = el('div', { className: 'dangerous-overlay' }, [
+    el('div', { className: 'dangerous-modal' }, [
+      el('div', { className: 'expired-icon' }, [iconEl('shield', 36)]),
+      el('h3', { textContent: t('terminal.sessionExpired') }),
+      el('p', { textContent: t('terminal.sessionExpiredHint') }),
+      codeInput,
+      statusMsg,
+    ]),
+  ]);
+
+  let isVerifying = false;
+
+  async function doReAuth() {
+    const code = codeInput.value.trim();
+    if (!/^\d{6}$/.test(code) || isVerifying) return;
+    isVerifying = true;
+    codeInput.disabled = true;
+    statusMsg.textContent = '';
+    statusMsg.className = 'totp-status';
+
+    try {
+      const result = await api.terminalAuth(code);
+      if (result.success) {
+        // Update session
+        session.token = result.terminalToken;
+        session.expiresAt = result.expiresAt;
+
+        // Remove overlay
+        overlay.remove();
+
+        // Restart timer
+        if (timerEl) {
+          restartSessionTimer(page, timerEl);
+        }
+
+        // Add reconnected separator
+        const output = container.querySelector('.terminal-output');
+        if (output) {
+          const sep = el('div', {
+            className: 'terminal-line reconnected',
+            textContent: `── ${t('terminal.reconnected')} ──`,
+          });
+          output.appendChild(sep);
+          scrollToBottom(output);
+        }
+
+        // Re-focus input
+        const cmdInput = container.querySelector('.terminal-cmd-input');
+        if (cmdInput) cmdInput.focus();
+
+        showToast(t('terminal.authSuccess'));
+      } else {
+        codeInput.classList.add('shake');
+        statusMsg.textContent = t('terminal.invalidCode');
+        statusMsg.className = 'totp-status error';
+        setTimeout(() => codeInput.classList.remove('shake'), 500);
+        codeInput.value = '';
+        codeInput.disabled = false;
+        codeInput.focus();
+      }
+    } catch {
+      statusMsg.textContent = t('msg.error');
+      statusMsg.className = 'totp-status error';
+      codeInput.disabled = false;
+    }
+    isVerifying = false;
+  }
+
+  codeInput.addEventListener('input', () => {
+    codeInput.value = codeInput.value.replace(/\D/g, '');
+    if (codeInput.value.length === 6) doReAuth();
+  });
+
+  container.appendChild(overlay);
+  setTimeout(() => codeInput.focus(), 100);
 }
 
 function scrollToBottom(el) {

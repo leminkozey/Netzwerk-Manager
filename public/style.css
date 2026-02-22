@@ -4925,6 +4925,14 @@ input.shake {
   color: #8b949e;
   font-style: italic;
 }
+.terminal-line.reconnected {
+  text-align: center;
+  color: #3fb950;
+  font-size: 0.78rem;
+  opacity: 0.7;
+  padding: 8px 0;
+  letter-spacing: 0.5px;
+}
 
 /* Terminal welcome banner */
 .terminal-welcome {
@@ -5501,6 +5509,10 @@ input[type='text'].terminal-cmd-input:focus-visible {
 
 [data-theme='light'] .terminal-line.loading {
   color: var(--text-muted);
+}
+
+[data-theme='light'] .terminal-line.reconnected {
+  color: #1a7f37;
 }
 
 [data-theme='light'] .terminal-welcome {

@@ -355,6 +355,7 @@ const translations = {
     'terminal.authSuccess': 'Authentifizierung erfolgreich!',
     'terminal.readyHint': 'Bereit für Befehle',
     'terminal.sessionExpiredHint': 'Deine Session ist abgelaufen. Bitte authentifiziere dich erneut.',
+    'terminal.reconnected': 'Neu verbunden',
 
     // Settings - TOTP
     'settings.totp2fa': 'Zwei-Faktor-Authentifizierung',
@@ -726,6 +727,7 @@ const translations = {
     'terminal.authSuccess': 'Authentication successful!',
     'terminal.readyHint': 'Ready for commands',
     'terminal.sessionExpiredHint': 'Your session has expired. Please re-authenticate.',
+    'terminal.reconnected': 'Reconnected',
 
     // Settings - TOTP
     'settings.totp2fa': 'Two-Factor Authentication',
