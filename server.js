@@ -784,8 +784,9 @@ function getClientIp(req) {
   if (TRUST_PROXY && req.headers['x-forwarded-for']) {
     return req.headers['x-forwarded-for'].split(',')[0].trim();
   }
-  // Direct connection - use socket address
-  return req.ip || req.socket?.remoteAddress || 'unknown';
+  // Direct connection - use socket address, strip IPv6-mapped prefix
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  return ip.replace(/^::ffff:/, '');
 }
 
 async function getIpLocation(ip) {
