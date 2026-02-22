@@ -504,11 +504,11 @@ function showTerminalView(page, device) {
 
   page.appendChild(termContainer);
 
-  // Focus input on click anywhere in terminal
+  // Focus input on click anywhere in terminal (but not when overlay is open)
   termContainer.addEventListener('click', (e) => {
-    if (!e.target.closest('.terminal-header-btn') && !e.target.closest('.terminal-header-right')) {
-      cmdInput.focus();
-    }
+    if (e.target.closest('.dangerous-overlay') || e.target.closest('.terminal-header-btn') || e.target.closest('.terminal-header-right')) return;
+    if (termContainer.querySelector('.dangerous-overlay')) return;
+    cmdInput.focus();
   });
 
   // Sudo challenge listener – show modal when backend requests sudo approval
@@ -629,6 +629,10 @@ function showSessionExpired(page, timerEl) {
   // Find timer element if not passed (e.g. called from executeCommand)
   if (!timerEl) timerEl = container.querySelector('.terminal-timer');
 
+  // Disable terminal input while overlay is open
+  const cmdInput = container.querySelector('.terminal-cmd-input');
+  if (cmdInput) cmdInput.disabled = true;
+
   const codeInput = el('input', {
     type: 'text',
     className: 'totp-input',
@@ -687,9 +691,11 @@ function showSessionExpired(page, timerEl) {
           scrollToBottom(output);
         }
 
-        // Re-focus input
-        const cmdInput = container.querySelector('.terminal-cmd-input');
-        if (cmdInput) cmdInput.focus();
+        // Re-enable and focus input
+        if (cmdInput) {
+          cmdInput.disabled = false;
+          cmdInput.focus();
+        }
 
         showToast(t('terminal.authSuccess'));
       } else {
