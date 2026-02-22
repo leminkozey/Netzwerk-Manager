@@ -469,9 +469,9 @@ a:hover {
 /* Simple button style variant */
 [data-button-style="simple"] .btn {
   background: transparent;
-  border: 1px solid var(--border);
+  border: 1px solid var(--accent);
   box-shadow: none;
-  color: var(--text);
+  color: var(--accent);
 }
 
 [data-button-style="simple"] .btn:hover {
