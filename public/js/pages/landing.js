@@ -46,6 +46,9 @@ export function renderLanding(container) {
     }));
   }
 
+  // ── Logo above title ──
+  page.appendChild(el('img', { className: 'landing-logo', src: 'logo.svg', alt: 'Logo' }));
+
   // ── "Lokales Netzwerk" title ──
   page.appendChild(el('h1', { className: 'landing-title', textContent: t('app.title') }));
 
