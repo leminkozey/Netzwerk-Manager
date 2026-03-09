@@ -64,6 +64,8 @@ const ACTION_SUCCESS_KEYS = {
   wake: 'control.wakeSuccess',
   shutdown: 'control.shutdownSuccess',
   restart: 'control.restartSuccess',
+  'tailscale-start': 'control.tailscaleStartSuccess',
+  'tailscale-stop': 'control.tailscaleStopSuccess',
 };
 
 // ── Section Title ──

@@ -95,6 +95,10 @@ const translations = {
     'control.wakeSuccess': 'Wake-on-LAN Paket gesendet!',
     'control.shutdownSuccess': 'Shutdown-Befehl gesendet!',
     'control.restartSuccess': 'Restart-Befehl gesendet!',
+    'control.tailscale-start': 'Tailscale Start',
+    'control.tailscale-stop': 'Tailscale Stop',
+    'control.tailscaleStartSuccess': 'Tailscale VPN gestartet!',
+    'control.tailscaleStopSuccess': 'Tailscale VPN gestoppt!',
     'control.connectionError': 'Verbindungsfehler',
     'control.noDevices': 'Keine Geräte konfiguriert',
 
@@ -470,6 +474,10 @@ const translations = {
     'control.wakeSuccess': 'Wake-on-LAN packet sent!',
     'control.shutdownSuccess': 'Shutdown command sent!',
     'control.restartSuccess': 'Restart command sent!',
+    'control.tailscale-start': 'Tailscale Start',
+    'control.tailscale-stop': 'Tailscale Stop',
+    'control.tailscaleStartSuccess': 'Tailscale VPN started!',
+    'control.tailscaleStopSuccess': 'Tailscale VPN stopped!',
     'control.connectionError': 'Connection error',
     'control.noDevices': 'No devices configured',
 

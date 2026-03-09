@@ -2910,6 +2910,8 @@ const DEVICE_COMMANDS = {
   'ssh-windows': {
     shutdown: 'shutdown /s /t 0',
     restart: 'shutdown /r /t 0',
+    'tailscale-start': 'net start Tailscale && timeout /t 3 /nobreak >nul && tailscale up --unattended',
+    'tailscale-stop': 'tailscale down && net stop Tailscale',
   },
   'ssh-linux': {
     shutdown: 'sudo shutdown -h now',

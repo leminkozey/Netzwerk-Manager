@@ -560,6 +560,37 @@ a:hover {
   box-shadow: none;
 }
 
+[data-button-style="simple"] .tailscale-start-btn,
+[data-button-style="simple"] .tailscale-stop-btn {
+  border-width: 2px;
+}
+
+[data-button-style="simple"] .tailscale-start-btn {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #8b5cf6;
+}
+
+[data-button-style="simple"] .tailscale-start-btn:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  box-shadow: none;
+}
+
+[data-button-style="simple"] .tailscale-stop-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+[data-button-style="simple"] .tailscale-stop-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ef4444;
+  box-shadow: none;
+}
+
 [data-button-style="simple"] .pause-btn {
   background: rgba(245, 158, 11, 0.1);
   border-color: rgba(245, 158, 11, 0.3);
@@ -2522,6 +2553,8 @@ label {
 [data-animation-icons="off"] .pc-restart-btn svg,
 [data-animation-icons="off"] .shutdown-btn svg,
 [data-animation-icons="off"] .pc-shutdown-btn svg,
+[data-animation-icons="off"] .tailscale-start-btn svg,
+[data-animation-icons="off"] .tailscale-stop-btn svg,
 [data-animation-icons="off"] .pause-btn svg,
 [data-animation-icons="off"] .resume-btn svg,
 [data-animation-icons="off"] .settings-tab svg,
@@ -2747,6 +2780,55 @@ label {
 .pc-shutdown-btn:active,
 .shutdown-btn:active {
   transform: scale(0.95);
+}
+
+.tailscale-start-btn {
+  background: rgba(139, 92, 246, 0.1);
+  border: 2px solid rgba(139, 92, 246, 0.3);
+  color: #8b5cf6;
+  box-shadow: none;
+}
+
+.tailscale-start-btn:hover {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: #8b5cf6;
+  transform: scale(1.08);
+  box-shadow: none;
+}
+
+.tailscale-start-btn:active {
+  transform: scale(0.95);
+}
+
+.tailscale-stop-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  box-shadow: none;
+}
+
+.tailscale-stop-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  transform: scale(1.08);
+  box-shadow: none;
+}
+
+.tailscale-stop-btn:active {
+  transform: scale(0.95);
+}
+
+.tailscale-start-btn svg,
+.tailscale-stop-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.tailscale-start-btn:hover svg {
+  animation: wake-rotate 3s linear infinite;
+}
+
+.tailscale-stop-btn:hover svg {
+  animation: shutdown-bounce 0.8s ease-in-out infinite;
 }
 
 .pause-btn {
