@@ -2998,7 +2998,7 @@ function logControlAction(deviceId, action, ip, success, details = '') {
 // ═══════════════════════════════════════════════════════════════════
 
 const SERVICE_NAME_PATTERN = /^[a-zA-Z0-9_.-]{1,100}$/;
-const VALID_SERVICE_TYPES = new Set(['systemd', 'pm2', 'docker', 'nssm']);
+const VALID_SERVICE_TYPES = new Set(['systemd', 'pm2', 'docker', 'nssm', 'sc']);
 const VALID_SERVICE_ACTIONS = new Set(['start', 'stop', 'restart']);
 
 const SERVICE_COMMANDS = {
@@ -3027,6 +3027,12 @@ const SERVICE_COMMANDS = {
     stop:    name => `nssm stop ${name}`,
     restart: name => `nssm restart ${name}`,
     status:  name => `nssm status ${name}`,
+  },
+  sc: {
+    start:   name => `net start ${name}`,
+    stop:    name => `net stop ${name}`,
+    restart: name => `net stop ${name} && timeout /t 2 /nobreak >nul && net start ${name}`,
+    status:  name => `sc query ${name}`,
   },
 };
 
@@ -3196,6 +3202,15 @@ function parseServiceStatus(type, serviceName, result) {
     return 'stopped';
   }
 
+  if (type === 'sc') {
+    const out = result.stdout.toUpperCase();
+    if (out.includes('RUNNING')) return 'running';
+    if (out.includes('STOPPED') || out.includes('STOP_PENDING')) return 'stopped';
+    if (out.includes('START_PENDING')) return 'running';
+    if (result.code !== 0) return 'unknown';
+    return 'stopped';
+  }
+
   return 'unknown';
 }
 
@@ -3233,9 +3248,12 @@ function readServicesFromConfig() {
 }
 
 async function executeServiceCommand(serviceConfig, action) {
+  // Allow per-service command overrides (e.g. for Tailscale: custom start/stop)
+  const customCmd = serviceConfig.commands?.[action];
+
   if (serviceConfig.host === 'local') {
     const localHostType = process.platform === 'win32' ? 'ssh-windows' : 'ssh-linux';
-    const command = buildServiceCommand(serviceConfig.type, action, serviceConfig.service, localHostType);
+    const command = customCmd || buildServiceCommand(serviceConfig.type, action, serviceConfig.service, localHostType);
     if (!command) return { stdout: '', stderr: 'Invalid command', code: -1 };
     return localCommandWithOutput(command);
   }
@@ -3250,7 +3268,7 @@ async function executeServiceCommand(serviceConfig, action) {
     return { stdout: '', stderr: 'SSH credentials not configured', code: -1 };
   }
 
-  const command = buildServiceCommand(serviceConfig.type, action, serviceConfig.service, controlDevice.type);
+  const command = customCmd || buildServiceCommand(serviceConfig.type, action, serviceConfig.service, controlDevice.type);
   if (!command) return { stdout: '', stderr: 'Invalid command', code: -1 };
 
   const sshConfig = {
