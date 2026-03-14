@@ -46,4 +46,5 @@ pids/
 .idea/
 *.swp
 *.swo
-*.code-workspaceCLAUDE.md
+*.code-workspace
+CLAUDE.md
