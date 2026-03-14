@@ -497,6 +497,25 @@ const siteConfig = {
   },
 
   // ┌─────────────────────────────────────────────┐
+  // │             AI HELP ASSISTANT               │
+  // └─────────────────────────────────────────────┘
+
+  // ── AI Assistant ──
+  // Embeddable chat bot that helps users with questions.
+  // The bot is embedded as an iframe/popup via an external service.
+  //
+  // enabled:  true/false – enable/disable assistant completely
+  // url:      URL of the chat bot (loaded as iframe)
+  // name:     Display name in the UI (e.g. 'Network Assistant')
+  // position: Button position – 'bottom-right' | 'bottom-left'
+  aiAssistant: {
+    enabled: false,
+    url: '',
+    name: 'AI Assistant',
+    position: 'bottom-right',
+  },
+
+  // ┌─────────────────────────────────────────────┐
   // │             EMAIL NOTIFICATIONS             │
   // └─────────────────────────────────────────────┘
 

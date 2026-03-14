@@ -53,6 +53,7 @@ function openSettings() {
           createControlPanel(),
           createDataPanel(),
           createSessionPanel(),
+          createAiAssistantPanel(),
           createUserPanel(),
           createCreditsPanel(),
         ]),
@@ -85,6 +86,7 @@ function createSidebar() {
     ...(hasControlDevices ? [{ id: 'control', icon: 'start', label: t('settings.controlDevices') }] : []),
     { id: 'daten', icon: 'copy', label: t('settings.data') },
     { id: 'session', icon: 'uptime', label: t('settings.session') },
+    ...(cfg?.aiAssistant ? [{ id: 'aiAssistant', icon: 'info', label: t('settings.aiAssistant') }] : []),
     { id: 'user', icon: 'user', label: t('settings.user') },
     { id: 'credits', icon: 'info', label: t('settings.credits') },
   ];
@@ -633,6 +635,40 @@ function createSessionPanel() {
       minutesRow.classList.toggle('hidden', !enabled);
     })),
     minutesRow,
+  ]);
+}
+
+// ── AI Assistant Panel ──
+function createAiAssistantPanel() {
+  const cfg = getConfig();
+  const ai = cfg?.aiAssistant || {};
+
+  const statusDot = el('span', {
+    className: `status-dot ${ai.enabled ? 'online' : 'offline'}`,
+    style: { width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', marginRight: '8px', background: ai.enabled ? 'var(--success, #22c55e)' : 'var(--danger, #ef4444)' },
+  });
+
+  const fields = [
+    { label: t('settings.aiEnabled'), value: ai.enabled ? t('settings.on') : t('settings.off'), dot: true },
+    { label: t('settings.aiUrl'), value: ai.url || '—' },
+    { label: t('settings.aiName'), value: ai.name || '—' },
+    { label: t('settings.aiPosition'), value: ai.position === 'bottom-left' ? t('settings.aiPositionLeft') : t('settings.aiPositionRight') },
+  ];
+
+  return el('div', { className: 'settings-panel', id: 'panel-aiAssistant' }, [
+    el('h4', { textContent: t('settings.aiAssistant'), 'data-i18n': 'settings.aiAssistant' }),
+    el('p', { className: 'setting-description', textContent: t('settings.aiAssistantDesc'), 'data-i18n': 'settings.aiAssistantDesc' }),
+    ...fields.map(f =>
+      el('div', { className: 'setting-row' }, [
+        el('label', { textContent: f.label }),
+        el('span', { className: 'muted' }, f.dot ? [statusDot, document.createTextNode(f.value)] : [document.createTextNode(f.value)]),
+      ])
+    ),
+    el('p', {
+      className: 'setting-description',
+      style: { marginTop: '16px', fontSize: '0.8em' },
+      textContent: 'config.js → aiAssistant { enabled, url, name, position }',
+    }),
   ]);
 }
 
