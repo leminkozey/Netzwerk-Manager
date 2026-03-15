@@ -2912,6 +2912,8 @@ const DEVICE_COMMANDS = {
     restart: 'shutdown /r /t 0',
     'tailscale-start': 'net start Tailscale && ping -n 4 127.0.0.1 >nul && tailscale up --unattended',
     'tailscale-stop': 'tailscale down && net stop Tailscale',
+    'ollama-start': 'start /B ollama serve',
+    'ollama-stop': 'taskkill /F /IM ollama.exe',
   },
   'ssh-linux': {
     shutdown: 'sudo shutdown -h now',
