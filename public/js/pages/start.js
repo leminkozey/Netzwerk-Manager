@@ -66,6 +66,8 @@ const ACTION_SUCCESS_KEYS = {
   restart: 'control.restartSuccess',
   'tailscale-start': 'control.tailscaleStartSuccess',
   'tailscale-stop': 'control.tailscaleStopSuccess',
+  'ollama-start': 'control.ollamaStartSuccess',
+  'ollama-stop': 'control.ollamaStopSuccess',
 };
 
 // ── Section Title ──
