@@ -152,10 +152,6 @@ If `infoCenter` is not used, the old cards can be shown/hidden with:
 
 ```js
 cards: {
-  switch: true,
-  router: true,
-  pihole: true,
-  speedport: true,
   speedtest: true,
   windowsPc: true,
 },
