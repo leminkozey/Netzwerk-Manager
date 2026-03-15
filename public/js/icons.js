@@ -182,6 +182,18 @@ export const icons = {
     <line x1="15" y1="9" x2="9" y2="15"/>
   </svg>`,
 
+  'ollama-start': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
+    <line x1="9" y1="21" x2="15" y2="21"/>
+    <line x1="10" y1="24" x2="14" y2="24"/>
+  </svg>`,
+
+  'ollama-stop': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/>
+    <line x1="9" y1="21" x2="15" y2="21"/>
+    <line x1="9" y1="10" x2="15" y2="10"/>
+  </svg>`,
+
   pause: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="6" y="4" width="4" height="16" rx="1"/>
     <rect x="14" y="4" width="4" height="16" rx="1"/>
