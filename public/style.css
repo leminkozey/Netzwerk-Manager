@@ -588,6 +588,36 @@ a:hover {
   background: rgba(239, 68, 68, 0.2);
   border-color: #ef4444;
   color: #ef4444;
+}
+
+[data-button-style="simple"] .ollama-start-btn,
+[data-button-style="simple"] .ollama-stop-btn {
+  border-width: 2px;
+}
+
+[data-button-style="simple"] .ollama-start-btn {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+}
+
+[data-button-style="simple"] .ollama-start-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  color: #f59e0b;
+  box-shadow: none;
+}
+
+[data-button-style="simple"] .ollama-stop-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+[data-button-style="simple"] .ollama-stop-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ef4444;
   box-shadow: none;
 }
 
@@ -2568,6 +2598,8 @@ label {
 [data-animation-icons="off"] .pc-shutdown-btn svg,
 [data-animation-icons="off"] .tailscale-start-btn svg,
 [data-animation-icons="off"] .tailscale-stop-btn svg,
+[data-animation-icons="off"] .ollama-start-btn svg,
+[data-animation-icons="off"] .ollama-stop-btn svg,
 [data-animation-icons="off"] .pause-btn svg,
 [data-animation-icons="off"] .resume-btn svg,
 [data-animation-icons="off"] .settings-tab svg,
@@ -2841,6 +2873,55 @@ label {
 }
 
 .tailscale-stop-btn:hover svg {
+  animation: shutdown-bounce 0.8s ease-in-out infinite;
+}
+
+.ollama-start-btn {
+  background: rgba(245, 158, 11, 0.1);
+  border: 2px solid rgba(245, 158, 11, 0.3);
+  color: #f59e0b;
+  box-shadow: none;
+}
+
+.ollama-start-btn:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: #f59e0b;
+  transform: scale(1.08);
+  box-shadow: none;
+}
+
+.ollama-start-btn:active {
+  transform: scale(0.95);
+}
+
+.ollama-stop-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  box-shadow: none;
+}
+
+.ollama-stop-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  transform: scale(1.08);
+  box-shadow: none;
+}
+
+.ollama-stop-btn:active {
+  transform: scale(0.95);
+}
+
+.ollama-start-btn svg,
+.ollama-stop-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.ollama-start-btn:hover svg {
+  animation: wake-rotate 3s linear infinite;
+}
+
+.ollama-stop-btn:hover svg {
   animation: shutdown-bounce 0.8s ease-in-out infinite;
 }
 
