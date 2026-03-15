@@ -91,21 +91,31 @@ function createSidebar() {
     { id: 'credits', icon: 'info', label: t('settings.credits') },
   ];
 
-  return el('nav', { className: 'settings-sidebar' },
-    tabs.filter(tab => {
-      if (tab.id === 'credits') return true;
-      return cfg?.settings?.tabs?.[tab.id] !== false;
-    }).map(tab =>
-      el('button', {
-        className: `settings-tab ${tab.id === activeTab ? 'active' : ''}`,
-        'data-tab': tab.id,
-        onClick: () => switchTab(tab.id),
-      }, [
-        el('span', { style: { display: 'flex' } }, [iconEl(tab.icon, 18)]),
-        el('span', { textContent: tab.label }),
-      ])
-    )
+  const tabButtons = tabs.filter(tab => {
+    if (tab.id === 'credits') return true;
+    return cfg?.settings?.tabs?.[tab.id] !== false;
+  }).map(tab =>
+    el('button', {
+      className: `settings-tab ${tab.id === activeTab ? 'active' : ''}`,
+      'data-tab': tab.id,
+      onClick: () => switchTab(tab.id),
+    }, [
+      el('span', { style: { display: 'flex' } }, [iconEl(tab.icon, 18)]),
+      el('span', { textContent: tab.label }),
+    ])
   );
+
+  const helpLink = el('a', {
+    className: 'settings-tab settings-help-link',
+    href: '/help/',
+    target: '_blank',
+    style: { marginTop: 'auto' },
+  }, [
+    el('span', { style: { display: 'flex' } }, [iconEl('info', 18)]),
+    el('span', { textContent: 'Help' }),
+  ]);
+
+  return el('nav', { className: 'settings-sidebar' }, [...tabButtons, helpLink]);
 }
 
 function switchTab(tabName) {

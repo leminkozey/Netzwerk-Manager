@@ -1443,6 +1443,18 @@ label {
   color: var(--text);
 }
 
+.settings-help-link {
+  text-decoration: none;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  font-size: 0.82rem;
+  opacity: 0.7;
+}
+
+.settings-help-link:hover {
+  opacity: 1;
+}
+
 .settings-tab:hover svg {
   transform: scale(1.1);
 }
