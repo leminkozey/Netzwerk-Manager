@@ -277,7 +277,7 @@ const siteConfig = {
   // icon:    icon name from icons.js (e.g. 'windowsColor', 'server')
   // type:    'ssh-windows' | 'ssh-linux' – determines SSH commands
   // ip:      IP address of the device
-  // actions: array of actions: 'wake', 'restart', 'shutdown', 'tailscale-start', 'tailscale-stop'
+  // actions: array of actions: 'wake', 'restart', 'shutdown', 'tailscale-start', 'tailscale-stop', 'ollama-start', 'ollama-stop'
   // show:    control visibility (default: visible everywhere)
   //          Object: { controlCenter: true/false, terminal: true/false }
   //          Example: show: { controlCenter: false, terminal: true }
