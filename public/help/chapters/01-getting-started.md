@@ -1,54 +1,50 @@
 # Getting Started
 
-Welcome to the Help Book — a standalone, drop-in documentation system for any web project.
+Network Manager is a web application for managing, documenting, and controlling your local network.
+
+## Features
+
+- **Configurable Info Center** – Define custom sections, cards, and fields via config (tables + info cards with password encryption, copy buttons, and links)
+- **Port Documentation** – Label switch and router ports (which cable goes where)
+- **Speed Test** – Measure download, upload, and ping on the local network
+- **Device Info / Uptime Monitoring** – Monitor devices via ping with live status, optionally CPU load, RAM, and temperature via SSH or locally
+- **Control Center** – Control devices via Wake-on-LAN, SSH shutdown, and SSH restart
+- **Service / Container Management** – Start, stop, and restart systemd services, PM2 processes, and Docker containers (locally and remotely via SSH)
+- **WOL Schedule** – Automatic startup and shutdown of devices on a configurable schedule (cron-based)
+- **Pi-hole DNS Analytics** – Statistics, top domains, and query history directly in the dashboard
+- **Pi-hole Blocking Toggle** – Pause and resume DNS blocking with one click
+- **Web Terminal** – Execute SSH commands directly in the browser (TOTP 2FA required)
+- **Email Notifications** – Automatic emails on device outages and security events via SMTP
+- **Data Export/Import** – Full backup as JSON
+- **Multi-Language** – German and English
+- **Theming** – Dark, light, and system theme with customizable accent color
+- **Ping Monitor** – Latency measurement to external hosts with live chart and statistics
+- **Remote Update** – Update directly from the settings with configurable commands
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) (version 18 or higher)
+- A web browser
+- `sshpass` installed on the server (only needed for web terminal and SSH-based features)
 
 ## Installation
 
-Copy the `help/` folder into your project:
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Create configuration:
+   ```bash
+   cp public/config.example.js public/config.js
+   ```
+4. Customize `public/config.js` (see the Configuration chapters)
+5. Start the server:
+   ```bash
+   node server.js
+   ```
+6. Open in browser: `http://localhost:5055`
 
-```
-your-project/
-  help/
-    index.html
-    help.css
-    help.js
-    chapters.json
-    chapters/
-      ...your markdown files
-```
+> **Tip:** Always copy `config.example.js` as a starting point. It contains all available options with detailed comments and sensible example values. Then adjust IPs, passwords, and devices to match your network.
 
-Then serve it as a static directory. For example with Express:
-
-```javascript
-app.use('/help', express.static('help'));
-```
-
-Or with a plain HTTP server:
-
-```bash
-# development
-cd help && python3 -m http.server 8082
-```
-
-Your documentation is now available at `yoursite.com/help`.
-
-## How It Works
-
-1. **chapters.json** defines the structure — titles, order, and file paths
-2. **Markdown files** in `chapters/` contain the actual content
-3. **help.js** loads the manifest, builds the sidebar, and renders markdown on the fly
-4. No build step, no dependencies to install — just static files
-
-## Quick Start
-
-1. Edit `chapters.json` to set your project name, version, and chapters
-2. Write your markdown files in `chapters/`
-3. Done
-
-> **Tip:** Use `Ctrl+K` / `Cmd+K` to quickly search across all chapters.
-
-## Requirements
-
-- A modern browser (Chrome, Firefox, Safari, Edge)
-- A web server that can serve static files
-- That's it. No npm, no webpack, no build pipeline.
+> **Updates:** When pulling new versions, `config.example.js` may change (new features, new options). After an update, compare your `config.js` with the current `config.example.js` and adopt new sections as needed. Your `config.js` will not be overwritten by updates.

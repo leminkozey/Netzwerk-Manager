@@ -1,7 +1,7 @@
 {
-  "title": "Help Book Demo",
+  "title": "Network Manager Help",
   "version": "v1.0.0",
-  "accent": "#e8791d",
+  "accent": "#00d4ff",
   "chapters": [
     {
       "id": "getting-started",
@@ -11,23 +11,53 @@
     {
       "id": "configuration",
       "title": "Configuration",
-      "file": "chapters/02-configuration.md"
-    },
-    {
-      "id": "features",
-      "title": "Features",
       "children": [
         {
-          "id": "dashboard",
-          "title": "Dashboard",
-          "file": "chapters/03-features/01-dashboard.md"
+          "id": "general",
+          "title": "General",
+          "file": "chapters/02-config/01-general.md"
         },
         {
-          "id": "settings",
-          "title": "Settings",
-          "file": "chapters/03-features/02-settings.md"
+          "id": "landing-page",
+          "title": "Landing Page",
+          "file": "chapters/02-config/02-landing-page.md"
+        },
+        {
+          "id": "info-center",
+          "title": "Info Center",
+          "file": "chapters/02-config/03-info-center.md"
+        },
+        {
+          "id": "control-center",
+          "title": "Control Center",
+          "file": "chapters/02-config/04-control-center.md"
+        },
+        {
+          "id": "analytics",
+          "title": "Analytics Center",
+          "file": "chapters/02-config/05-analytics.md"
+        },
+        {
+          "id": "web-terminal",
+          "title": "Web Terminal",
+          "file": "chapters/02-config/06-web-terminal.md"
+        },
+        {
+          "id": "notifications",
+          "title": "Email Notifications",
+          "file": "chapters/02-config/07-notifications.md"
         }
       ]
+    },
+    {
+      "id": "security",
+      "title": "Security",
+      "file": "chapters/03-security.md"
+    },
+    {
+      "id": "user-management",
+      "title": "User Management",
+      "file": "chapters/04-user-management.md"
     }
   ]
 }
