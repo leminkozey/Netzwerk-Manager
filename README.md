@@ -30,6 +30,8 @@ A web application for managing, documenting, and controlling your local network.
 - **Email Notifications** – Automatic emails on device outages (offline/online) via SMTP
 - **Web Terminal** – Execute SSH commands directly in the browser on configured devices (TOTP 2FA required)
 - **TOTP Two-Factor Authentication** – Configurable in settings, required for the web terminal, with QR code setup and replay protection
+- **Built-in Help Book** – Searchable documentation accessible via settings sidebar (`/help/`), with dark/light mode, chapter navigation, and table of contents
+- **AI Assistant Config** – Optional embeddable chat bot configurable via `config.js` (enable/disable, URL, name, position)
 
 ## Prerequisites
 
@@ -1388,6 +1390,45 @@ Commands that contain one of the `dangerousCommands` patterns trigger an additio
 #### Backward Compatibility
 
 The `terminal` block is **completely optional**. Without `terminal` in the config (or with `enabled: false`), the web terminal is disabled and the button on the landing page is not shown. Existing configurations work without changes.
+
+---
+
+### AI Assistant (`aiAssistant`)
+
+Optional embeddable chat bot that helps users with questions. The bot is loaded as an iframe/popup via an external service. When enabled, an AI Assistant tab appears in the settings showing the current configuration.
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | `false` | Enable/disable assistant completely. When `false`, the settings tab is hidden. |
+| `url` | `string` | `''` | URL of the chat bot (loaded as iframe). |
+| `name` | `string` | `'AI Assistant'` | Display name in the UI. |
+| `position` | `string` | `'bottom-right'` | Button position: `'bottom-right'` or `'bottom-left'`. |
+
+```js
+aiAssistant: {
+  enabled: true,
+  url: 'https://example.com/chat',
+  name: 'Network Assistant',
+  position: 'bottom-right',
+},
+```
+
+The `aiAssistant` block is **completely optional**. Without it (or with `enabled: false`), the settings tab is not shown.
+
+---
+
+### Help Book
+
+A built-in searchable documentation system accessible via the settings sidebar or directly at `/help/`. Features dark/light mode, chapter navigation, search, and table of contents.
+
+The help book is located in `public/help/` and consists of:
+- `index.html` – Single-page application
+- `help.css` – Styles
+- `help.js` – Logic (markdown rendering, search, routing)
+- `chapters.json` – Chapter manifest
+- `chapters/` – Markdown documentation files
+
+To customize the documentation, edit the markdown files in `public/help/chapters/` and update `chapters.json` to reflect the structure.
 
 ---
 
