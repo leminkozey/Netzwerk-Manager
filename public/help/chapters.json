@@ -46,6 +46,11 @@
           "id": "notifications",
           "title": "Email Notifications",
           "file": "chapters/02-config/07-notifications.md"
+        },
+        {
+          "id": "ai-chat",
+          "title": "AI Chat",
+          "file": "chapters/02-config/08-ai-chat.md"
         }
       ]
     },

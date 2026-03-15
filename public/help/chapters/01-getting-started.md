@@ -19,6 +19,7 @@ Network Manager is a web application for managing, documenting, and controlling 
 - **Multi-Language** – German and English
 - **Theming** – Dark, light, and system theme with customizable accent color
 - **Ping Monitor** – Latency measurement to external hosts with live chart and statistics
+- **AI Chat** – Floating chat widget on the landing page, connects to a local Ollama-compatible AI server with automatic network context
 - **Remote Update** – Update directly from the settings with configurable commands
 
 ## Prerequisites
