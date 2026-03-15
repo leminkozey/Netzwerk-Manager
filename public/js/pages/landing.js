@@ -7,6 +7,7 @@ import { navigate } from '../router.js';
 import { el } from '../ui.js';
 import { iconEl } from '../icons.js';
 import { getConfig } from '../state.js';
+import { mountAiChat, unmountAiChat } from '../components/ai-chat.js';
 
 function randomGreeting() {
   const cfg = getConfig();
@@ -116,4 +117,14 @@ export function renderLanding(container) {
   }
 
   container.appendChild(page);
+
+  // ── Mount AI Chat widget (only on landing page) ──
+  const aiCfg = cfg0?.ai;
+  if (aiCfg?.enabled !== false) {
+    mountAiChat();
+  }
+
+  return function cleanupLanding() {
+    unmountAiChat();
+  };
 }
