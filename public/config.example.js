@@ -497,22 +497,35 @@ const siteConfig = {
   },
 
   // ┌─────────────────────────────────────────────┐
-  // │             AI HELP ASSISTANT               │
+  // │             AI CHAT                         │
   // └─────────────────────────────────────────────┘
-
-  // ── AI Assistant ──
-  // Embeddable chat bot that helps users with questions.
-  // The bot is embedded as an iframe/popup via an external service.
   //
-  // enabled:  true/false – enable/disable assistant completely
-  // url:      URL of the chat bot (loaded as iframe)
-  // name:     Display name in the UI (e.g. 'Network Assistant')
-  // position: Button position – 'bottom-right' | 'bottom-left'
-  aiAssistant: {
-    enabled: false,
-    url: '',
-    name: 'AI Assistant',
-    position: 'bottom-right',
+  // AI-Chat Widget on the landing page.
+  // Connects to an Ollama-compatible API (Ollama, LM Studio, LocalAI, etc.)
+  // The server proxies requests to the AI backend — the AI is never
+  // exposed directly to the browser.
+
+  ai: {
+    enabled: true,                // Enable/disable AI chat widget on landing page
+
+    // ── AI Server Connection ──
+    // Any server that speaks the Ollama /api/chat endpoint format works.
+    // Examples:
+    //   Ollama:     host = '192.168.2.137', port = 11434
+    //   LM Studio:  host = '192.168.2.137', port = 1234
+    //   LocalAI:    host = '192.168.2.137', port = 8080
+    ollamaHost: '192.168.2.100', // IP or hostname of the AI server
+    ollamaPort: 11434,           // API port
+
+    // ── Model ──
+    // Model name as known by the AI server (run 'ollama list' to see available models).
+    // Default: 'qwen2.5:7b' (good German support, runs on 4GB+ VRAM)
+    model: 'qwen2.5:7b',
+
+    // ── System Prompt ──
+    // Defines the AI's personality and knowledge scope.
+    // Network device info (IPs, services) is automatically appended from your config.
+    systemPrompt: 'Du bist ein hilfreicher Netzwerk-Assistent. Antworte kurz und praezise auf Deutsch.',
   },
 
   // ┌─────────────────────────────────────────────┐
