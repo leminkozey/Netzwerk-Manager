@@ -53,7 +53,7 @@ function openSettings() {
           createControlPanel(),
           createDataPanel(),
           createSessionPanel(),
-          createAiAssistantPanel(),
+          createAiChatPanel(),
           createUserPanel(),
           createCreditsPanel(),
         ]),
@@ -86,7 +86,7 @@ function createSidebar() {
     ...(hasControlDevices ? [{ id: 'control', icon: 'start', label: t('settings.controlDevices') }] : []),
     { id: 'daten', icon: 'copy', label: t('settings.data') },
     { id: 'session', icon: 'uptime', label: t('settings.session') },
-    ...(cfg?.aiAssistant?.enabled ? [{ id: 'aiAssistant', icon: 'info', label: t('settings.aiAssistant') }] : []),
+    ...(cfg?.ai?.enabled !== false ? [{ id: 'aiChat', icon: 'info', label: t('settings.aiChat') }] : []),
     { id: 'user', icon: 'user', label: t('settings.user') },
     { id: 'credits', icon: 'info', label: t('settings.credits') },
   ];
@@ -648,36 +648,59 @@ function createSessionPanel() {
   ]);
 }
 
-// ── AI Assistant Panel ──
-function createAiAssistantPanel() {
+// ── AI Chat Panel ──
+function createAiChatPanel() {
   const cfg = getConfig();
-  const ai = cfg?.aiAssistant || {};
+  const ai = cfg?.ai || {};
 
   const statusDot = el('span', {
-    className: `status-dot ${ai.enabled ? 'online' : 'offline'}`,
-    style: { width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', marginRight: '8px', background: ai.enabled ? 'var(--success, #22c55e)' : 'var(--danger, #ef4444)' },
+    className: 'ai-settings-dot',
+    style: { width: '8px', height: '8px', borderRadius: '50%', display: 'inline-block', marginRight: '8px', background: 'var(--text-muted)' },
+  });
+  const statusText = el('span', { className: 'muted', textContent: '...' });
+
+  // Live status check
+  const token = state.token;
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+  fetch('/api/ai/status', { headers }).then(r => r.json()).then(data => {
+    if (data.online && data.ready) {
+      statusDot.style.background = 'var(--success, #22c55e)';
+      statusText.textContent = 'Online — ' + (data.model || '?');
+    } else if (data.online) {
+      statusDot.style.background = 'var(--warning, #f59e0b)';
+      statusText.textContent = t('settings.aiModelNotLoaded');
+    } else {
+      statusDot.style.background = 'var(--danger, #ef4444)';
+      statusText.textContent = 'Offline';
+    }
+  }).catch(() => {
+    statusDot.style.background = 'var(--danger, #ef4444)';
+    statusText.textContent = 'Offline';
   });
 
   const fields = [
-    { label: t('settings.aiEnabled'), value: ai.enabled ? t('settings.on') : t('settings.off'), dot: true },
-    { label: t('settings.aiUrl'), value: ai.url || '—' },
-    { label: t('settings.aiName'), value: ai.name || '—' },
-    { label: t('settings.aiPosition'), value: ai.position === 'bottom-left' ? t('settings.aiPositionLeft') : t('settings.aiPositionRight') },
+    { label: t('settings.aiHost'), value: (ai.ollamaHost || '—') + ':' + (ai.ollamaPort || 11434) },
+    { label: t('settings.aiModel'), value: ai.model || '—' },
+    { label: t('settings.aiSystemPrompt'), value: ai.systemPrompt || '—' },
   ];
 
-  return el('div', { className: 'settings-panel', id: 'panel-aiAssistant' }, [
-    el('h4', { textContent: t('settings.aiAssistant'), 'data-i18n': 'settings.aiAssistant' }),
-    el('p', { className: 'setting-description', textContent: t('settings.aiAssistantDesc'), 'data-i18n': 'settings.aiAssistantDesc' }),
+  return el('div', { className: 'settings-panel', id: 'panel-aiChat' }, [
+    el('h4', { textContent: t('settings.aiChat') }),
+    el('p', { className: 'setting-description', textContent: t('settings.aiChatDesc') }),
+    el('div', { className: 'setting-row' }, [
+      el('label', { textContent: 'Status' }),
+      el('span', {}, [statusDot, statusText]),
+    ]),
     ...fields.map(f =>
       el('div', { className: 'setting-row' }, [
         el('label', { textContent: f.label }),
-        el('span', { className: 'muted' }, f.dot ? [statusDot, document.createTextNode(f.value)] : [document.createTextNode(f.value)]),
+        el('span', { className: 'muted', textContent: f.value, style: f.label === t('settings.aiSystemPrompt') ? { fontSize: '0.85em', maxWidth: '300px', wordBreak: 'break-word' } : {} }),
       ])
     ),
     el('p', {
       className: 'setting-description',
       style: { marginTop: '16px', fontSize: '0.8em' },
-      textContent: 'config.js → aiAssistant { enabled, url, name, position }',
+      textContent: 'config.js → ai { enabled, ollamaHost, ollamaPort, model, systemPrompt }',
     }),
   ]);
 }
