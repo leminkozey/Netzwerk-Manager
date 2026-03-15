@@ -99,6 +99,10 @@ const translations = {
     'control.tailscale-stop': 'Tailscale Stop',
     'control.tailscaleStartSuccess': 'Tailscale VPN gestartet!',
     'control.tailscaleStopSuccess': 'Tailscale VPN gestoppt!',
+    'control.ollama-start': 'Ollama Start',
+    'control.ollama-stop': 'Ollama Stop',
+    'control.ollamaStartSuccess': 'Ollama AI gestartet!',
+    'control.ollamaStopSuccess': 'Ollama AI gestoppt!',
     'control.connectionError': 'Verbindungsfehler',
     'control.noDevices': 'Keine Geräte konfiguriert',
 
@@ -484,6 +488,10 @@ const translations = {
     'control.tailscale-stop': 'Tailscale Stop',
     'control.tailscaleStartSuccess': 'Tailscale VPN started!',
     'control.tailscaleStopSuccess': 'Tailscale VPN stopped!',
+    'control.ollama-start': 'Ollama Start',
+    'control.ollama-stop': 'Ollama Stop',
+    'control.ollamaStartSuccess': 'Ollama AI started!',
+    'control.ollamaStopSuccess': 'Ollama AI stopped!',
     'control.connectionError': 'Connection error',
     'control.noDevices': 'No devices configured',
 
