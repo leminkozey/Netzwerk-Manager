@@ -13,7 +13,7 @@ Devices that can be remotely controlled. SSH credentials are configured per devi
 | `icon` | `string` | Icon for the device. |
 | `type` | `string` | SSH type: `'ssh-windows'` or `'ssh-linux'`. |
 | `ip` | `string` | IP address of the device. |
-| `actions` | `array` | Available actions: `'wake'`, `'restart'`, `'shutdown'`. |
+| `actions` | `array` | Available actions: `'wake'`, `'restart'`, `'shutdown'`, `'tailscale-start'`, `'tailscale-stop'`. |
 | `show` | `boolean \| object` | Controls visibility (see below). |
 
 **SSH commands by type:**
@@ -22,6 +22,15 @@ Devices that can be remotely controlled. SSH credentials are configured per devi
 |------|----------|---------|
 | `ssh-windows` | `shutdown /s /t 0` | `shutdown /r /t 0` |
 | `ssh-linux` | `sudo shutdown -h now` | `sudo reboot` |
+
+**Tailscale commands (Windows only):**
+
+| Action | Command |
+|--------|---------|
+| `tailscale-start` | `net start Tailscale && ping -n 4 127.0.0.1 >nul && tailscale up --unattended` |
+| `tailscale-stop` | `tailscale down && net stop Tailscale` |
+
+> **Note:** Tailscale actions are currently only supported for `ssh-windows` devices.
 
 ```js
 controlDevices: [
