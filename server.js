@@ -845,8 +845,8 @@ app.use((req, res, next) => {
   // Content Security Policy to prevent XSS
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' https://cdnjs.cloudflare.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https:",
     "connect-src 'self' ws: wss:",
@@ -5805,6 +5805,162 @@ app.post('/api/notify', (req, res) => {
     .catch(err => console.error(`[Notify] E-Mail-Fehler:`, err.message));
 
   res.json({ success: true });
+});
+
+
+
+// ═══════════════════════════════════════════════════════════════════
+// AI Chat Proxy – forwards requests to Ollama on Windows PC
+// ═══════════════════════════════════════════════════════════════════
+
+const OLLAMA_MODEL_DEFAULT = 'qwen2.5:7b';
+
+function getOllamaUrl() {
+  const cfg = readSiteConfig();
+  const host = cfg?.ai?.ollamaHost || '192.168.2.137';
+  const port = cfg?.ai?.ollamaPort || 11434;
+  return `http://${host}:${port}`;
+}
+
+function getAiModel() {
+  const cfg = readSiteConfig();
+  return cfg?.ai?.model || OLLAMA_MODEL_DEFAULT;
+}
+
+function getAiSystemPrompt() {
+  const cfg = readSiteConfig();
+  const base = cfg?.ai?.systemPrompt || 'Du bist ein hilfreicher Netzwerk-Assistent. Antworte kurz und praezise auf Deutsch.';
+
+  // Build network context from config
+  const parts = [base, '\nHier sind die Informationen ueber das lokale Netzwerk:'];
+
+  // Uptime devices (have IPs)
+  if (Array.isArray(cfg?.uptimeDevices)) {
+    parts.push('\nGeraete im Netzwerk:');
+    for (const d of cfg.uptimeDevices) {
+      if (d.name && d.ip) parts.push('- ' + d.name + ': ' + d.ip);
+    }
+  }
+
+  // Services
+  if (Array.isArray(cfg?.services)) {
+    parts.push('\nDienste auf dem Server:');
+    for (const s of cfg.services) {
+      const host = typeof s.host === 'string' ? s.host : (s.host?.ip || '');
+      parts.push('- ' + s.name + ' (' + (s.type || '') + ')' + (host ? ' auf ' + host : ''));
+    }
+  }
+
+  // Pi-hole
+  if (cfg?.pihole) {
+    parts.push('\nPi-hole (DNS-Filter) laeuft im Netzwerk.');
+  }
+
+  // Gateway info
+  if (Array.isArray(cfg?.uptimeDevices)) {
+    const router = cfg.uptimeDevices.find(d => d.name && d.name.toLowerCase().includes('router'));
+    if (router) {
+      parts.push('\nDer Router/Gateway ist: ' + router.ip);
+    }
+  }
+
+  parts.push('\nBenutze diese konkreten Daten in deinen Antworten statt generischer Tipps.');
+
+  return parts.join('\n');
+}
+
+app.post('/api/ai/chat', authRequired, async (req, res) => {
+  const { message, history } = req.body;
+  if (!message || typeof message !== 'string' || message.length > 2000) {
+    return res.status(400).json({ error: 'Invalid message' });
+  }
+
+  const ollamaUrl = getOllamaUrl();
+  const systemPrompt = getAiSystemPrompt();
+
+  // Build messages array from history + new message
+  const messages = [{ role: 'system', content: systemPrompt }];
+  if (Array.isArray(history)) {
+    for (const msg of history.slice(-20)) { // max 20 history messages
+      if (msg.role === 'user' || msg.role === 'assistant') {
+        messages.push({ role: msg.role, content: String(msg.content).slice(0, 2000) });
+      }
+    }
+  }
+  messages.push({ role: 'user', content: message });
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  try {
+    const ollamaRes = await fetch(`${ollamaUrl}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: getAiModel(), messages, stream: true }),
+    });
+
+    if (!ollamaRes.ok) {
+      res.write('data: ' + JSON.stringify({ error: 'Ollama error ' + ollamaRes.status }) + '\n\n');
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    }
+
+    const reader = ollamaRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line);
+          if (parsed.message && parsed.message.content) {
+            res.write('data: ' + JSON.stringify({ content: parsed.message.content }) + '\n\n');
+          }
+          if (parsed.done) {
+            res.write('data: [DONE]\n\n');
+          }
+        } catch (e) {}
+      }
+    }
+    if (buffer.trim()) {
+      try {
+        const parsed = JSON.parse(buffer);
+        if (parsed.message && parsed.message.content) {
+          res.write('data: ' + JSON.stringify({ content: parsed.message.content }) + '\n\n');
+        }
+      } catch (e) {}
+    }
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (err) {
+    console.error('[AI] Chat error:', err.message);
+    if (!res.writableEnded) {
+      res.write('data: ' + JSON.stringify({ error: 'AI nicht erreichbar. Ist der Windows-PC an?' }) + '\n\n');
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
+  }
+});
+
+app.get('/api/ai/status', authRequired, async (req, res) => {
+  const ollamaUrl = getOllamaUrl();
+  try {
+    const r = await fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    const data = await r.json();
+    const aiModel = getAiModel();
+    const hasModel = data.models?.some(m => m.name.startsWith(aiModel.split(':')[0]));
+    res.json({ online: true, model: aiModel, ready: !!hasModel });
+  } catch {
+    res.json({ online: false });
+  }
 });
 
 app.use((req, res) => {
