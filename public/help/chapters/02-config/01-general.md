@@ -71,6 +71,7 @@ Default values for new users. Users can override these in the settings — perso
 | `buttonStyle` | `string` | `'default'` | Button style: `'default'` (with border) or `'simple'` (flat). |
 | `language` | `string` | `'de'` | Language: `'de'` (German) or `'en'` (English). |
 | `accentColor` | `string` | `'#00d4ff'` | Accent color as hex value. |
+| `borderRadius` | `number` | `1` | Corner rounding: `0` (sharp), `1` (default), `2` (round). |
 
 ### Glow Effect
 
@@ -92,6 +93,7 @@ defaults: {
   buttonStyle: 'default',
   language: 'de',
   accentColor: '#00d4ff',
+  borderRadius: 1,
   glow: { enabled: true, strength: 1 },
   sessionTimeout: { enabled: false, minutes: 5 },
 },
