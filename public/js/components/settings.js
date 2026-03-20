@@ -276,11 +276,15 @@ function createGlowSlider() {
     localStorage.setItem(STORAGE_KEYS.glowStrength, slider.value);
   });
 
-  return el('div', { className: 'glow-control' }, [
-    el('span', { className: 'glow-icon' }, [iconEl('moon', 18)]),
-    slider,
-    el('span', { className: 'glow-icon', style: { color: 'var(--accent)' } }, [iconEl('sun', 18)]),
-  ]);
+  // Glass intensity: thin square (no blur) → layered square (full blur)
+  const lowIcon = document.createElement('span');
+  lowIcon.className = 'glow-icon';
+  lowIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16" rx="4" opacity="0.35"/></svg>';
+  const highIcon = document.createElement('span');
+  highIcon.className = 'glow-icon';
+  highIcon.setAttribute('data-variant', 'high');
+  highIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="6" opacity="0.15"/><rect x="4" y="4" width="16" height="16" rx="4" fill="currentColor" opacity="0.4"/></svg>';
+  return el('div', { className: 'glow-control' }, [lowIcon, slider, highIcon]);
 }
 
 function radiusThumbSvg(scale) {
