@@ -2159,7 +2159,7 @@ label {
 
 .bg-custom-layer {
   position: fixed;
-  inset: 0;
+  inset: -20px;
   z-index: 0;
   background-size: cover;
   background-position: center;
