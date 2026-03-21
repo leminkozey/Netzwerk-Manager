@@ -13,10 +13,10 @@
   --bg-solid: #c8c0e8;
 
   /* Dark glass surfaces — base opacity + slider-controlled bonus */
-  --surface: rgba(30, 25, 50, calc(0.12 + 0.1 * var(--glow-strength)));
-  --surface-solid: rgba(30, 25, 50, calc(0.2 + 0.15 * var(--glow-strength)));
-  --surface-2: rgba(30, 25, 50, calc(0.08 + 0.06 * var(--glow-strength)));
-  --surface-elevated: rgba(30, 25, 50, calc(0.15 + 0.1 * var(--glow-strength)));
+  --surface: rgba(20, 20, 25, calc(0.12 + 0.1 * var(--glow-strength)));
+  --surface-solid: rgba(20, 20, 25, calc(0.2 + 0.15 * var(--glow-strength)));
+  --surface-2: rgba(20, 20, 25, calc(0.08 + 0.06 * var(--glow-strength)));
+  --surface-elevated: rgba(20, 20, 25, calc(0.15 + 0.1 * var(--glow-strength)));
 
   /* Light text on dark glass */
   --text: #f0ecf8;
