@@ -72,16 +72,16 @@
 }
 
 [data-theme='light'] {
-  --bg: linear-gradient(145deg, #e4e0f8 0%, #dce4fb 30%, #f0e8f6 55%, #e0ecfa 100%);
+  --bg: linear-gradient(145deg, rgba(228, 224, 248, 0.85) 0%, rgba(220, 228, 251, 0.85) 30%, rgba(240, 232, 246, 0.85) 55%, rgba(224, 236, 250, 0.85) 100%);
   --bg-solid: #e4e0f8;
-  --surface: rgba(255, 255, 255, calc(0.45 * var(--glow-strength)));
-  --surface-solid: rgba(240, 238, 252, 0.7);
-  --surface-2: rgba(255, 255, 255, calc(0.3 * var(--glow-strength)));
-  --surface-elevated: rgba(255, 255, 255, calc(0.55 * var(--glow-strength)));
+  --surface: rgba(255, 255, 255, calc(0.55 * var(--glow-strength)));
+  --surface-solid: rgba(245, 243, 255, 0.82);
+  --surface-2: rgba(255, 255, 255, calc(0.4 * var(--glow-strength)));
+  --surface-elevated: rgba(255, 255, 255, calc(0.65 * var(--glow-strength)));
 
   --text: #1a1a2e;
-  --text-secondary: #44426a;
-  --text-muted: #7a78a0;
+  --text-secondary: #3a3860;
+  --text-muted: #6a68a0;
 
   --accent: #7c5ce0;
   --accent-rgb: 124 92 224;
@@ -90,13 +90,14 @@
   --accent-warm: #ef4444;
   --accent-warm-rgb: 239 68 68;
 
-  /* Light mode borders: subtle dark lines instead of white-on-white */
-  --border: rgba(100, 80, 160, 0.12);
-  --bg-input: rgba(255, 255, 255, 0.55);
-  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  --glass-inner-bottom: inset 0 -1px 0 rgba(100, 80, 160, 0.06);
-  --shadow-ambient: 0 2px 12px rgba(100, 80, 160, 0.08), var(--glass-inner);
-  --shadow-elevated: 0 8px 32px rgba(100, 80, 160, 0.12), 0 0 0 1px rgba(100, 80, 160, 0.08);
+  /* Light mode borders: visible purple-tinted lines */
+  --border: rgba(80, 60, 140, 0.15);
+  --bg-input: rgba(255, 255, 255, 0.65);
+  --glass-blur: calc(20px * var(--glow-strength));
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --glass-inner-bottom: inset 0 -1px 0 rgba(80, 60, 140, 0.06);
+  --shadow-ambient: 0 2px 12px rgba(80, 60, 140, 0.1), var(--glass-inner);
+  --shadow-elevated: 0 8px 32px rgba(80, 60, 140, 0.15), 0 0 0 1px rgba(80, 60, 140, 0.1);
 
   --blob-1: radial-gradient(circle, rgba(124, 92, 224, 0.2), transparent 70%);
   --blob-2: radial-gradient(circle, rgba(91, 141, 239, 0.16), transparent 70%);
@@ -2194,6 +2195,16 @@ label {
 
 .bg-custom-layer.active {
   opacity: 1;
+}
+
+/* Light mode: wash overlay to lighten dark custom backgrounds */
+[data-theme='light'] .bg-custom-layer.active {
+  filter: blur(var(--bg-blur, 0px)) brightness(calc(var(--bg-brightness, 1) + 0.4)) saturate(0.6);
+}
+
+/* Light mode: extra wash layer via body gradient overlay */
+[data-theme='light'] body {
+  background-blend-mode: normal;
 }
 
 .bg-preset-grid {
