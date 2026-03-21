@@ -89,12 +89,14 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  background: var(--bg-solid);
 }
 
 body {
   margin: 0;
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
-  background: #111;
+  background: var(--bg);
   background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
