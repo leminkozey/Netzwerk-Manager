@@ -4,7 +4,7 @@
 
 import { t, setLanguage, getCurrentLang } from '../i18n.js';
 import { state, defaults, STORAGE_KEYS, getConfig } from '../state.js';
-import { el, applyTheme, applyGlowStrength, applyBorderRadius, applyAccentColor, applyButtonStyle, showToast, showConfirm } from '../ui.js';
+import { el, applyTheme, applyGlowStrength, applyBorderRadius, applyAccentColor, applyButtonStyle, applyBackground, BG_PRESETS, getPresetById, showToast, showConfirm } from '../ui.js';
 import { iconEl } from '../icons.js';
 import * as api from '../api.js';
 import { handleLogout } from '../auth.js';
@@ -161,6 +161,10 @@ function createDesignPanel() {
 
     // Accent Color
     createSettingRow(t('settings.accentColor'), createAccentPicker()),
+
+    // Background
+    el('hr', { className: 'settings-divider' }),
+    createBackgroundSection(),
 
     // Reset
     el('hr', { className: 'settings-divider' }),
@@ -329,6 +333,157 @@ function createRadiusSlider() {
     sharpIcon,
     slider,
     roundIcon,
+  ]);
+}
+
+function createBackgroundSection() {
+  const currentPreset = state.bgPreset || defaults.bgPreset;
+  const currentCustomUrl = state.bgCustomUrl || defaults.bgCustomUrl;
+  const currentBlur = state.bgBlur ?? defaults.bgBlur;
+  const currentBrightness = state.bgBrightness ?? defaults.bgBrightness;
+
+  // Determine effective theme for filtering presets
+  const effectiveTheme = (state.theme === 'system')
+    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : (state.theme || 'dark');
+  const filteredPresets = BG_PRESETS.filter(p => p.forTheme === effectiveTheme || p.forTheme === 'both');
+
+  // Preset grid
+  const presetGrid = el('div', { className: 'bg-preset-grid' },
+    filteredPresets.map(preset =>
+      el('button', {
+        className: `bg-preset-swatch ${preset.id === currentPreset && !currentCustomUrl ? 'active' : ''}`,
+        'data-preset': preset.id,
+        title: preset.name,
+        style: { background: preset.gradient },
+        onClick: () => {
+          // Deactivate custom image
+          applyBackground(preset.id, null, currentBlurSlider.value, currentBrightnessSlider.value);
+          localStorage.setItem(STORAGE_KEYS.bgPreset, preset.id);
+          localStorage.removeItem(STORAGE_KEYS.bgCustomUrl);
+          state.bgCustomUrl = null;
+          // Update active states
+          presetGrid.querySelectorAll('.bg-preset-swatch').forEach(s => {
+            s.classList.toggle('active', s.dataset.preset === preset.id);
+          });
+          removeBtn.style.display = 'none';
+        },
+      })
+    )
+  );
+
+  // Upload button
+  const fileInput = el('input', {
+    type: 'file',
+    accept: 'image/*',
+    style: { display: 'none' },
+  });
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      showToast('Max 25MB', true);
+      return;
+    }
+    const formData = new FormData();
+    formData.append('background', file);
+    try {
+      const token = state.token;
+      const resp = await fetch('/api/background/upload', {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (!resp.ok) throw new Error('Upload failed');
+      const data = await resp.json();
+      const url = data.url + '?t=' + Date.now();
+      applyBackground(state.bgPreset, url, currentBlurSlider.value, currentBrightnessSlider.value);
+      localStorage.setItem(STORAGE_KEYS.bgCustomUrl, url);
+      state.bgCustomUrl = url;
+      presetGrid.querySelectorAll('.bg-preset-swatch').forEach(s => s.classList.remove('active'));
+      removeBtn.style.display = '';
+      showToast(t('msg.saved'));
+    } catch {
+      showToast(t('msg.error'), true);
+    }
+    fileInput.value = '';
+  });
+
+  const uploadBtn = el('button', {
+    className: 'btn secondary',
+    textContent: t('settings.bgUpload'),
+    onClick: () => fileInput.click(),
+  });
+
+  // Remove button
+  const removeBtn = el('button', {
+    className: 'btn danger',
+    textContent: t('settings.bgRemove'),
+    style: { display: currentCustomUrl ? '' : 'none' },
+    onClick: async () => {
+      try {
+        const token = state.token;
+        await fetch('/api/background', {
+          method: 'DELETE',
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+      } catch { /* ignore */ }
+      applyBackground(state.bgPreset, null, currentBlurSlider.value, currentBrightnessSlider.value);
+      localStorage.removeItem(STORAGE_KEYS.bgCustomUrl);
+      state.bgCustomUrl = null;
+      removeBtn.style.display = 'none';
+      // Re-activate preset swatch
+      presetGrid.querySelectorAll('.bg-preset-swatch').forEach(s => {
+        s.classList.toggle('active', s.dataset.preset === state.bgPreset);
+      });
+    },
+  });
+
+  // Blur slider
+  const blurValue = el('span', { className: 'slider-value', textContent: String(currentBlur) });
+  const currentBlurSlider = el('input', {
+    type: 'range',
+    min: '0',
+    max: '20',
+    step: '1',
+    value: String(currentBlur),
+  });
+  currentBlurSlider.addEventListener('input', () => {
+    blurValue.textContent = currentBlurSlider.value;
+    applyBackground(state.bgPreset, state.bgCustomUrl, Number(currentBlurSlider.value), Number(currentBrightnessSlider.value));
+  });
+  currentBlurSlider.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEYS.bgBlur, currentBlurSlider.value);
+  });
+
+  // Brightness slider
+  const brightnessValue = el('span', { className: 'slider-value', textContent: String(currentBrightness) });
+  const currentBrightnessSlider = el('input', {
+    type: 'range',
+    min: '0.3',
+    max: '1.5',
+    step: '0.05',
+    value: String(currentBrightness),
+  });
+  currentBrightnessSlider.addEventListener('input', () => {
+    brightnessValue.textContent = Number(currentBrightnessSlider.value).toFixed(2);
+    applyBackground(state.bgPreset, state.bgCustomUrl, Number(currentBlurSlider.value), Number(currentBrightnessSlider.value));
+  });
+  currentBrightnessSlider.addEventListener('change', () => {
+    localStorage.setItem(STORAGE_KEYS.bgBrightness, currentBrightnessSlider.value);
+  });
+
+  return el('div', { className: 'bg-settings-section' }, [
+    el('h4', { textContent: t('settings.background') }),
+    el('label', { textContent: t('settings.bgPresets'), style: { marginBottom: '6px', display: 'block', color: 'var(--text-secondary)', fontSize: '0.85em' } }),
+    presetGrid,
+    el('div', { className: 'bg-upload-row', style: { marginTop: '12px' } }, [
+      uploadBtn,
+      removeBtn,
+      fileInput,
+    ]),
+    createSettingRow(t('settings.bgBlur'), el('div', { className: 'bg-slider-control' }, [currentBlurSlider, blurValue])),
+    createSettingRow(t('settings.bgBrightness'), el('div', { className: 'bg-slider-control' }, [currentBrightnessSlider, brightnessValue])),
   ]);
 }
 

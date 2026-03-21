@@ -62,6 +62,10 @@ const STORAGE_KEYS = {
   sessionTimeoutEnabled: 'sessionTimeoutEnabled',
   sessionTimeoutMinutes: 'sessionTimeoutMinutes',
   lang: 'lang',
+  bgPreset: 'bgPreset',
+  bgCustomUrl: 'bgCustomUrl',
+  bgBlur: 'bgBlur',
+  bgBrightness: 'bgBrightness',
 };
 
 export { STORAGE_KEYS };
@@ -159,6 +163,10 @@ export const defaults = {
   language: cfgDefaults?.language === 'en' ? 'en' : 'de',
   sessionTimeoutEnabled: cfgDefaults?.sessionTimeout?.enabled !== false,
   sessionTimeoutMinutes: validateTimeout(cfgDefaults?.sessionTimeout?.minutes ?? 5),
+  bgPreset: 'purple',
+  bgCustomUrl: null,
+  bgBlur: 0,
+  bgBrightness: 1,
 };
 
 export function getConfig() {

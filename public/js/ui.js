@@ -92,6 +92,69 @@ export function applyAccentColor(hex) {
   }
 }
 
+// ── Background Presets ──
+const BG_PRESETS = [
+  { id: 'cyan', name: 'Cyan', gradient: 'linear-gradient(145deg, #0a2e3d, #0d3b4a, #1a4a5a, #0a3040)', forTheme: 'dark' },
+  { id: 'purple', name: 'Purple', gradient: 'linear-gradient(145deg, #13111c, #170f28, #0f1525, #151122)', forTheme: 'dark' },
+  { id: 'green', name: 'Green', gradient: 'linear-gradient(145deg, #0a1f15, #0d2818, #152e1a, #0a2212)', forTheme: 'dark' },
+  { id: 'orange', name: 'Orange', gradient: 'linear-gradient(145deg, #1f150a, #28180d, #2e1e15, #22120a)', forTheme: 'dark' },
+  { id: 'pink', name: 'Pink', gradient: 'linear-gradient(145deg, #1f0a1a, #280d22, #2e1528, #220a1f)', forTheme: 'dark' },
+  { id: 'aurora', name: 'Aurora', gradient: 'linear-gradient(145deg, #0a1628, #0f2840, #1a1040, #081830)', forTheme: 'dark' },
+  { id: 'sunset', name: 'Sunset', gradient: 'linear-gradient(145deg, #2d1b0e, #3d1c1c, #1f0a1a, #2a1020)', forTheme: 'dark' },
+  { id: 'ocean', name: 'Ocean', gradient: 'linear-gradient(145deg, #041428, #0a2040, #082838, #061830)', forTheme: 'dark' },
+  { id: 'midnight', name: 'Midnight', gradient: 'linear-gradient(145deg, #08080f, #0c0c18, #080815, #0a0a12)', forTheme: 'dark' },
+  { id: 'lavender', name: 'Lavender', gradient: 'linear-gradient(145deg, #e4e0f8, #dce4fb, #f0e8f6, #e0ecfa)', forTheme: 'light' },
+  { id: 'frost', name: 'Frost', gradient: 'linear-gradient(145deg, #e8ecf5, #dce8fb, #e4e8f8, #d8e4fa)', forTheme: 'light' },
+  { id: 'peach', name: 'Peach', gradient: 'linear-gradient(145deg, #f8e8e0, #fbe4dc, #f6e0e8, #fae0e0)', forTheme: 'light' },
+  { id: 'mint', name: 'Mint', gradient: 'linear-gradient(145deg, #e0f8f0, #dcfbe8, #e8f6e4, #e0fae8)', forTheme: 'light' },
+];
+
+export { BG_PRESETS };
+
+export function getPresetById(id) {
+  return BG_PRESETS.find(p => p.id === id) || BG_PRESETS.find(p => p.id === 'purple');
+}
+
+// ── Background ──
+export function applyBackground(presetId, customUrl, blur, brightness) {
+  const safeBlur = Number.isNaN(Number(blur)) ? 0 : Math.min(20, Math.max(0, Number(blur)));
+  const safeBrightness = Number.isNaN(Number(brightness)) ? 1 : Math.min(1.5, Math.max(0.3, Number(brightness)));
+
+  state.bgPreset = presetId;
+  state.bgCustomUrl = customUrl || null;
+  state.bgBlur = safeBlur;
+  state.bgBrightness = safeBrightness;
+
+  document.documentElement.style.setProperty('--bg-blur', safeBlur + 'px');
+  document.documentElement.style.setProperty('--bg-brightness', String(safeBrightness));
+
+  // Handle custom image layer
+  let layer = document.querySelector('.bg-custom-layer');
+  if (customUrl) {
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'bg-custom-layer';
+      document.body.insertBefore(layer, document.body.firstChild);
+    }
+    layer.style.backgroundImage = `url('${customUrl}')`;
+    layer.classList.add('active');
+  } else {
+    if (layer) {
+      layer.classList.remove('active');
+      layer.style.backgroundImage = '';
+    }
+  }
+
+  // Apply gradient preset (always set, visible under custom image if transparent areas)
+  if (presetId) {
+    const preset = getPresetById(presetId);
+    if (preset) {
+      document.body.style.background = preset.gradient;
+      document.body.style.backgroundAttachment = 'fixed';
+    }
+  }
+}
+
 // ── Button Style ──
 export function applyButtonStyle(style, save = false) {
   state.buttonStyle = style;
@@ -215,6 +278,18 @@ export function loadLocalSettings() {
   applyGlowStrength(savedGlow !== null ? Number(savedGlow) : defaults.glowStrength);
   applyBorderRadius(savedRadius !== null ? Number(savedRadius) : defaults.borderRadius);
   applyAccentColor(savedAccent);
+
+  // Background settings
+  const savedBgPreset = localStorage.getItem(STORAGE_KEYS.bgPreset) || defaults.bgPreset;
+  const savedBgCustomUrl = localStorage.getItem(STORAGE_KEYS.bgCustomUrl) || defaults.bgCustomUrl;
+  const savedBgBlur = localStorage.getItem(STORAGE_KEYS.bgBlur);
+  const savedBgBrightness = localStorage.getItem(STORAGE_KEYS.bgBrightness);
+  applyBackground(
+    savedBgPreset,
+    savedBgCustomUrl,
+    savedBgBlur !== null ? Number(savedBgBlur) : defaults.bgBlur,
+    savedBgBrightness !== null ? Number(savedBgBrightness) : defaults.bgBrightness,
+  );
 
   // Session settings
   const savedTimeoutEnabled = localStorage.getItem(STORAGE_KEYS.sessionTimeoutEnabled);

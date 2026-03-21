@@ -5965,6 +5965,102 @@ app.get('/api/ai/status', authRequired, async (req, res) => {
   }
 });
 
+// ── Background Image Upload ──
+const BACKGROUNDS_DIR = path.join(__dirname, 'public', 'backgrounds');
+const MAX_BG_SIZE = 25 * 1024 * 1024; // 25MB
+
+app.post('/api/background/upload', authRequired, (req, res) => {
+  const contentType = req.headers['content-type'] || '';
+  if (!contentType.includes('multipart/form-data')) {
+    return res.status(400).json({ error: 'multipart/form-data required' });
+  }
+
+  const boundaryMatch = contentType.match(/boundary=(.+?)(?:;|$)/);
+  if (!boundaryMatch) return res.status(400).json({ error: 'No boundary found' });
+  const boundary = boundaryMatch[1];
+
+  const chunks = [];
+  let totalSize = 0;
+
+  req.on('data', chunk => {
+    totalSize += chunk.length;
+    if (totalSize > MAX_BG_SIZE) {
+      req.destroy();
+      return;
+    }
+    chunks.push(chunk);
+  });
+
+  req.on('end', () => {
+    if (totalSize > MAX_BG_SIZE) {
+      return res.status(413).json({ error: 'File too large (max 25MB)' });
+    }
+
+    try {
+      const body = Buffer.concat(chunks);
+      const boundaryBuf = Buffer.from('--' + boundary);
+
+      // Find the file content between boundaries
+      let start = body.indexOf(boundaryBuf);
+      if (start === -1) return res.status(400).json({ error: 'Invalid multipart data' });
+
+      start = body.indexOf(Buffer.from('\r\n\r\n'), start);
+      if (start === -1) return res.status(400).json({ error: 'Invalid multipart data' });
+      start += 4; // skip \r\n\r\n
+
+      const end = body.indexOf(Buffer.from('\r\n--' + boundary), start);
+      if (end === -1) return res.status(400).json({ error: 'Invalid multipart data' });
+
+      const fileData = body.slice(start, end);
+
+      // Detect file extension from header
+      const headerPart = body.slice(0, start).toString('utf8');
+      let ext = 'jpg';
+      if (headerPart.includes('image/png')) ext = 'png';
+      else if (headerPart.includes('image/webp')) ext = 'webp';
+      else if (headerPart.includes('image/gif')) ext = 'gif';
+
+      // Ensure backgrounds directory exists
+      if (!fs.existsSync(BACKGROUNDS_DIR)) {
+        fs.mkdirSync(BACKGROUNDS_DIR, { recursive: true });
+      }
+
+      // Remove any existing custom-bg files
+      const existing = fs.readdirSync(BACKGROUNDS_DIR).filter(f => f.startsWith('custom-bg.'));
+      for (const f of existing) {
+        try { fs.unlinkSync(path.join(BACKGROUNDS_DIR, f)); } catch { /* ignore */ }
+      }
+
+      const filename = `custom-bg.${ext}`;
+      fs.writeFileSync(path.join(BACKGROUNDS_DIR, filename), fileData);
+
+      res.json({ url: `/backgrounds/${filename}` });
+    } catch (err) {
+      console.error('[BG] Upload error:', err.message);
+      res.status(500).json({ error: 'Upload failed' });
+    }
+  });
+
+  req.on('error', () => {
+    res.status(500).json({ error: 'Upload failed' });
+  });
+});
+
+app.delete('/api/background', authRequired, (req, res) => {
+  try {
+    if (fs.existsSync(BACKGROUNDS_DIR)) {
+      const files = fs.readdirSync(BACKGROUNDS_DIR).filter(f => f.startsWith('custom-bg.'));
+      for (const f of files) {
+        try { fs.unlinkSync(path.join(BACKGROUNDS_DIR, f)); } catch { /* ignore */ }
+      }
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[BG] Delete error:', err.message);
+    res.status(500).json({ error: 'Delete failed' });
+  }
+});
+
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

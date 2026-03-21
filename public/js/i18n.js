@@ -392,6 +392,14 @@ const translations = {
     'settings.totpStepScan': 'Scannen',
     'settings.totpStepVerify': 'Bestätigen',
     'settings.totpCopied': 'Schlüssel kopiert!',
+
+    // Background
+    'settings.background': 'Hintergrund',
+    'settings.bgBlur': 'Unschärfe',
+    'settings.bgBrightness': 'Helligkeit',
+    'settings.bgUpload': 'Bild hochladen',
+    'settings.bgRemove': 'Entfernen',
+    'settings.bgPresets': 'Vorlagen',
   },
 
   en: {
@@ -778,6 +786,14 @@ const translations = {
     'settings.totpStepScan': 'Scan',
     'settings.totpStepVerify': 'Confirm',
     'settings.totpCopied': 'Key copied!',
+
+    // Background
+    'settings.background': 'Background',
+    'settings.bgBlur': 'Blur',
+    'settings.bgBrightness': 'Brightness',
+    'settings.bgUpload': 'Upload Image',
+    'settings.bgRemove': 'Remove',
+    'settings.bgPresets': 'Presets',
   },
 };
 

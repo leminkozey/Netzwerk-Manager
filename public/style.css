@@ -64,6 +64,11 @@
   /* Blobs */
   --blob-1: radial-gradient(circle, rgba(124, 92, 224, 0.12), transparent 70%);
   --blob-2: radial-gradient(circle, rgba(91, 141, 239, 0.08), transparent 70%);
+
+  /* Custom Background */
+  --bg-image: none;
+  --bg-blur: 0px;
+  --bg-brightness: 1;
 }
 
 [data-theme='light'] {
@@ -2165,6 +2170,97 @@ label {
   border-color: var(--text);
   transform: scale(1.1);
   box-shadow: 0 0 0 3px var(--surface-2);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Custom Background Layer & Preset Picker
+   ═══════════════════════════════════════════════════════════════════ */
+
+.bg-custom-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(var(--bg-blur, 0px)) brightness(var(--bg-brightness, 1));
+  transition: filter 0.3s ease, opacity 0.3s ease;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.bg-custom-layer.active {
+  opacity: 1;
+}
+
+.bg-preset-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bg-preset-swatch {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  padding: 0;
+}
+
+.bg-preset-swatch:hover {
+  transform: scale(1.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.bg-preset-swatch.active {
+  border-color: var(--accent);
+  transform: scale(1.08);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.bg-upload-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bg-slider-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.bg-slider-control input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+
+.bg-slider-control input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.bg-slider-control .slider-value {
+  min-width: 32px;
+  text-align: right;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  font-family: 'Space Mono', monospace;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
