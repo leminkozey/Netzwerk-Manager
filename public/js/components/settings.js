@@ -334,40 +334,64 @@ function createRadiusSlider() {
 }
 
 function createBackgroundSection() {
-  const currentPreset = state.bgPreset || defaults.bgPreset;
   const currentCustomUrl = state.bgCustomUrl || defaults.bgCustomUrl;
   const currentBlur = state.bgBlur ?? defaults.bgBlur;
   const currentBrightness = state.bgBrightness ?? defaults.bgBrightness;
 
-  // Determine effective theme for filtering presets
-  const effectiveTheme = (state.theme === 'system')
-    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-    : (state.theme || 'dark');
-  const filteredPresets = BG_PRESETS.filter(p => p.forTheme === effectiveTheme || p.forTheme === 'both');
+  // History grid — load from server
+  const historyGrid = el('div', { className: 'bg-preset-grid' });
 
-  // Preset grid
-  const presetGrid = el('div', { className: 'bg-preset-grid' },
-    filteredPresets.map(preset =>
-      el('button', {
-        className: `bg-preset-swatch ${preset.id === currentPreset && !currentCustomUrl ? 'active' : ''}`,
-        'data-preset': preset.id,
-        title: preset.name,
-        style: { background: preset.gradient },
-        onClick: () => {
-          // Deactivate custom image
-          applyBackground(preset.id, null, currentBlurSlider.value, currentBrightnessSlider.value);
-          localStorage.setItem(STORAGE_KEYS.bgPreset, preset.id);
-          localStorage.removeItem(STORAGE_KEYS.bgCustomUrl);
-          state.bgCustomUrl = null;
-          // Update active states
-          presetGrid.querySelectorAll('.bg-preset-swatch').forEach(s => {
-            s.classList.toggle('active', s.dataset.preset === preset.id);
+  function refreshHistory() {
+    const token = state.token;
+    fetch('/api/backgrounds', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => r.json())
+      .then(urls => {
+        historyGrid.innerHTML = '';
+        urls.forEach(url => {
+          const thumb = el('button', {
+            className: `bg-preset-swatch ${state.bgCustomUrl?.startsWith(url) ? 'active' : ''}`,
+            style: { backgroundImage: `url('${url}')`, backgroundSize: 'cover', backgroundPosition: 'center' },
+            title: url.split('/').pop(),
+            onClick: () => {
+              const fullUrl = url + '?t=' + Date.now();
+              applyBackground(null, fullUrl, currentBlurSlider.value, currentBrightnessSlider.value);
+              localStorage.setItem(STORAGE_KEYS.bgCustomUrl, fullUrl);
+              state.bgCustomUrl = fullUrl;
+              historyGrid.querySelectorAll('.bg-preset-swatch').forEach(s => s.classList.remove('active'));
+              thumb.classList.add('active');
+              removeBtn.style.display = '';
+            },
           });
-          removeBtn.style.display = 'none';
-        },
+
+          // Delete button on each thumbnail
+          const delBtn = el('button', {
+            className: 'bg-thumb-delete',
+            textContent: '×',
+            onClick: (e) => {
+              e.stopPropagation();
+              const token = state.token;
+              fetch('/api/background?url=' + encodeURIComponent(url), {
+                method: 'DELETE',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+              }).then(() => {
+                thumb.remove();
+                if (state.bgCustomUrl?.startsWith(url)) {
+                  applyBackground(null, null, currentBlurSlider.value, currentBrightnessSlider.value);
+                  localStorage.removeItem(STORAGE_KEYS.bgCustomUrl);
+                  state.bgCustomUrl = null;
+                  removeBtn.style.display = 'none';
+                }
+              });
+            },
+          });
+          thumb.style.position = 'relative';
+          thumb.appendChild(delBtn);
+          historyGrid.appendChild(thumb);
+        });
       })
-    )
-  );
+      .catch(() => {});
+  }
+  refreshHistory();
 
   // Upload button
   const fileInput = el('input', {
@@ -394,11 +418,11 @@ function createBackgroundSection() {
       if (!resp.ok) throw new Error('Upload failed');
       const data = await resp.json();
       const url = data.url + '?t=' + Date.now();
-      applyBackground(state.bgPreset, url, currentBlurSlider.value, currentBrightnessSlider.value);
+      applyBackground(null, url, currentBlurSlider.value, currentBrightnessSlider.value);
       localStorage.setItem(STORAGE_KEYS.bgCustomUrl, url);
       state.bgCustomUrl = url;
-      presetGrid.querySelectorAll('.bg-preset-swatch').forEach(s => s.classList.remove('active'));
       removeBtn.style.display = '';
+      refreshHistory();
       showToast(t('msg.saved'));
     } catch {
       showToast(t('msg.error'), true);
@@ -412,27 +436,17 @@ function createBackgroundSection() {
     onClick: () => fileInput.click(),
   });
 
-  // Remove button
+  // Remove current bg (don't delete file, just deactivate)
   const removeBtn = el('button', {
     className: 'btn danger',
     textContent: t('settings.bgRemove'),
     style: { display: currentCustomUrl ? '' : 'none' },
-    onClick: async () => {
-      try {
-        const token = state.token;
-        await fetch('/api/background', {
-          method: 'DELETE',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-      } catch { /* ignore */ }
-      applyBackground(state.bgPreset, null, currentBlurSlider.value, currentBrightnessSlider.value);
+    onClick: () => {
+      applyBackground(null, null, currentBlurSlider.value, currentBrightnessSlider.value);
       localStorage.removeItem(STORAGE_KEYS.bgCustomUrl);
       state.bgCustomUrl = null;
       removeBtn.style.display = 'none';
-      // Re-activate preset swatch
-      presetGrid.querySelectorAll('.bg-preset-swatch').forEach(s => {
-        s.classList.toggle('active', s.dataset.preset === state.bgPreset);
-      });
+      historyGrid.querySelectorAll('.bg-preset-swatch').forEach(s => s.classList.remove('active'));
     },
   });
 
@@ -472,7 +486,8 @@ function createBackgroundSection() {
 
   return el('div', { className: 'bg-settings-section' }, [
     el('h4', { textContent: t('settings.background') }),
-    el('div', { className: 'bg-upload-row', style: { marginTop: '8px' } }, [
+    historyGrid,
+    el('div', { className: 'bg-upload-row', style: { marginTop: '10px' } }, [
       uploadBtn,
       removeBtn,
       fileInput,

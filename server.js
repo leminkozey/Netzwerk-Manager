@@ -6025,13 +6025,8 @@ app.post('/api/background/upload', authRequired, (req, res) => {
         fs.mkdirSync(BACKGROUNDS_DIR, { recursive: true });
       }
 
-      // Remove any existing custom-bg files
-      const existing = fs.readdirSync(BACKGROUNDS_DIR).filter(f => f.startsWith('custom-bg.'));
-      for (const f of existing) {
-        try { fs.unlinkSync(path.join(BACKGROUNDS_DIR, f)); } catch { /* ignore */ }
-      }
-
-      const filename = `custom-bg.${ext}`;
+      // Save with timestamp (keep history)
+      const filename = `bg-${Date.now()}.${ext}`;
       fs.writeFileSync(path.join(BACKGROUNDS_DIR, filename), fileData);
 
       res.json({ url: `/backgrounds/${filename}` });
@@ -6046,13 +6041,33 @@ app.post('/api/background/upload', authRequired, (req, res) => {
   });
 });
 
+// List all background images (history)
+app.get('/api/backgrounds', authRequired, (req, res) => {
+  try {
+    if (!fs.existsSync(BACKGROUNDS_DIR)) return res.json([]);
+    const files = fs.readdirSync(BACKGROUNDS_DIR)
+      .filter(f => /\.(jpg|jpeg|png|webp|gif)$/i.test(f))
+      .sort((a, b) => {
+        // Sort newest first by extracting timestamp from filename
+        const ta = parseInt(a.replace(/\D/g, '')) || 0;
+        const tb = parseInt(b.replace(/\D/g, '')) || 0;
+        return tb - ta;
+      })
+      .map(f => `/backgrounds/${f}`);
+    res.json(files);
+  } catch (err) {
+    console.error('[BG] List error:', err.message);
+    res.json([]);
+  }
+});
+
+// Delete a specific background image
 app.delete('/api/background', authRequired, (req, res) => {
   try {
-    if (fs.existsSync(BACKGROUNDS_DIR)) {
-      const files = fs.readdirSync(BACKGROUNDS_DIR).filter(f => f.startsWith('custom-bg.'));
-      for (const f of files) {
-        try { fs.unlinkSync(path.join(BACKGROUNDS_DIR, f)); } catch { /* ignore */ }
-      }
+    const url = req.query.url || '';
+    const filename = path.basename(url);
+    if (filename && fs.existsSync(path.join(BACKGROUNDS_DIR, filename))) {
+      fs.unlinkSync(path.join(BACKGROUNDS_DIR, filename));
     }
     res.json({ ok: true });
   } catch (err) {
