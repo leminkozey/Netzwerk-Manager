@@ -71,13 +71,16 @@
   --bg-brightness: 1;
 }
 
+/* ─── LIGHT MODE: Mirror dark mode glass logic, just brighter ─── */
 [data-theme='light'] {
-  --bg: linear-gradient(145deg, rgba(228, 224, 248, 0.85) 0%, rgba(220, 228, 251, 0.85) 30%, rgba(240, 232, 246, 0.85) 55%, rgba(224, 236, 250, 0.85) 100%);
+  --bg: linear-gradient(145deg, #e4e0f8 0%, #dce4fb 30%, #f0e8f6 55%, #e0ecfa 100%);
   --bg-solid: #e4e0f8;
-  --surface: rgba(255, 255, 255, calc(0.55 * var(--glow-strength)));
-  --surface-solid: rgba(245, 243, 255, 0.82);
-  --surface-2: rgba(255, 255, 255, calc(0.4 * var(--glow-strength)));
-  --surface-elevated: rgba(255, 255, 255, calc(0.65 * var(--glow-strength)));
+
+  /* Same glass logic as dark: white at low opacity + blur = glass */
+  --surface: rgba(255, 255, 255, calc(0.4 * var(--glow-strength)));
+  --surface-solid: rgba(255, 255, 255, calc(0.55 * var(--glow-strength)));
+  --surface-2: rgba(255, 255, 255, calc(0.25 * var(--glow-strength)));
+  --surface-elevated: rgba(255, 255, 255, calc(0.5 * var(--glow-strength)));
 
   --text: #1a1a2e;
   --text-secondary: #3a3860;
@@ -90,14 +93,14 @@
   --accent-warm: #ef4444;
   --accent-warm-rgb: 239 68 68;
 
-  /* Light mode borders: visible purple-tinted lines */
-  --border: rgba(80, 60, 140, 0.15);
-  --bg-input: rgba(255, 255, 255, 0.65);
-  --glass-blur: calc(20px * var(--glow-strength));
-  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  --glass-inner-bottom: inset 0 -1px 0 rgba(80, 60, 140, 0.06);
-  --shadow-ambient: 0 2px 12px rgba(80, 60, 140, 0.1), var(--glass-inner);
-  --shadow-elevated: 0 8px 32px rgba(80, 60, 140, 0.15), 0 0 0 1px rgba(80, 60, 140, 0.1);
+  /* Borders: same as dark mode — white lines, subtle */
+  --border: rgba(255, 255, 255, 0.5);
+  --bg-input: rgba(255, 255, 255, 0.4);
+  --glass-blur: calc(24px * var(--glow-strength));
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --glass-inner-bottom: inset 0 -1px 0 rgba(255, 255, 255, 0.15);
+  --shadow-ambient: 0 2px 8px rgba(0, 0, 0, 0.04), var(--glass-inner);
+  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.06), var(--glass-inner);
 
   --blob-1: radial-gradient(circle, rgba(124, 92, 224, 0.2), transparent 70%);
   --blob-2: radial-gradient(circle, rgba(91, 141, 239, 0.16), transparent 70%);
@@ -2774,14 +2777,7 @@ label {
   background: rgb(var(--accent-rgb) / 0.35);
 }
 
-/* Light mode scrollbars */
-[data-theme='light'] ::-webkit-scrollbar-thumb {
-  background: rgba(100, 80, 160, 0.15);
-}
-
-[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 80, 160, 0.3);
-}
+/* Scrollbar stays accent-tinted in both modes */
 
 /* ═══════════════════════════════════════════════════════════════════
    Selection
@@ -5779,29 +5775,19 @@ input[type='text'].terminal-cmd-input:focus-visible {
    Light Mode Overrides
    ═══════════════════════════════════════════════════════════════════ */
 
+/* ─── LIGHT MODE OVERRIDES (minimal — variables handle most) ─── */
+
+/* Tables: slightly visible row lines */
 [data-theme='light'] .table th,
 [data-theme='light'] .table td {
-  border-bottom-color: rgba(0, 0, 0, 0.06);
+  border-bottom-color: rgba(0, 0, 0, 0.05);
 }
 
 [data-theme='light'] .table tbody tr:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(255, 255, 255, 0.3);
 }
 
-[data-theme='light'] .inline-input {
-  background: var(--bg-input);
-  border-color: var(--border);
-}
-
-[data-theme='light'] .inline-input:focus {
-  background: var(--surface);
-}
-
-[data-theme='light'] .pc-info-item {
-  background: var(--surface-2);
-  border-color: var(--border);
-}
-
+/* Alerts keep their semantic colors */
 [data-theme='light'] .alert {
   color: #a23030;
   background: rgba(220, 38, 38, 0.08);
@@ -5812,180 +5798,31 @@ input[type='text'].terminal-cmd-input:focus-visible {
   background: rgba(34, 197, 94, 0.08);
 }
 
-[data-theme='light'] .icon-badge {
-  background: rgba(124, 92, 224, 0.06);
-  border-color: var(--border);
-}
-
-[data-theme='light'] .color-input::-webkit-color-swatch {
-  border-color: rgba(0, 0, 0, 0.15);
-}
-
-[data-theme='light'] #settingsOverlay {
-  background: rgba(100, 80, 160, 0.2);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-[data-theme='light'] .overlay {
-  background: rgba(100, 80, 160, 0.15);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-[data-theme='light'] .service-field {
-  border-bottom-color: var(--border);
-}
-
-[data-theme='light'] .service-input {
-  background: var(--bg-input);
-  border-color: var(--border);
-}
-
-[data-theme='light'] .service-input:focus {
-  background: var(--surface);
-}
-
-[data-theme='light'] .service-field .copy-btn {
-  background: var(--surface-2);
-  border-color: var(--border);
-}
-
-[data-theme='light'] .card-links {
-  border-top-color: var(--border);
-}
-
-[data-theme='light'] .card-link-btn {
-  background: rgb(var(--accent-rgb) / 0.08);
-}
-
-/* Terminal light mode */
+/* Terminal: readable dark text on glass */
 [data-theme='light'] .terminal-container {
-  background: rgba(246, 248, 252, 0.6);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  border-color: var(--border);
-  box-shadow: var(--shadow-elevated);
+  background: rgba(255, 255, 255, 0.35);
 }
 
-[data-theme='light'] .terminal-header {
-  background: var(--surface-elevated);
-  border-bottom-color: var(--border);
-}
+[data-theme='light'] .terminal-output { color: #1a1a2e; }
+[data-theme='light'] .terminal-line-cmd { color: #1a1a2e; }
+[data-theme='light'] .terminal-line.stdout { color: #1a1a2e; }
+[data-theme='light'] .terminal-line.stderr { color: #cf222e; }
+[data-theme='light'] .terminal-line.error { color: #cf222e; }
+[data-theme='light'] .terminal-line.reconnected { color: #1a7f37; }
+[data-theme='light'] .terminal-input-line { background: var(--surface); }
+[data-theme='light'] .terminal-cmd-input { color: #1a1a2e; caret-color: var(--accent); }
 
-[data-theme='light'] .terminal-header-title {
-  color: var(--text-muted);
-}
-
-[data-theme='light'] .terminal-timer {
-  color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.05);
-}
-
-[data-theme='light'] .terminal-timer.warn {
-  background: rgba(249, 115, 22, 0.1);
-}
-
-[data-theme='light'] .terminal-timer.critical {
-  background: rgba(239, 68, 68, 0.1);
-}
-
-[data-theme='light'] .terminal-header-btn {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--text);
-  border-color: var(--border);
-}
-
-[data-theme='light'] .terminal-header-btn:hover {
-  background: rgba(0, 0, 0, 0.08);
-  border-color: var(--border);
-}
-
-[data-theme='light'] .terminal-header-btn.danger {
-  color: #cf222e;
-  border-color: rgba(207, 34, 46, 0.15);
-}
-
-[data-theme='light'] .terminal-header-btn.danger:hover {
-  background: rgba(207, 34, 46, 0.08);
-}
-
-[data-theme='light'] .terminal-output {
-  color: #1a1a1a;
-  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
-}
-
-[data-theme='light'] .terminal-output::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
-}
-
-[data-theme='light'] .terminal-output::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-[data-theme='light'] .terminal-line-prompt {
-  color: var(--accent);
-}
-
-[data-theme='light'] .terminal-line-cmd {
-  color: #1a1a1a;
-}
-
-[data-theme='light'] .terminal-line.stdout {
-  color: #1a1a1a;
-}
-
-[data-theme='light'] .terminal-line.stderr {
-  color: #cf222e;
-}
-
-[data-theme='light'] .terminal-line.error {
-  color: #cf222e;
-}
-
-[data-theme='light'] .terminal-line.loading {
-  color: var(--text-muted);
-}
-
-[data-theme='light'] .terminal-line.reconnected {
-  color: #1a7f37;
-}
-
-[data-theme='light'] .terminal-welcome {
-  border-bottom-color: var(--border);
-}
-
-[data-theme='light'] .terminal-welcome-info {
-  color: var(--text-muted);
-}
-
-[data-theme='light'] .terminal-input-line {
-  background: #f6f8fa;
-  border-top-color: var(--border);
-}
-
-[data-theme='light'] .terminal-cmd-input {
-  color: #1a1a1a;
-  caret-color: var(--accent);
-}
-
+/* Dangerous command styling */
 [data-theme='light'] .dangerous-command {
   background: rgba(207, 34, 46, 0.06);
   border-color: rgba(207, 34, 46, 0.15);
   color: #cf222e;
 }
 
-[data-theme='light'] .sudo-approval-overlay {
-  background: rgba(0, 0, 0, 0.4);
-}
-
-[data-theme='light'] .dangerous-overlay {
-  background: rgba(0, 0, 0, 0.5);
-}
-
+/* Selection */
 [data-theme='light'] ::selection {
-  background: var(--accent);
-  color: #fff;
+  background: rgb(var(--accent-rgb) / 0.2);
+  color: var(--text);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
