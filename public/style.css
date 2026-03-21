@@ -94,7 +94,7 @@ html {
 body {
   margin: 0;
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
-  background: var(--bg);
+  background: #111;
   background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
@@ -2159,7 +2159,7 @@ label {
 
 .bg-custom-layer {
   position: fixed;
-  inset: -20px;
+  inset: -60px;
   z-index: 0;
   background-size: cover;
   background-position: center;
