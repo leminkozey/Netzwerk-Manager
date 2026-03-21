@@ -8,9 +8,9 @@
 :root {
   --glow-strength: 1;
 
-  /* Solid dark background — no gradients */
-  --bg: #111111;
-  --bg-solid: #111111;
+  /* Solid black background */
+  --bg: #0a0a0a;
+  --bg-solid: #0a0a0a;
 
   /* Dark glass surfaces — base opacity + slider-controlled bonus */
   --surface: rgba(20, 20, 25, calc(0.12 + 0.1 * var(--glow-strength)));
@@ -84,7 +84,7 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
-  background: #111111;
+  background: #0a0a0a;
   overscroll-behavior: none;
 }
 

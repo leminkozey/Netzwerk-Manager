@@ -472,9 +472,7 @@ function createBackgroundSection() {
 
   return el('div', { className: 'bg-settings-section' }, [
     el('h4', { textContent: t('settings.background') }),
-    el('label', { textContent: t('settings.bgPresets'), style: { marginBottom: '6px', display: 'block', color: 'var(--text-secondary)', fontSize: '0.85em' } }),
-    presetGrid,
-    el('div', { className: 'bg-upload-row', style: { marginTop: '12px' } }, [
+    el('div', { className: 'bg-upload-row', style: { marginTop: '8px' } }, [
       uploadBtn,
       removeBtn,
       fileInput,
