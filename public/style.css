@@ -73,12 +73,6 @@
   --bg-brightness: 1;
 }
 
-/* [data-theme='light'] removed — :root IS the only mode now */
-
-  --blob-1: none;
-  --blob-2: none;
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    Base & Reset
    ═══════════════════════════════════════════════════════════════════ */
@@ -91,13 +85,18 @@ html {
   scroll-behavior: smooth;
   overflow-x: hidden;
   background: #111111;
+  overscroll-behavior: none;
+}
+
+html, body {
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
 }
 
 body {
   margin: 0;
   font-family: 'Outfit', system-ui, -apple-system, sans-serif;
   background: var(--bg);
-  background-attachment: fixed;
   color: var(--text);
   min-height: 100vh;
   line-height: 1.5;
@@ -109,14 +108,7 @@ body {
 
 /* Noise texture overlay */
 body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9999;
-  opacity: 0.4;
-  mix-blend-mode: overlay;
+  display: none;
 }
 
 /* Animated gradient blobs */

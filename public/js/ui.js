@@ -150,7 +150,6 @@ export function applyBackground(presetId, customUrl, blur, brightness) {
     const preset = getPresetById(presetId);
     if (preset) {
       document.body.style.background = preset.gradient;
-      document.body.style.backgroundAttachment = 'fixed';
     }
   }
 }
