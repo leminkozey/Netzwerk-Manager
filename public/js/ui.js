@@ -53,7 +53,7 @@ export function applyTheme(theme, save = false) {
 // ── Glow ──
 export function applyGlowStrength(value) {
   const n = Number(value);
-  const safe = Number.isNaN(n) ? defaults.glowStrength : Math.min(2, Math.max(0, n));
+  const safe = Number.isNaN(n) ? defaults.glowStrength : Math.min(2, Math.max(0.5, n));
   state.glowStrength = safe;
   document.documentElement.style.setProperty('--glow-strength', String(safe));
   document.body.style.setProperty('--glow-strength', String(safe));

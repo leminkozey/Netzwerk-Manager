@@ -255,7 +255,7 @@ function createGlowSlider() {
   const slider = el('input', {
     type: 'range',
     className: 'glow-slider',
-    min: '0',
+    min: '0.5',
     max: '2',
     step: '0.1',
     value: String(currentGlow),
