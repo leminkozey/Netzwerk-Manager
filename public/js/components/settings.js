@@ -134,9 +134,6 @@ function createDesignPanel() {
   const panel = el('div', { className: 'settings-panel active', id: 'panel-design' }, [
     el('h4', { textContent: t('settings.design'), 'data-i18n': 'settings.design' }),
 
-    // Theme
-    createSettingRow(t('settings.theme'), createThemeSwitcher()),
-
     // Button Style
     createSettingRow(t('settings.buttonStyle'), createToggleGroup('buttonStyle', [
       { value: 'default', label: t('settings.default') },

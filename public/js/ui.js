@@ -267,7 +267,7 @@ export async function copyToClipboard(text) {
 
 // ── Load All Local Settings ──
 export function loadLocalSettings() {
-  const savedTheme = localStorage.getItem(STORAGE_KEYS.theme) || defaults.theme;
+  const savedTheme = 'light'; // Force light mode (dark glass on light bg)
   const savedButtonStyle = localStorage.getItem(STORAGE_KEYS.buttonStyle) || defaults.buttonStyle;
   const savedGlow = localStorage.getItem(STORAGE_KEYS.glowStrength);
   const savedAccent = localStorage.getItem(STORAGE_KEYS.accent) || defaults.accent;
