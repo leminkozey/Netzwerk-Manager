@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Light Mode Glassmorphism — Approaches</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Outfit', sans-serif;
+    background: #0a0a12;
+    color: #e8e4f0;
+    padding: 40px 20px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #7c5ce0, #5b8def, #c084fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #8a86a0;
+    font-size: 14px;
+    margin-bottom: 40px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .approach {
+    border-radius: 20px;
+    overflow: hidden;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .approach:hover {
+    border-color: rgba(124, 92, 224, 0.4);
+    transform: translateY(-4px);
+  }
+
+  .approach.selected {
+    border-color: #7c5ce0;
+    box-shadow: 0 0 30px rgba(124, 92, 224, 0.3);
+  }
+
+  .preview {
+    height: 320px;
+    position: relative;
+    overflow: hidden;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Noise on all previews */
+  .preview::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: overlay;
+  }
+
+  .mock-topbar {
+    border-radius: 12px;
+    padding: 10px 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .mock-card {
+    border-radius: 16px;
+    padding: 18px;
+    flex: 1;
+  }
+
+  .mock-card h3 {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .mock-card p {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .mock-row {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .mock-btn {
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .info {
+    padding: 16px 20px;
+    background: rgba(255,255,255,0.03);
+  }
+
+  .info h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .info p {
+    font-size: 12px;
+    color: #8a86a0;
+    line-height: 1.6;
+  }
+
+  .tag {
+    display: inline-block;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(124,92,224,0.15);
+    color: #a78bfa;
+    margin-top: 8px;
+  }
+
+  /* ═══ APPROACH A: Frosted White ═══ */
+  .preview-a {
+    background: linear-gradient(145deg, #e4e0f8, #dce4fb, #f0e8f6, #e0ecfa);
+  }
+  .preview-a .mock-topbar {
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.6);
+    color: #1a1a2e;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .preview-a .mock-card {
+    background: rgba(255,255,255,0.45);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.55);
+    color: #1a1a2e;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.7);
+  }
+  .preview-a .mock-card p { color: #5a587a; }
+  .preview-a .mock-btn {
+    background: linear-gradient(135deg, #7c5ce0, #5b8def);
+    color: white;
+    box-shadow: 0 4px 12px rgba(124,92,224,0.25);
+  }
+
+  /* ═══ APPROACH B: Tinted Glass (Purple Tint) ═══ */
+  .preview-b {
+    background: linear-gradient(145deg, #d8d0f0, #c8d4f8, #e0d0f0, #d0dcf8);
+  }
+  .preview-b::before {
+    content: '';
+    position: absolute;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,92,224,0.25), transparent 70%);
+    top: -60px; right: -40px;
+    filter: blur(40px);
+  }
+  .preview-b .mock-topbar {
+    background: rgba(220, 215, 240, 0.55);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(200, 190, 230, 0.4);
+    color: #1a1a2e;
+    box-shadow: 0 2px 8px rgba(100,80,160,0.06);
+  }
+  .preview-b .mock-card {
+    background: rgba(230, 225, 248, 0.5);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(200, 190, 230, 0.35);
+    color: #1a1a2e;
+    box-shadow: 0 4px 16px rgba(100,80,160,0.06), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .preview-b .mock-card p { color: #4a4870; }
+  .preview-b .mock-btn {
+    background: linear-gradient(135deg, #7c5ce0, #5b8def);
+    color: white;
+    box-shadow: 0 4px 12px rgba(124,92,224,0.3);
+  }
+
+  /* ═══ APPROACH C: Dark Glass on Light BG ═══ */
+  .preview-c {
+    background: linear-gradient(145deg, #f0ecff, #e8f0ff, #f4ecf8, #eaf2ff);
+  }
+  .preview-c::before {
+    content: '';
+    position: absolute;
+    width: 250px; height: 250px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(91,141,239,0.2), transparent 70%);
+    bottom: -80px; left: -40px;
+    filter: blur(50px);
+  }
+  .preview-c .mock-topbar {
+    background: rgba(20, 18, 35, 0.08);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(20, 18, 35, 0.06);
+    color: #1a1a2e;
+  }
+  .preview-c .mock-card {
+    background: rgba(20, 18, 35, 0.06);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(20, 18, 35, 0.05);
+    color: #1a1a2e;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+  }
+  .preview-c .mock-card p { color: #5a587a; }
+  .preview-c .mock-btn {
+    background: linear-gradient(135deg, #7c5ce0, #5b8def);
+    color: white;
+    box-shadow: 0 4px 12px rgba(124,92,224,0.2);
+  }
+
+  /* ═══ APPROACH D: Inverted Dark Mode ═══ */
+  .preview-d {
+    background: linear-gradient(145deg, #18152a, #1c1435, #141828, #1a1530);
+  }
+  .preview-d::before {
+    content: '';
+    position: absolute;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(124,92,224,0.15), transparent 70%);
+    top: -50px; right: -30px;
+    filter: blur(50px);
+  }
+  .preview-d .mock-topbar {
+    background: rgba(255,255,255,0.07);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #e8e4f0;
+  }
+  .preview-d .mock-card {
+    background: rgba(255,255,255,0.05);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: #e8e4f0;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .preview-d .mock-card p { color: #a8a4be; }
+  .preview-d .mock-btn {
+    background: linear-gradient(135deg, #7c5ce0, #5b8def);
+    color: white;
+    box-shadow: 0 4px 16px rgba(124,92,224,0.35);
+  }
+
+  .vote-btn {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    text-align: center;
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    background: none;
+    color: #8a86a0;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .vote-btn:hover { color: #e8e4f0; background: rgba(124,92,224,0.08); }
+  .approach.selected .vote-btn { color: #7c5ce0; }
+</style>
+</head>
+<body>
+
+<h1>Light Mode Glassmorphism</h1>
+<p class="subtitle">Vier Ansätze — klick auf deinen Favoriten</p>
+
+<div class="grid">
+
+  <!-- A: Frosted White -->
+  <div class="approach" data-choice="a" onclick="document.querySelectorAll('.approach').forEach(a=>a.classList.remove('selected'));this.classList.add('selected')">
+    <div class="preview preview-a">
+      <div class="mock-topbar">Local Network</div>
+      <div class="mock-row">
+        <div class="mock-card">
+          <h3>Info Center</h3>
+          <p>Network details and device config for your homelab.</p>
+        </div>
+        <div class="mock-card">
+          <h3>Analytics</h3>
+          <p>Speedtest, uptime monitoring and ping stats.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="mock-btn">Control Center</div>
+      </div>
+    </div>
+    <div class="info">
+      <h3>A — Frosted White</h3>
+      <p>Klassisch. Weiße Glass-Panels mit hoher Opacity. Clean, Apple-like. Borders sind weiße Linien. Subtil aber safe.</p>
+      <span class="tag">SAFE CHOICE</span>
+    </div>
+    <button class="vote-btn">Auswählen</button>
+  </div>
+
+  <!-- B: Tinted Glass -->
+  <div class="approach" data-choice="b" onclick="document.querySelectorAll('.approach').forEach(a=>a.classList.remove('selected'));this.classList.add('selected')">
+    <div class="preview preview-b">
+      <div class="mock-topbar">Local Network</div>
+      <div class="mock-row">
+        <div class="mock-card">
+          <h3>Info Center</h3>
+          <p>Network details and device config for your homelab.</p>
+        </div>
+        <div class="mock-card">
+          <h3>Analytics</h3>
+          <p>Speedtest, uptime monitoring and ping stats.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="mock-btn">Control Center</div>
+      </div>
+    </div>
+    <div class="info">
+      <h3>B — Purple Tinted Glass</h3>
+      <p>Lila-getönte Glass-Panels statt reinem Weiß. Background ist dunkler/saturierter. Mehr Personality, unique. Borders sind lila-getönt.</p>
+      <span class="tag">EMPFEHLUNG</span>
+    </div>
+    <button class="vote-btn">Auswählen</button>
+  </div>
+
+  <!-- C: Dark Glass on Light -->
+  <div class="approach" data-choice="c" onclick="document.querySelectorAll('.approach').forEach(a=>a.classList.remove('selected'));this.classList.add('selected')">
+    <div class="preview preview-c">
+      <div class="mock-topbar">Local Network</div>
+      <div class="mock-row">
+        <div class="mock-card">
+          <h3>Info Center</h3>
+          <p>Network details and device config for your homelab.</p>
+        </div>
+        <div class="mock-card">
+          <h3>Analytics</h3>
+          <p>Speedtest, uptime monitoring and ping stats.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="mock-btn">Control Center</div>
+      </div>
+    </div>
+    <div class="info">
+      <h3>C — Smoked Glass</h3>
+      <p>Invertiert: dunkle Glass-Panels auf hellem Background. Wie getöntes Autoglas. Keine Borders nötig — der Kontrast reicht. Mutig.</p>
+      <span class="tag">BOLD</span>
+    </div>
+    <button class="vote-btn">Auswählen</button>
+  </div>
+
+  <!-- D: Keep Dark -->
+  <div class="approach" data-choice="d" onclick="document.querySelectorAll('.approach').forEach(a=>a.classList.remove('selected'));this.classList.add('selected')">
+    <div class="preview preview-d">
+      <div class="mock-topbar">Local Network</div>
+      <div class="mock-row">
+        <div class="mock-card">
+          <h3>Info Center</h3>
+          <p>Network details and device config for your homelab.</p>
+        </div>
+        <div class="mock-card">
+          <h3>Analytics</h3>
+          <p>Speedtest, uptime monitoring and ping stats.</p>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="mock-btn">Control Center</div>
+      </div>
+    </div>
+    <div class="info">
+      <h3>D — Kein Light Mode</h3>
+      <p>Fuck it — nur Dark Mode. Der Dark Mode sieht gut aus, warum sich mit Light abmühen? Das ist ein Network Dashboard, kein Instagram.</p>
+      <span class="tag">PRAGMATISCH</span>
+    </div>
+    <button class="vote-btn">Auswählen</button>
+  </div>
+
+</div>
+
+</body>
+</html>

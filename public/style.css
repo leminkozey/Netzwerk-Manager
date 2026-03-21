@@ -71,20 +71,22 @@
   --bg-brightness: 1;
 }
 
-/* ─── LIGHT MODE: Mirror dark mode glass logic, just brighter ─── */
+/* ─── LIGHT MODE: Dark glass on light background (macOS Dock style) ─── */
 [data-theme='light'] {
-  --bg: linear-gradient(145deg, #e4e0f8 0%, #dce4fb 30%, #f0e8f6 55%, #e0ecfa 100%);
-  --bg-solid: #e4e0f8;
+  /* Light gradient background — the wallpaper */
+  --bg: linear-gradient(145deg, #c8c0e8 0%, #b8c8f0 30%, #d8c0e0 55%, #b8d0f0 100%);
+  --bg-solid: #c8c0e8;
 
-  /* Same glass logic as dark: white at low opacity + blur = glass */
-  --surface: rgba(255, 255, 255, calc(0.4 * var(--glow-strength)));
-  --surface-solid: rgba(255, 255, 255, calc(0.55 * var(--glow-strength)));
-  --surface-2: rgba(255, 255, 255, calc(0.25 * var(--glow-strength)));
-  --surface-elevated: rgba(255, 255, 255, calc(0.5 * var(--glow-strength)));
+  /* Dark glass surfaces — same as dark mode, slightly more opaque */
+  --surface: rgba(30, 25, 50, calc(0.18 * var(--glow-strength)));
+  --surface-solid: rgba(30, 25, 50, calc(0.35 * var(--glow-strength)));
+  --surface-2: rgba(30, 25, 50, calc(0.12 * var(--glow-strength)));
+  --surface-elevated: rgba(30, 25, 50, calc(0.22 * var(--glow-strength)));
 
-  --text: #1a1a2e;
-  --text-secondary: #3a3860;
-  --text-muted: #6a68a0;
+  /* Light text on dark glass */
+  --text: #f0ecf8;
+  --text-secondary: #c8c4d8;
+  --text-muted: #8a86a0;
 
   --accent: #7c5ce0;
   --accent-rgb: 124 92 224;
@@ -93,17 +95,17 @@
   --accent-warm: #ef4444;
   --accent-warm-rgb: 239 68 68;
 
-  /* Borders: same as dark mode — white lines, subtle */
-  --border: rgba(255, 255, 255, 0.5);
-  --bg-input: rgba(255, 255, 255, 0.4);
+  /* Same border logic as dark: thin white lines */
+  --border: rgba(255, 255, 255, 0.1);
+  --bg-input: rgba(0, 0, 0, 0.12);
   --glass-blur: calc(24px * var(--glow-strength));
-  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  --glass-inner-bottom: inset 0 -1px 0 rgba(255, 255, 255, 0.15);
-  --shadow-ambient: 0 2px 8px rgba(0, 0, 0, 0.04), var(--glass-inner);
-  --shadow-elevated: 0 8px 24px rgba(0, 0, 0, 0.06), var(--glass-inner);
+  --glass-inner: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-inner-bottom: inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-ambient: 0 2px 8px rgba(0, 0, 0, 0.15), var(--glass-inner);
+  --shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.2), var(--glass-inner);
 
-  --blob-1: radial-gradient(circle, rgba(124, 92, 224, 0.2), transparent 70%);
-  --blob-2: radial-gradient(circle, rgba(91, 141, 239, 0.16), transparent 70%);
+  --blob-1: radial-gradient(circle, rgba(124, 92, 224, 0.25), transparent 70%);
+  --blob-2: radial-gradient(circle, rgba(91, 141, 239, 0.2), transparent 70%);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2200,14 +2202,9 @@ label {
   opacity: 1;
 }
 
-/* Light mode: wash overlay to lighten dark custom backgrounds */
+/* Light mode: slightly brighter custom bg since panels are dark glass */
 [data-theme='light'] .bg-custom-layer.active {
-  filter: blur(var(--bg-blur, 0px)) brightness(calc(var(--bg-brightness, 1) + 0.4)) saturate(0.6);
-}
-
-/* Light mode: extra wash layer via body gradient overlay */
-[data-theme='light'] body {
-  background-blend-mode: normal;
+  filter: blur(var(--bg-blur, 0px)) brightness(calc(var(--bg-brightness, 1) + 0.15)) saturate(1.1);
 }
 
 .bg-preset-grid {
@@ -5775,55 +5772,15 @@ input[type='text'].terminal-cmd-input:focus-visible {
    Light Mode Overrides
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ─── LIGHT MODE OVERRIDES (minimal — variables handle most) ─── */
+/* ─── LIGHT MODE OVERRIDES (minimal — dark glass = same as dark mode) ─── */
 
-/* Tables: slightly visible row lines */
-[data-theme='light'] .table th,
-[data-theme='light'] .table td {
-  border-bottom-color: rgba(0, 0, 0, 0.05);
-}
+/* Light mode uses dark glass like macOS Dock, so almost no overrides needed.
+   Text stays light, surfaces stay dark-tinted, only bg is lighter. */
 
-[data-theme='light'] .table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.3);
-}
-
-/* Alerts keep their semantic colors */
-[data-theme='light'] .alert {
-  color: #a23030;
-  background: rgba(220, 38, 38, 0.08);
-}
-
-[data-theme='light'] .success {
-  color: #1e8a54;
-  background: rgba(34, 197, 94, 0.08);
-}
-
-/* Terminal: readable dark text on glass */
-[data-theme='light'] .terminal-container {
-  background: rgba(255, 255, 255, 0.35);
-}
-
-[data-theme='light'] .terminal-output { color: #1a1a2e; }
-[data-theme='light'] .terminal-line-cmd { color: #1a1a2e; }
-[data-theme='light'] .terminal-line.stdout { color: #1a1a2e; }
-[data-theme='light'] .terminal-line.stderr { color: #cf222e; }
-[data-theme='light'] .terminal-line.error { color: #cf222e; }
-[data-theme='light'] .terminal-line.reconnected { color: #1a7f37; }
-[data-theme='light'] .terminal-input-line { background: var(--surface); }
-[data-theme='light'] .terminal-cmd-input { color: #1a1a2e; caret-color: var(--accent); }
-
-/* Dangerous command styling */
-[data-theme='light'] .dangerous-command {
-  background: rgba(207, 34, 46, 0.06);
-  border-color: rgba(207, 34, 46, 0.15);
-  color: #cf222e;
-}
-
-/* Selection */
-[data-theme='light'] ::selection {
-  background: rgb(var(--accent-rgb) / 0.2);
-  color: var(--text);
-}
+/* Terminal stderr/error stay red */
+[data-theme='light'] .terminal-line.stderr { color: #ff6b6b; }
+[data-theme='light'] .terminal-line.error { color: #ff6b6b; }
+[data-theme='light'] .terminal-line.reconnected { color: #34d399; }
 
 /* ═══════════════════════════════════════════════════════════════════
    Reduced Motion – disable GPU-heavy effects for low-power devices
