@@ -1472,7 +1472,7 @@ label {
   display: none;
   position: fixed;
   inset: 0;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.2);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   z-index: 1000;
@@ -2596,7 +2596,7 @@ label {
 .overlay {
   position: fixed;
   inset: 0;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.2);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   display: none;
