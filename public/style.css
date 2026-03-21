@@ -1537,7 +1537,9 @@ label {
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: var(--surface-2);
+  background: var(--surface);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
@@ -5827,9 +5829,11 @@ input[type='text'].terminal-cmd-input:focus-visible {
   width: 52px;
   height: 52px;
   border-radius: var(--radius-xl);
-  background: var(--accent-gradient);
-  color: #fff;
-  border: none;
+  background: var(--surface);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border);
+  color: var(--accent);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -6022,9 +6026,11 @@ input[type='text'].terminal-cmd-input:focus-visible {
 }
 
 .ai-send-btn {
-  background: var(--accent-gradient);
-  color: #fff;
-  border: none;
+  background: var(--surface);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  color: var(--accent);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 8px 12px;
   cursor: pointer;
