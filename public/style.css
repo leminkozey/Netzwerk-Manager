@@ -8,9 +8,9 @@
 :root {
   --glow-strength: 1;
 
-  /* Light gradient background */
-  --bg: linear-gradient(145deg, #c8c0e8 0%, #b8c8f0 30%, #d8c0e0 55%, #b8d0f0 100%);
-  --bg-solid: #c8c0e8;
+  /* Solid dark background — no gradients */
+  --bg: #111111;
+  --bg-solid: #111111;
 
   /* Dark glass surfaces — base opacity + slider-controlled bonus */
   --surface: rgba(20, 20, 25, calc(0.12 + 0.1 * var(--glow-strength)));
@@ -75,8 +75,8 @@
 
 /* [data-theme='light'] removed — :root IS the only mode now */
 
-  --blob-1: radial-gradient(circle, rgba(124, 92, 224, 0.25), transparent 70%);
-  --blob-2: radial-gradient(circle, rgba(91, 141, 239, 0.2), transparent 70%);
+  --blob-1: none;
+  --blob-2: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -90,7 +90,7 @@
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
-  background: var(--bg-solid);
+  background: #111111;
 }
 
 body {
@@ -121,18 +121,7 @@ body::before {
 
 /* Animated gradient blobs */
 body::after {
-  content: '';
-  position: fixed;
-  width: 500px;
-  height: 500px;
-  border-radius: 50%;
-  filter: blur(80px);
-  background: var(--blob-1);
-  top: -120px;
-  right: -80px;
-  pointer-events: none;
-  z-index: 0;
-  animation: blobFloat 14s ease-in-out infinite;
+  display: none;
 }
 
 @keyframes blobFloat {
