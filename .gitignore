@@ -47,4 +47,8 @@ pids/
 *.swp
 *.swo
 *.code-workspace
+
+# claude code
 CLAUDE.md
+.claude/
+.superpowers/
