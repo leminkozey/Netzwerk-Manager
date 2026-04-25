@@ -1,0 +1,83 @@
+{
+  "title": "Network Manager Help",
+  "version": "v5.1.0",
+  "accent": "#00d4ff",
+  "chapters": [
+    {
+      "id": "getting-started",
+      "title": "Getting Started",
+      "file": "chapters/01-getting-started.md"
+    },
+    {
+      "id": "configuration",
+      "title": "Configuration",
+      "children": [
+        {
+          "id": "general",
+          "title": "General",
+          "file": "chapters/02-config/01-general.md"
+        },
+        {
+          "id": "landing-page",
+          "title": "Landing Page",
+          "file": "chapters/02-config/02-landing-page.md"
+        },
+        {
+          "id": "info-center",
+          "title": "Info Center",
+          "file": "chapters/02-config/03-info-center.md"
+        },
+        {
+          "id": "control-center",
+          "title": "Control Center",
+          "file": "chapters/02-config/04-control-center.md"
+        },
+        {
+          "id": "analytics",
+          "title": "Analytics Center",
+          "file": "chapters/02-config/05-analytics.md"
+        },
+        {
+          "id": "web-terminal",
+          "title": "Web Terminal",
+          "file": "chapters/02-config/06-web-terminal.md"
+        },
+        {
+          "id": "notifications",
+          "title": "Email Notifications",
+          "file": "chapters/02-config/07-notifications.md"
+        },
+        {
+          "id": "ai-chat",
+          "title": "AI Chat",
+          "file": "chapters/02-config/08-ai-chat.md"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "title": "Security",
+      "file": "chapters/03-security.md"
+    },
+    {
+      "id": "user-management",
+      "title": "User Management",
+      "file": "chapters/04-user-management.md"
+    },
+    {
+      "id": "architecture",
+      "title": "Architecture & Deploy",
+      "file": "chapters/05-architecture.md"
+    },
+    {
+      "id": "api",
+      "title": "API Reference",
+      "file": "chapters/06-api.md"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting & FAQ",
+      "file": "chapters/07-troubleshooting.md"
+    }
+  ]
+}

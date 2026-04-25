@@ -24,6 +24,12 @@ The full docs ship with the app:
 
 - Run the server, open `http://localhost:5055/help/`
 - Or browse the source: [`public/help/chapters/`](public/help/chapters/)
+- Or read it without installing — preview locally:
+  ```bash
+  cd docs && python3 -m http.server 8082
+  # open http://localhost:8082
+  ```
+  (When GitHub Pages is enabled on this repo with source `main` / `/docs`, the same site is served at `https://leminkozey.github.io/Netzwerk-Manager/`.)
 
 Topics covered:
 
