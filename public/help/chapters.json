@@ -1,6 +1,6 @@
 {
   "title": "Network Manager Help",
-  "version": "v1.0.0",
+  "version": "v5.1.0",
   "accent": "#00d4ff",
   "chapters": [
     {
@@ -63,6 +63,21 @@
       "id": "user-management",
       "title": "User Management",
       "file": "chapters/04-user-management.md"
+    },
+    {
+      "id": "architecture",
+      "title": "Architecture & Deploy",
+      "file": "chapters/05-architecture.md"
+    },
+    {
+      "id": "api",
+      "title": "API Reference",
+      "file": "chapters/06-api.md"
+    },
+    {
+      "id": "troubleshooting",
+      "title": "Troubleshooting & FAQ",
+      "file": "chapters/07-troubleshooting.md"
     }
   ]
 }

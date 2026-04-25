@@ -1,51 +1,106 @@
 # Getting Started
 
-Network Manager is a web application for managing, documenting, and controlling your local network.
+Network Manager is a self-hosted web application for documenting, monitoring, and remote-controlling devices on your local network. It's designed to run on a Raspberry Pi (or any small Linux box) as a single Node.js service on port 5055.
 
-## Features
+## What you can do with it
 
-- **Configurable Info Center** – Define custom sections, cards, and fields via config (tables + info cards with password encryption, copy buttons, and links)
-- **Port Documentation** – Label switch and router ports (which cable goes where)
-- **Speed Test** – Measure download, upload, and ping on the local network
-- **Device Info / Uptime Monitoring** – Monitor devices via ping with live status, optionally CPU load, RAM, and temperature via SSH or locally
-- **Control Center** – Control devices via Wake-on-LAN, SSH shutdown, and SSH restart
-- **Service / Container Management** – Start, stop, and restart systemd services, PM2 processes, and Docker containers (locally and remotely via SSH)
-- **WOL Schedule** – Automatic startup and shutdown of devices on a configurable schedule (cron-based)
-- **Pi-hole DNS Analytics** – Statistics, top domains, and query history directly in the dashboard
-- **Pi-hole Blocking Toggle** – Pause and resume DNS blocking with one click
-- **Web Terminal** – Execute SSH commands directly in the browser (TOTP 2FA required)
-- **Email Notifications** – Automatic emails on device outages and security events via SMTP
-- **Data Export/Import** – Full backup as JSON
-- **Multi-Language** – German and English
-- **Theming** – Dark, light, and system theme with customizable accent color
-- **Ping Monitor** – Latency measurement to external hosts with live chart and statistics
-- **AI Chat** – Floating chat widget on the landing page, connects to a local Ollama-compatible AI server with automatic network context
-- **Remote Update** – Update directly from the settings with configurable commands
+- **Document the network** — port assignments on your switch/router, IPs, passwords, WiFi data, all the things you forget after six months
+- **Monitor devices** — live ping, CPU, RAM, temperature via SSH or locally
+- **Remote control** — Wake-on-LAN, shutdown, restart, scheduled wake/sleep
+- **Service management** — start/stop systemd services, PM2 processes, Docker containers (locally and over SSH)
+- **Pi-hole integration** — DNS analytics, blocking toggle, query stats
+- **Web Terminal** — TOTP-protected SSH shell in the browser
+- **Email alerts** — outage notifications, security events
+- **AI Chat** — local Ollama model with full network context as a floating widget
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) (version 18 or higher)
-- A web browser
-- `sshpass` installed on the server (only needed for web terminal and SSH-based features)
+| Requirement | Notes |
+|-------------|-------|
+| Node.js 18+ | LTS recommended |
+| A web browser | Anything modern |
+| `sshpass` | Only for web terminal and SSH features (`apt install sshpass` / `brew install sshpass`) |
 
 ## Installation
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Create configuration:
-   ```bash
-   cp public/config.example.js public/config.js
-   ```
-4. Customize `public/config.js` (see the Configuration chapters)
-5. Start the server:
-   ```bash
-   node server.js
-   ```
-6. Open in browser: `http://localhost:5055`
+```bash
+# 1. Clone
+git clone https://github.com/leminkozey/Netzwerk-Manager.git
+cd Netzwerk-Manager
 
-> **Tip:** Always copy `config.example.js` as a starting point. It contains all available options with detailed comments and sensible example values. Then adjust IPs, passwords, and devices to match your network.
+# 2. Install
+npm install
 
-> **Updates:** When pulling new versions, `config.example.js` may change (new features, new options). After an update, compare your `config.js` with the current `config.example.js` and adopt new sections as needed. Your `config.js` will not be overwritten by updates.
+# 3. Create config from template
+cp public/config.example.js public/config.js
+
+# 4. Start
+node server.js
+```
+
+Open `http://localhost:5055` in your browser. Default credentials are `admin` / `admin` — change them immediately under Settings → User.
+
+> **Tip:** Always start from `config.example.js`. It contains every available option with comments and sane defaults. Tweak IPs, passwords, and devices to match your setup.
+
+## Updates
+
+When you pull a new version, `config.example.js` may have new options. Compare it against your `config.js` and merge in what you need. Your `config.js` is gitignored and never overwritten.
+
+```bash
+git pull
+npm install         # only if package.json changed
+# diff your config.js against config.example.js, port new options over
+sudo systemctl restart netzwerk-manager   # or pm2 restart, etc.
+```
+
+## Running on a Raspberry Pi
+
+The project ships with a low-memory start option for Pi-class hardware:
+
+```json
+"scripts": {
+  "start": "node --max-old-space-size=256 server.js"
+}
+```
+
+Recommended deploy: `systemd` unit named `netzwerk-manager.service` listening on port 5055. Auto-deploy is typically wired up as a cron job that polls `git fetch` every 2 minutes and restarts the service on new commits.
+
+Example systemd unit (`/etc/systemd/system/netzwerk-manager.service`):
+
+```ini
+[Unit]
+Description=Network Manager
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/srv/netzwerk-manager
+ExecStart=/usr/bin/node --max-old-space-size=256 server.js
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable netzwerk-manager
+sudo systemctl start netzwerk-manager
+sudo journalctl -u netzwerk-manager -f
+```
+
+## Where data lives
+
+| Path | What's there | Backed up? |
+|------|--------------|-----------|
+| `Data/users.json` | Account credentials (PBKDF2-hashed) | Yes via export |
+| `Data/devices.json` | Device configs + encrypted SSH passwords | Yes |
+| `Data/InfoCards.json` | Info Center field values | Yes |
+| `Data/portHistory.json` | Port scan history | Yes |
+| `Data/totp.json` | Encrypted TOTP secrets | Yes |
+| `Data/sessions.json` | Active sessions | No (transient) |
+| `Data/terminal-audit.json` | Audit log of terminal commands | Yes |
+| `public/config.js` | Your runtime config | Manual |
+
+The whole `Data/` folder is gitignored. Use Settings → Data → Export for a JSON snapshot.
