@@ -1,5 +1,10 @@
 # Network Manager
 
+[![Version](https://img.shields.io/github/v/release/leminkozey/Netzwerk-Manager?label=release&color=22d3ee)](https://github.com/leminkozey/Netzwerk-Manager/releases)
+[![License: ISC](https://img.shields.io/badge/license-ISC-22d3ee)](#license)
+[![Docs](https://img.shields.io/badge/docs-online-22d3ee)](https://leminkozey.github.io/Netzwerk-Manager/)
+[![Node](https://img.shields.io/badge/node-%E2%89%A518-22d3ee)](https://nodejs.org)
+
 Self-hosted dashboard to document, monitor, and remote-control devices on your local network. Designed to run on a Raspberry Pi as a single Node.js service on port 5055.
 
 ## Quick install
@@ -20,16 +25,12 @@ Port docs, Wake-on-LAN, SSH-based stats and control, Pi-hole DNS analytics, web 
 
 ## Documentation
 
-The full docs ship with the app:
+**📖 Read online: <https://leminkozey.github.io/Netzwerk-Manager/>**
+
+The full docs also ship with the app:
 
 - Run the server, open `http://localhost:5055/help/`
 - Or browse the source: [`public/help/chapters/`](public/help/chapters/)
-- Or read it without installing — preview locally:
-  ```bash
-  cd docs && python3 -m http.server 8082
-  # open http://localhost:8082
-  ```
-  (When GitHub Pages is enabled on this repo with source `main` / `/docs`, the same site is served at `https://leminkozey.github.io/Netzwerk-Manager/`.)
 
 Topics covered:
 
