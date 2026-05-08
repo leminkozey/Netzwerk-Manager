@@ -21,7 +21,7 @@ Open `http://localhost:5055` and log in with `admin` / `admin`. Change the passw
 
 ## What's inside
 
-Port docs, Wake-on-LAN, SSH-based stats and control, Pi-hole DNS analytics, web terminal with TOTP 2FA, email notifications, AI chat with full network context. The full feature list, configuration reference, API docs, and troubleshooting are in the embedded help book.
+Port docs, Wake-on-LAN, SSH-based stats and control, Pi-hole integration with DNS analytics, web terminal with TOTP 2FA, email notifications, AI chat with full network context. The full feature list, configuration reference, API docs, and troubleshooting are in the embedded help book.
 
 ## Documentation
 
